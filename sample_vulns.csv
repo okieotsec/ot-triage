@@ -1,0 +1,35 @@
+id,name,cvss,threat,asset,exposure,patch,controls,expected
+PLC-01,Rockwell PLC web server RCE,9.8,active,crown,high,available,none,NOW
+HMI-02,HMI remote desktop flaw,8.8,public,important,high,available,none,NOW
+HIST-03,Historian SQL injection,7.5,public,standard,medium,available,none,NEXT
+FW-04,Perimeter firewall auth bypass,9.1,none,crown,high,available,none,NOW
+SW-05,Access switch DoS,5.3,none,standard,low,available,none,NEVER
+ENG-06,Engineering workstation priv esc,7.8,none,important,low,available,none,NEXT
+HMI-07,HMI remote desktop flaw (segmented),8.8,public,important,high,available,strong,NEXT
+RTU-08,EOL RTU firmware overflow,9.0,none,crown,medium,eol,none,NOW
+RTU-09,EOL RTU firmware overflow (isolated),9.0,none,crown,medium,eol,strong,NEXT
+CAM-10,EOL camera RCE (ACLs only),8.1,none,standard,low,eol,partial,NEXT
+CAM-11,EOL camera RCE (isolated),8.1,none,standard,low,eol,strong,NEXT
+GW-12,Gateway RCE - vendor fix pending,8.0,public,important,high,pending,none,NOW
+GW-13,Gateway info leak - vendor fix pending,6.5,public,standard,high,pending,none,NOW
+GW-14,Gateway info leak - pending + controls,6.5,public,standard,high,pending,strong,NEXT
+PRT-15,Print server exploited in the wild,9.0,active,standard,low,available,none,NEXT
+PRT-16,Print server exploited (strong controls),9.0,active,standard,low,available,strong,NEXT
+PRT-17,Print server exploited (partial controls),9.0,active,standard,low,available,partial,NEXT
+SRV-18,App server public exploit (partial controls),7.5,public,standard,high,available,partial,NEXT
+SRV-19,Low severity but exploited crown jewel,2.1,active,crown,high,available,none,NEXT
+SRV-20,Low severity unpatched,3.0,none,standard,low,pending,none,NEVER
+SRV-21,Medium severity unpatched,4.0,none,standard,low,pending,none,NEXT
+ALI-22,Alias values test,9.8,active,crown_jewel,internet,available,none,NOW
+LBL-23,Full dropdown labels test,8.0,Public exploit available,Important asset,High exposure (internet connected),Patch available,"Strong (e.g. segmentation, virtual patching, allow-listing)",NEXT
+MIX-24,Case and whitespace test, 7.0 , PUBLIC ,Standard,HIGH,,,NOW
+OPT-25,Optional columns left blank,7.2,none,important,medium,,,NEXT
+BAD-26,Invalid CVSS (nan),nan,none,standard,low,available,none,ERROR
+BAD-27,CVSS out of range,11,none,standard,low,available,none,ERROR
+BAD-28,Missing required threat,6.0,,standard,low,available,none,ERROR
+BAD-29,Unknown asset value,6.0,none,mega critical,low,available,none,ERROR
+BAD-30,Non-numeric CVSS,high,none,standard,low,available,none,ERROR
+BAD-31,Several problems at once,abc,maybe,standard,sideways,available,none,ERROR
+"=HYPERLINK(""http://example.com"",""click"")",Spreadsheet formula in the id column,6.0,none,standard,low,available,none,NEVER
+,,,,,,,,
+FIN-33,"Name with, a comma",6.8,public,standard,low,available,none,NEXT
