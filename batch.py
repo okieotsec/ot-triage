@@ -5,11 +5,14 @@ Optional columns: id, name, patch (default: available), controls (default: none)
 Extra columns are ignored. Enum cells accept short aliases or the full dropdown labels.
 """
 import csv
+import os
 from dataclasses import dataclass, field
 
 from prioritizer import (Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Result, Threat,
                          parse_cvss, prioritize)
 
+MAX_FILE_BYTES = 25 * 1024 * 1024
+MAX_ROWS = 50_000
 REQUIRED = ["cvss", "threat", "asset", "exposure"]
 DEFAULTS = {"patch": Patch.AVAILABLE, "controls": Controls.NONE}
 FIELD_ENUMS = {"threat": Threat, "asset": Asset, "exposure": Exposure, "patch": Patch, "controls": Controls}
@@ -89,6 +92,8 @@ def _norm_header(name):
 
 def read_rows(path):
     """Return [(line_number, {normalized_header: stripped_value})], skipping fully blank rows."""
+    if os.path.getsize(path) > MAX_FILE_BYTES:
+        raise ValueError(f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
     with open(path, newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
         try:
@@ -96,6 +101,9 @@ def read_rows(path):
         except StopIteration:
             raise ValueError("The file is empty") from None
         columns = [_norm_header(h) for h in header]
+        duplicates = sorted({c for c in columns if c and columns.count(c) > 1})
+        if duplicates:
+            raise ValueError(f"Duplicate column(s): {', '.join(duplicates)}")
         missing = [c for c in REQUIRED if c not in columns]
         if missing:
             raise ValueError(f"Missing required column(s): {', '.join(missing)}. "
@@ -106,6 +114,8 @@ def read_rows(path):
                 continue
             row = {col: (cells[i].strip() if i < len(cells) else "") for i, col in enumerate(columns)}
             rows.append((reader.line_num, row))
+            if len(rows) > MAX_ROWS:
+                raise ValueError(f"The file has more than {MAX_ROWS:,} data rows")
         return rows
 
 
