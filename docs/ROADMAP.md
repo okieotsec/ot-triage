@@ -6,7 +6,7 @@ Approved 2026-10-07. This page records what is planned, in what order, and why.
 
 1. **Baseline and Part 1 fixes** (done). A tagged baseline lets every later change be compared. The small fixes were done first because they are low risk.
 2. **Policy decisions** (done, see [POLICY.md](POLICY.md)). The rules had to be settled before anything else was built on top of them.
-3. **Scoring settings, core only (no screen yet).** The rule code takes its numbers from one settings object. This makes later features simple, and it makes the threat-data work and the new GUI use the same values.
+3. **Scoring settings, core only (no screen yet).** The rule code takes its numbers from one settings object. This makes later features simple, and it makes the threat-data work and the new GUI use the same values. *(done: see [SETTINGS.md](SETTINGS.md))*
 4. **Threat-data layer (KEV and EPSS), no screen yet.** Download, import from file, validation and storage come first, with the security checkpoint CP2 after it.
 5. **New GUI, built once** on top of steps 3 and 4, then a settings tab. Building the GUI last avoids building it twice.
 

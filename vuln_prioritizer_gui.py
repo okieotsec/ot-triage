@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 import tkinter.font as tkfont
 
 import batch
+import settings as scoring_settings
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss, prioritize
 
 # Palette
@@ -56,6 +57,8 @@ class VulnerabilityPrioritizer:
         self.family = tkfont.nametofont("TkDefaultFont").actual("family")
         self._init_styles()
         self._summary = ""
+        loaded = scoring_settings.load()
+        self.settings = loaded.settings
 
         self._build_header()
         body = tk.Frame(root, bg=BG)
@@ -76,6 +79,9 @@ class VulnerabilityPrioritizer:
             var.trace_add("write", self._update)
         self._update()
         self.cvss_entry.focus_set()
+        if loaded.warnings:
+            root.after(200, lambda: messagebox.showwarning("Scoring settings", "\n\n".join(loaded.warnings),
+                                                           parent=root))
 
     def font(self, size, weight="normal"):
         return (self.family, size, weight)
@@ -140,6 +146,9 @@ class VulnerabilityPrioritizer:
                  font=self.font(10), bg=HEADER, fg=MUTED).pack(anchor="w", padx=24, pady=(2, 14))
         tk.Frame(header, bg=ACCENT, height=3).pack(fill=tk.X)
         self._button(header, "Batch import (CSV)", self.open_batch).place(relx=1.0, x=-24, y=22, anchor="ne")
+        if not self.settings.is_default:
+            tk.Label(header, text="Custom scoring", font=self.font(9, "bold"), bg=PRIORITY_COLORS["NEXT"], fg=BG,
+                     padx=10, pady=4).place(relx=1.0, x=-24, y=66, anchor="ne")
 
     def _button(self, parent, text, command, **kwargs):
         btn = tk.Button(parent, text=text, command=command, font=self.font(10, "bold"), bg=ACCENT, fg=BG,
@@ -154,7 +163,7 @@ class VulnerabilityPrioritizer:
         if not path:
             return
         try:
-            items = batch.process_file(path)
+            items = batch.process_file(path, self.settings)
         except (OSError, UnicodeDecodeError, csv.Error, ValueError) as e:
             messagebox.showerror("Batch import failed", str(e), parent=self.root)
             return
@@ -264,6 +273,7 @@ class VulnerabilityPrioritizer:
             Exposure(self.exposure_var.get()),
             Controls(self.controls_var.get()),
             Patch(self.patch_var.get()),
+            self.settings,
         )
         color = PRIORITY_COLORS[res.priority]
         headline, sub = PRIORITY_TEXT[res.priority]
@@ -279,6 +289,7 @@ class VulnerabilityPrioritizer:
                          f"Ordering score: {res.score:.2f}/10\n"
                          f"Action: {res.action}\n\n"
                          "Inputs:\n" + "\n".join(f"- {i}" for i in res.inputs)
+                         + f"\n- Scoring settings: {res.profile}"
                          + "\n\nRationale:\n" + "\n".join(f"- {r}" for r in res.reasons))
         self.copy_btn.config(state="normal")
 
@@ -403,7 +414,8 @@ class BatchWindow:
         lines = [f"Source line {item.line}: {label}"]
         if item.result:
             lines += ([f"Action: {item.result.action}"] + [f"•  {r}" for r in item.result.reasons]
-                      + ["Inputs: " + "; ".join(item.result.inputs)])
+                      + ["Inputs: " + "; ".join(item.result.inputs),
+                         "Scoring settings: " + item.result.profile])
         else:
             lines += [f"•  {part}" for part in item.error.split("; ")]
         self.detail.config(state="normal")

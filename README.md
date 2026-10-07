@@ -39,6 +39,8 @@ For the reasoning behind each rule, see [docs/POLICY.md](docs/POLICY.md).
 
 The **ordering score** (0 to 10) only ranks items within a bucket; it never decides the bucket.
 
+Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [docs/SETTINGS.md](docs/SETTINGS.md). Values shown above are the defaults.
+
 **Low exposure** means no routable path from IT or the internet, verified by testing, not assumed from a firewall's existence.
 
 ## Batch CSV
@@ -52,6 +54,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 ## Documentation
 
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
+- [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned work, order and design decisions
 
 ## Security testing

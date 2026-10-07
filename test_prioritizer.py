@@ -2,6 +2,7 @@ import itertools
 import unittest
 
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, NOW, NEXT, NEVER, parse_cvss, prioritize
+from settings import DEFAULT_SETTINGS, Settings
 
 
 def p(cvss, threat, asset, exposure, controls=False, patch=Patch.AVAILABLE):
@@ -191,28 +192,35 @@ WORSENING = {
     "patch": [Patch.AVAILABLE, Patch.PENDING, Patch.EOL],
 }
 CVSS_GRID = [x / 10 for x in range(0, 101, 5)]
+SETTINGS_SAMPLE = [DEFAULT_SETTINGS, Settings(cvss_high=5.0, cvss_critical=8.0),
+                   Settings(cvss_high=8.0, cvss_critical=8.5), Settings(cvss_high=6.5, cvss_critical=10.0),
+                   Settings(cvss_high=7.5, cvss_critical=9.5), Settings(cvss_high=5.0, cvss_critical=10.0)]
 
 
-def rank(cvss, args):
-    result = prioritize(cvss, args["threat"], args["asset"], args["exposure"], args["controls"], args["patch"])
+def rank(cvss, args, config=DEFAULT_SETTINGS):
+    result = prioritize(cvss, args["threat"], args["asset"], args["exposure"], args["controls"], args["patch"],
+                        config)
     return RANK[result.priority]
 
 
 class MonotonicityTests(unittest.TestCase):
     def test_worse_input_never_lowers_priority(self):
-        for cvss in CVSS_GRID:
-            for combo in itertools.product(*WORSENING.values()):
-                args = dict(zip(WORSENING, combo, strict=True))
-                base = rank(cvss, args)
-                for key, levels in WORSENING.items():
-                    i = levels.index(args[key])
-                    if i + 1 < len(levels):
-                        worse = {**args, key: levels[i + 1]}
-                        with self.subTest(cvss=cvss, changed=key, **{k: v.name for k, v in args.items()}):
-                            self.assertGreaterEqual(rank(cvss, worse), base)
-                if cvss < 10.0:
-                    with self.subTest(cvss=cvss, changed="cvss", **{k: v.name for k, v in args.items()}):
-                        self.assertGreaterEqual(rank(cvss + 0.5, args), base)
+        for config in SETTINGS_SAMPLE:
+            for cvss in CVSS_GRID:
+                for combo in itertools.product(*WORSENING.values()):
+                    args = dict(zip(WORSENING, combo, strict=True))
+                    base = rank(cvss, args, config)
+                    for key, levels in WORSENING.items():
+                        i = levels.index(args[key])
+                        if i + 1 < len(levels):
+                            worse = {**args, key: levels[i + 1]}
+                            with self.subTest(settings=config.describe(), cvss=cvss, changed=key,
+                                              **{k: v.name for k, v in args.items()}):
+                                self.assertGreaterEqual(rank(cvss, worse, config), base)
+                    if cvss < 10.0:
+                        with self.subTest(settings=config.describe(), cvss=cvss, changed="cvss",
+                                          **{k: v.name for k, v in args.items()}):
+                            self.assertGreaterEqual(rank(cvss + 0.5, args, config), base)
 
 
 if __name__ == "__main__":

@@ -42,3 +42,26 @@ def build(directory):
                          ("huge", "1e308"), ("blank", ""), ("text", "high")):
         add("cvss_" + label, HEADER + f"X-1,Example,{value},active,crown,high,available,none\n".encode())
     return cases
+
+
+def build_settings(directory):
+    """Write hostile settings files into `directory` and return {case name: path}."""
+    good = (b'{"version": 1, "cvss_high": 7.0, "cvss_critical": 9.0, '
+            b'"epss_percentile_cutoff": 0.95, "stale_days": 7}')
+    cases = {
+        "empty": b"",
+        "truncated": good[:30],
+        "wrong_types": good.replace(b"7.0", b'"7.0"').replace(b': 7}', b": true}"),
+        "out_of_range": good.replace(b"7.0", b"1.0"),
+        "inconsistent": good.replace(b"9.0", b"7.2"),
+        "extra_keys": good[:-1] + b', "extra": 1}',
+        "nan": good.replace(b"7.0", b"NaN"),
+        "huge_integer": good.replace(b": 7}", b": " + b"9" * 5000 + b"}"),
+        "huge_file": good + b" " * (1024 * 1024),
+        "utf16": good.decode().encode("utf-16"),
+        "invalid_utf8": b"\xff\xfe\xfd",
+        "null_bytes": good.replace(b"7.0", b"7.0\x00"),
+        "deep_nesting": b'{"version": 1, "cvss_high": ' + b"[" * 5000 + b"]" * 5000 + b"}",
+        "not_an_object": b"[1, 2, 3]",
+    }
+    return {name: _write(directory, name + ".json", data) for name, data in cases.items()}

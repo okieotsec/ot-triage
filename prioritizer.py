@@ -3,6 +3,8 @@ import math
 from dataclasses import dataclass, field
 from enum import Enum
 
+from settings import DEFAULT_SETTINGS
+
 
 class Threat(Enum):
     """Exploitation status of a vulnerability."""
@@ -59,6 +61,7 @@ class Result:
     reasons: list = field(default_factory=list)
     action: str = ""
     inputs: list = field(default_factory=list)
+    profile: str = ""
 
 
 def parse_cvss(text):
@@ -77,11 +80,19 @@ def _shift(priority, steps):
     return _ORDER[max(0, min(_ORDER.index(priority) + steps, len(_ORDER) - 1))]
 
 
-def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patch.AVAILABLE):
-    """Return the priority, ordering score, reasons, action and inputs for one vulnerability."""
+def _fmt(value):
+    """Format a CVSS line with at least one decimal place."""
+    text = f"{value:.2f}".rstrip("0")
+    return text + "0" if text.endswith(".") else text
+
+
+def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patch.AVAILABLE,
+               settings=DEFAULT_SETTINGS):
+    """Return the priority, ordering score, reasons, action, inputs and settings profile."""
     if not math.isfinite(cvss) or not 0.0 <= cvss <= 10.0:
         raise ValueError("CVSS score must be between 0.0 and 10.0")
 
+    high, critical = settings.cvss_high, settings.cvss_critical
     reachable = exposure in (Exposure.HIGH, Exposure.MEDIUM)
     exposed_crown = asset is Asset.CROWN and exposure is Exposure.HIGH
     reasons = []
@@ -97,19 +108,19 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
             priority = NEXT
             reasons.append("Actively exploited, but low exposure and not a crown jewel")
     elif threat is Threat.PUBLIC:
-        if exposure is Exposure.HIGH and cvss >= 7.0:
+        if exposure is Exposure.HIGH and cvss >= high:
             priority = NOW
-            reasons.append("Public exploit, internet-exposed, and CVSS >= 7.0")
+            reasons.append(f"Public exploit, internet-exposed, and CVSS >= {_fmt(high)}")
         else:
             priority = NEXT
             reasons.append("Public exploit available")
     else:
-        if cvss >= 9.0 and exposure is Exposure.HIGH and asset is Asset.CROWN:
+        if cvss >= critical and exposure is Exposure.HIGH and asset is Asset.CROWN:
             priority = NOW
             reasons.append("Critical CVSS on an internet-exposed crown jewel, even without known exploitation")
-        elif cvss >= 7.0 and (reachable or asset is not Asset.STANDARD):
+        elif cvss >= high and (reachable or asset is not Asset.STANDARD):
             priority = NEXT
-            reasons.append("High CVSS (>= 7.0) with exposure or elevated asset value")
+            reasons.append(f"High CVSS (>= {_fmt(high)}) with exposure or elevated asset value")
         else:
             priority = NEVER
             reasons.append("No known exploitation and low combined risk; re-evaluate if conditions change")
@@ -153,9 +164,10 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
             action = ("Isolate/segment and monitor; plan replacement or migration "
                       "(no fix will ever ship)")
             reasons.append("End-of-life: exposure is permanent and accumulates over time")
-            if cvss >= 7.0 and priority == NEVER:
+            if cvss >= high and priority == NEVER:
                 priority = NEXT
-                reasons.append("Floored at NEXT: unpatchable device with CVSS >= 7.0 needs a replacement plan")
+                reasons.append(f"Floored at NEXT: unpatchable device with CVSS >= {_fmt(high)} "
+                               "needs a replacement plan")
 
     # Exposed crown jewels with meaningful severity are never left at NEVER
     if exposed_crown and cvss >= 4.0 and priority == NEVER:
@@ -175,4 +187,4 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         f"Patch: {patch.value}",
         f"Compensating controls: {controls.value}",
     ]
-    return Result(priority, round(score, 2), reasons, action, inputs)
+    return Result(priority, round(score, 2), reasons, action, inputs, settings.describe())

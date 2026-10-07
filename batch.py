@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from prioritizer import (Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Result, Threat,
                          parse_cvss, prioritize)
+from settings import DEFAULT_SETTINGS
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_ROWS = 50_000
@@ -115,7 +116,7 @@ def read_rows(path):
         return rows
 
 
-def score_row(line, row):
+def score_row(line, row, settings=DEFAULT_SETTINGS):
     """Parse one normalized row and score it, recording any errors on the item."""
     item = BatchItem(line=line, id=row.get("id", ""), name=row.get("name", ""), cvss_raw=row.get("cvss", ""))
     errors = []
@@ -132,7 +133,7 @@ def score_row(line, row):
         item.error = "; ".join(errors)
         return item
     item.result = prioritize(item.cvss, item.inputs["threat"], item.inputs["asset"], item.inputs["exposure"],
-                             item.inputs["controls"], item.inputs["patch"])
+                             item.inputs["controls"], item.inputs["patch"], settings)
     return item
 
 
@@ -148,9 +149,9 @@ def sort_items(items):
     return ok + bad
 
 
-def process_file(path):
+def process_file(path, settings=DEFAULT_SETTINGS):
     """Read a CSV file and return its scored rows in ranked order."""
-    return sort_items([score_row(line, row) for line, row in read_rows(path)])
+    return sort_items([score_row(line, row, settings) for line, row in read_rows(path)])
 
 
 def summarize(items):
@@ -168,7 +169,7 @@ def _safe(text):
 
 
 OUTPUT_COLUMNS = ["rank", "id", "name", "priority", "ordering_score", "cvss", "threat", "asset",
-                  "exposure", "patch", "controls", "action", "rationale", "error", "source_line"]
+                  "exposure", "patch", "controls", "action", "rationale", "scoring_settings", "error", "source_line"]
 
 
 def write_results(path, items):
@@ -185,6 +186,7 @@ def write_results(path, items):
                 row.update(
                     rank=rank, ordering_score=f"{item.result.score:.2f}", cvss=f"{item.cvss:.1f}",
                     action=item.result.action, rationale=" | ".join(item.result.reasons),
+                    scoring_settings=item.result.profile,
                     **{k: item.inputs[k].value for k in FIELD_ENUMS},
                 )
             else:

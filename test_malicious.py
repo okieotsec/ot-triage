@@ -6,6 +6,7 @@ import unittest
 
 import batch
 import malicious_cases
+import settings
 
 ALLOWED_ERRORS = (ValueError, OSError, UnicodeDecodeError, csv.Error)
 TIME_LIMIT_SECONDS = 30
@@ -79,6 +80,22 @@ class MaliciousFileTests(unittest.TestCase):
             fh.truncate(batch.MAX_FILE_BYTES + 1)
         with self.assertRaisesRegex(ValueError, "larger than"):
             batch.process_file(path)
+
+
+class MaliciousSettingsTests(unittest.TestCase):
+    def test_every_hostile_settings_file_falls_back_to_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cases = malicious_cases.build_settings(directory)
+            before = sorted(os.listdir(directory))
+            for name, path in cases.items():
+                with self.subTest(case=name):
+                    start = time.monotonic()
+                    result = settings.load(path)
+                    self.assertLess(time.monotonic() - start, TIME_LIMIT_SECONDS)
+                    self.assertEqual(result.settings, settings.DEFAULT_SETTINGS)
+                    self.assertEqual(len(result.warnings), 1)
+                    self.assertLess(len(result.warnings[0]), 600)
+            self.assertEqual(sorted(os.listdir(directory)), before)
 
 
 if __name__ == "__main__":
