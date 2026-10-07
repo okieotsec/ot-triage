@@ -181,7 +181,7 @@ class MonotonicityTests(unittest.TestCase):
     def test_worse_input_never_lowers_priority(self):
         for cvss in CVSS_GRID:
             for combo in itertools.product(*WORSENING.values()):
-                args = dict(zip(WORSENING, combo))
+                args = dict(zip(WORSENING, combo, strict=True))
                 base = rank(cvss, args)
                 for key, levels in WORSENING.items():
                     i = levels.index(args[key])

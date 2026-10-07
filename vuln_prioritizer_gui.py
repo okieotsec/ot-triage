@@ -133,7 +133,8 @@ class VulnerabilityPrioritizer:
         header.pack(fill=tk.X)
         tk.Label(header, text="Vulnerability Prioritizer", font=self.font(20, "bold"),
                  bg=HEADER, fg=TEXT).pack(anchor="w", padx=24, pady=(16, 0))
-        tk.Label(header, text="Now / Next / Never triage from CVSS, threat intel, asset value, exposure and mitigations",
+        tk.Label(header, text=("Now / Next / Never triage from CVSS, threat intel, asset value, "
+                               "exposure and mitigations"),
                  font=self.font(10), bg=HEADER, fg=MUTED).pack(anchor="w", padx=24, pady=(2, 14))
         tk.Frame(header, bg=ACCENT, height=3).pack(fill=tk.X)
         self._button(header, "Batch import (CSV)", self.open_batch).place(relx=1.0, x=-24, y=22, anchor="ne")
