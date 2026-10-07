@@ -25,16 +25,21 @@ python3 -m unittest                 # tests
 
 ## Rules as implemented
 
+For the reasoning behind each rule, see [docs/POLICY.md](docs/POLICY.md).
+
 1. **Base bucket from threat**
    - Active exploitation: NOW if reachable or the asset is a crown jewel, otherwise NEXT.
    - Public exploit: NOW if exposure is high and CVSS >= 7.0, otherwise NEXT.
    - No known exploitation: NOW if CVSS >= 9.0 on a high-exposure crown jewel; NEXT if CVSS >= 7.0 and the item is reachable or not a standard asset; otherwise NEVER.
-2. **Partial controls** reduce the CVSS used for the threshold checks above by 1.05 points (35% of the 3-point span from 7.0 to 10.0). The fractional credit only changes the outcome near a threshold, since buckets are discrete.
-3. **Low severity cap**: an item whose (credit-adjusted) CVSS is below 4.0 is capped at NEXT.
-4. **Patch available**: strong controls lower the bucket one level, but never below NEXT for actively exploited items.
-5. **No patch (pending or end of life)**: with raw CVSS of 4.0 or more, the bucket is raised one level unless strong controls are in place. Strong controls withhold the raise but earn no additional downgrade. End-of-life items with raw CVSS of 7.0 or more are floored at NEXT, since they need a replacement plan.
+2. **Low severity cap**: an item with CVSS below 4.0 is capped at NEXT, except an actively exploited, high-exposure crown jewel, which stays at NOW.
+3. **Patch available**: strong controls lower the bucket one level, but never below NEXT for actively exploited items.
+4. **No patch (pending or end of life)**: with CVSS of 4.0 or more, the bucket is raised one level unless strong controls are in place. Strong controls withhold the raise but earn no additional downgrade. End-of-life items with CVSS of 7.0 or more are floored at NEXT, since they need a replacement plan.
+5. **Exposed crown jewel floor**: a crown jewel with high exposure and CVSS of 4.0 or more is never below NEXT.
+6. **Partial controls** never change the bucket. They lower the ordering score by 0.5.
 
 The **ordering score** (0 to 10) only ranks items within a bucket; it never decides the bucket.
+
+**Low exposure** means no routable path from IT or the internet, verified by testing, not assumed from a firewall's existence.
 
 ## Batch CSV
 
@@ -43,6 +48,11 @@ Optional columns: `id`, `name`, `patch` (default available), `controls` (default
 Other columns are ignored. Header names accept common aliases, and enum cells accept short aliases or the full dropdown labels.
 
 Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are rejected. Exported CSVs prefix text cells that start with `=`, `+`, `-`, `@`, tab or carriage return with `'` so spreadsheets do not run them as formulas.
+
+## Documentation
+
+- [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
+- [docs/ROADMAP.md](docs/ROADMAP.md): planned work, order and design decisions
 
 ## Security testing
 

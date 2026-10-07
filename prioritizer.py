@@ -39,9 +39,8 @@ class Controls(Enum):
     STRONG = "Strong (e.g. segmentation, virtual patching, allow-listing)"
 
 
-# CVSS credit for partial controls: 35% of the 3-point span from 7.0 to 10.0
-PARTIAL_CREDIT_FRACTION = 0.35
-PARTIAL_CVSS_CREDIT = PARTIAL_CREDIT_FRACTION * 3.0
+# Points subtracted from the ordering score when partial controls are in place
+PARTIAL_SCORE_CREDIT = 0.5
 
 NOW, NEXT, NEVER = "NOW", "NEXT", "NEVER"
 _ORDER = [NOW, NEXT, NEVER]
@@ -84,13 +83,8 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         raise ValueError("CVSS score must be between 0.0 and 10.0")
 
     reachable = exposure in (Exposure.HIGH, Exposure.MEDIUM)
+    exposed_crown = asset is Asset.CROWN and exposure is Exposure.HIGH
     reasons = []
-
-    raw_cvss = cvss
-    if controls is Controls.PARTIAL:
-        cvss = max(0.0, cvss - PARTIAL_CVSS_CREDIT)
-        reasons.append(f"Partial controls credited at {PARTIAL_CREDIT_FRACTION:.0%}: "
-                       f"CVSS treated as {cvss:.2f} instead of {raw_cvss:.1f} for threshold checks")
 
     if threat is Threat.ACTIVE:
         if reachable:
@@ -120,10 +114,13 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
             priority = NEVER
             reasons.append("No known exploitation and low combined risk; re-evaluate if conditions change")
 
-    # Cap low-severity items at NEXT
+    # Cap low-severity items at NEXT, except actively exploited exposed crown jewels
     if cvss < 4.0 and priority == NOW:
-        priority = NEXT
-        reasons.append("Capped at NEXT: CVSS < 4.0")
+        if threat is Threat.ACTIVE and exposed_crown:
+            reasons.append("Kept at NOW despite CVSS < 4.0: actively exploited, exposed crown jewel")
+        else:
+            priority = NEXT
+            reasons.append("Capped at NEXT: CVSS < 4.0")
 
     if patch is Patch.AVAILABLE:
         action = "Apply the patch"
@@ -137,7 +134,7 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
                 priority = lowered
     else:
         # Without a patch, raise the priority one level unless strong controls are in place
-        if raw_cvss >= 4.0:
+        if cvss >= 4.0:
             if controls is Controls.STRONG:
                 reasons.append("No patch, but strong compensating controls: priority not raised")
             else:
@@ -156,16 +153,22 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
             action = ("Isolate/segment and monitor; plan replacement or migration "
                       "(no fix will ever ship)")
             reasons.append("End-of-life: exposure is permanent and accumulates over time")
-            if raw_cvss >= 7.0 and priority == NEVER:
+            if cvss >= 7.0 and priority == NEVER:
                 priority = NEXT
                 reasons.append("Floored at NEXT: unpatchable device with CVSS >= 7.0 needs a replacement plan")
 
-    score = min(
-        10.0,
-        cvss * 0.3 + _THREAT_PTS[threat] * 0.25 + _ASSET_PTS[asset] * 0.25 + _EXPOSURE_PTS[exposure] * 0.2,
-    )
+    # Exposed crown jewels with meaningful severity are never left at NEVER
+    if exposed_crown and cvss >= 4.0 and priority == NEVER:
+        priority = NEXT
+        reasons.append("Floored at NEXT: internet-exposed crown jewel with CVSS >= 4.0")
+
+    score = cvss * 0.3 + _THREAT_PTS[threat] * 0.25 + _ASSET_PTS[asset] * 0.25 + _EXPOSURE_PTS[exposure] * 0.2
+    if controls is Controls.PARTIAL:
+        score -= PARTIAL_SCORE_CREDIT
+        reasons.append("Partial controls: ranked lower within the bucket; the bucket itself is unchanged")
+    score = max(0.0, min(10.0, score))
     inputs = [
-        f"CVSS: {raw_cvss:.1f}",
+        f"CVSS: {cvss:.1f}",
         f"Threat: {threat.value}",
         f"Asset: {asset.value}",
         f"Exposure: {exposure.value}",

@@ -26,10 +26,28 @@ class PrioritizeTests(unittest.TestCase):
         self.assertEqual(p(9.8, Threat.NONE, Asset.CROWN, Exposure.HIGH), NOW)
         self.assertEqual(p(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH), NEXT)
         self.assertEqual(p(8.0, Threat.NONE, Asset.STANDARD, Exposure.LOW), NEVER)
-        self.assertEqual(p(5.0, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEVER)
+
+    def test_exposed_crown_jewel_floor(self):
+        self.assertEqual(p(5.0, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEXT)
+        self.assertEqual(p(4.0, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEXT)
+        self.assertEqual(p(3.9, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEVER)
+        self.assertEqual(p(5.0, Threat.NONE, Asset.CROWN, Exposure.MEDIUM), NEVER)
+        self.assertEqual(p(5.0, Threat.NONE, Asset.IMPORTANT, Exposure.HIGH), NEVER)
+
+    def test_exposed_crown_jewel_floor_holds_with_strong_controls(self):
+        self.assertEqual(p(8.0, Threat.NONE, Asset.CROWN, Exposure.HIGH, True), NEXT)
+        self.assertEqual(p(5.0, Threat.NONE, Asset.CROWN, Exposure.HIGH, True), NEXT)
 
     def test_low_cvss_caps_at_next(self):
-        self.assertEqual(p(2.0, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH), NEXT)
+        self.assertEqual(p(2.0, Threat.ACTIVE, Asset.STANDARD, Exposure.HIGH), NEXT)
+        self.assertEqual(p(2.0, Threat.ACTIVE, Asset.CROWN, Exposure.MEDIUM), NEXT)
+        self.assertEqual(p(2.0, Threat.ACTIVE, Asset.CROWN, Exposure.LOW), NEXT)
+
+    def test_active_exposed_crown_jewel_ignores_low_cvss_cap(self):
+        self.assertEqual(p(2.0, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH), NOW)
+        self.assertEqual(p(0.0, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH), NOW)
+        self.assertEqual(p(2.0, Threat.PUBLIC, Asset.CROWN, Exposure.HIGH), NEXT)
+        self.assertEqual(p(2.0, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH, True), NEXT)
 
     def test_controls_downgrade_but_not_below_next_when_exploited(self):
         self.assertEqual(p(9.0, Threat.ACTIVE, Asset.STANDARD, Exposure.HIGH, True), NEXT)
@@ -67,26 +85,26 @@ class PrioritizeTests(unittest.TestCase):
         self.assertIn("replacement", acts[Patch.EOL])
         self.assertIn("vendor advisory", acts[Patch.PENDING])
 
-    def test_partial_credit_only_matters_near_thresholds(self):
-        part = Controls.PARTIAL
-        # Credit is 1.05 CVSS points: 7.5 -> 6.45 crosses the 7.0 line, 8.5 -> 7.45 does not.
-        self.assertEqual(p(7.5, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH), NOW)
-        self.assertEqual(p(7.5, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, part), NEXT)
-        self.assertEqual(p(8.5, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, part), NOW)
-        # 9.5 -> 8.45 drops below the 9.0 crown-jewel line.
-        self.assertEqual(p(9.5, Threat.NONE, Asset.CROWN, Exposure.HIGH), NOW)
-        self.assertEqual(p(9.5, Threat.NONE, Asset.CROWN, Exposure.HIGH, part), NEXT)
-        # Partial never beats strong, and doesn't move an actively exploited, reachable issue.
-        self.assertEqual(p(7.5, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, Controls.STRONG), NEXT)
-        self.assertEqual(p(9.0, Threat.ACTIVE, Asset.STANDARD, Exposure.MEDIUM, part), NOW)
+    def test_partial_controls_never_change_the_bucket(self):
+        for cvss in (0.0, 3.9, 4.0, 5.0, 6.9, 7.0, 7.5, 8.5, 9.0, 9.5, 10.0):
+            for threat, asset, exposure, patch in itertools.product(Threat, Asset, Exposure, Patch):
+                with self.subTest(cvss=cvss, threat=threat.name, asset=asset.name, exposure=exposure.name,
+                                  patch=patch.name):
+                    self.assertEqual(p(cvss, threat, asset, exposure, Controls.PARTIAL, patch),
+                                     p(cvss, threat, asset, exposure, Controls.NONE, patch))
 
-    def test_partial_credit_lowers_ordering_score(self):
-        none = prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH).score
-        part = prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH, Controls.PARTIAL).score
-        self.assertAlmostEqual(none - part, 0.3 * 1.05, delta=0.01)
+    def test_partial_controls_lower_the_ordering_score_only(self):
+        none = prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH)
+        part = prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH, Controls.PARTIAL)
+        strong = prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH, Controls.STRONG)
+        self.assertEqual(part.priority, none.priority)
+        self.assertAlmostEqual(none.score - part.score, 0.5, places=6)
+        self.assertEqual(strong.score, none.score)
+        lowest = prioritize(0.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, Controls.PARTIAL)
+        self.assertGreaterEqual(lowest.score, 0.0)
 
-    def test_unpatched_partial_still_raised_but_credit_applied_first(self):
-        # PUBLIC 7.5 high exposure: tree gives NEXT with credit, then the no-patch raise makes it NOW.
+    def test_unpatched_partial_controls_still_raise_priority(self):
+        # PUBLIC 7.5 high exposure is already NOW; partial controls do not change that.
         self.assertEqual(p(7.5, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, Controls.PARTIAL, Patch.PENDING), NOW)
         # Strong controls withhold the raise but earn no downgrade when unpatched: stays at the base (NOW).
         self.assertEqual(p(7.5, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, Controls.STRONG, Patch.PENDING), NOW)
@@ -154,10 +172,13 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(p(7.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEXT)
         self.assertEqual(p(6.9, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEVER)
 
-    def test_partial_credit_at_the_7_line(self):
-        part = Controls.PARTIAL
-        self.assertEqual(p(8.05, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, part), NOW)
-        self.assertEqual(p(8.04, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, part), NEXT)
+    def test_exposed_crown_jewel_floor_at_4(self):
+        self.assertEqual(p(4.0, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEXT)
+        self.assertEqual(p(3.9, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEVER)
+
+    def test_active_exposed_crown_jewel_cap_exemption_at_any_cvss(self):
+        self.assertEqual(p(3.9, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH), NOW)
+        self.assertEqual(p(3.9, Threat.ACTIVE, Asset.CROWN, Exposure.MEDIUM), NEXT)
 
 
 RANK = {NEVER: 0, NEXT: 1, NOW: 2}

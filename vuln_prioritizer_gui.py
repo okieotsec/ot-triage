@@ -25,6 +25,8 @@ PRIORITY_TEXT = {
     "NEXT": ("Schedule remediation", "Plan it into the next patch cycle (roughly 30-90 days)."),
     "NEVER": ("No scheduled remediation", "Re-evaluate if conditions change."),
 }
+EXPOSURE_HELP = ("Low means no routable path from IT or the internet, verified by testing, "
+                 "not assumed from a firewall's existence.")
 CVSS_BANDS = [  # (minimum score, label, colour)
     (9.0, "CRITICAL", "#ef4444"),
     (7.0, "HIGH", "#f97316"),
@@ -182,6 +184,10 @@ class VulnerabilityPrioritizer:
         env = self._card(parent, "Asset & environment")
         self.asset_var = self._combo(env, "Asset criticality", Asset, Asset.STANDARD)
         self.exposure_var = self._combo(env, "Network exposure", Exposure, Exposure.LOW)
+        self.exposure_hint = tk.Label(env, text=EXPOSURE_HELP, font=self.font(8), bg=CARD, fg=MUTED,
+                                      anchor="w", justify="left")
+        self.exposure_hint.pack(fill=tk.X, pady=(4, 0))
+        self.exposure_hint.bind("<Configure>", lambda e: self.exposure_hint.config(wraplength=max(e.width - 4, 100)))
 
         rem = self._card(parent, "Remediation & mitigation")
         self.patch_var = self._combo(rem, "Patch status", Patch, Patch.AVAILABLE)

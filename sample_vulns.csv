@@ -16,8 +16,8 @@ GW-14,Gateway info leak - pending + controls,6.5,public,standard,high,pending,st
 PRT-15,Print server exploited in the wild,9.0,active,standard,low,available,none,NEXT
 PRT-16,Print server exploited (strong controls),9.0,active,standard,low,available,strong,NEXT
 PRT-17,Print server exploited (partial controls),9.0,active,standard,low,available,partial,NEXT
-SRV-18,App server public exploit (partial controls),7.5,public,standard,high,available,partial,NEXT
-SRV-19,Low severity but exploited crown jewel,2.1,active,crown,high,available,none,NEXT
+SRV-18,App server public exploit (partial controls),7.5,public,standard,high,available,partial,NOW
+SRV-19,Low severity but exploited crown jewel,2.1,active,crown,high,available,none,NOW
 SRV-20,Low severity unpatched,3.0,none,standard,low,pending,none,NEVER
 SRV-21,Medium severity unpatched,4.0,none,standard,low,pending,none,NEXT
 ALI-22,Alias values test,9.8,active,crown_jewel,internet,available,none,NOW
