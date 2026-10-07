@@ -1,3 +1,4 @@
+import itertools
 import unittest
 
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, NOW, NEXT, NEVER, parse_cvss, prioritize
@@ -101,8 +102,24 @@ class PrioritizeTests(unittest.TestCase):
         self.assertEqual(p(8.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, Controls.PARTIAL, Patch.EOL), NEXT)
 
     def test_score_bounded(self):
-        r = prioritize(10.0, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH)
-        self.assertLessEqual(r.score, 10.0)
+        highest = prioritize(10.0, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH)
+        lowest = prioritize(0.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, Controls.STRONG, Patch.AVAILABLE)
+        self.assertLessEqual(highest.score, 10.0)
+        self.assertGreaterEqual(lowest.score, 0.0)
+
+    def test_score_bounded_for_all_inputs(self):
+        for cvss in (0.0, 5.0, 10.0):
+            for combo in itertools.product(Threat, Asset, Exposure, Controls, Patch):
+                threat, asset, exposure, controls, patch = combo
+                score = prioritize(cvss, threat, asset, exposure, controls, patch).score
+                self.assertTrue(0.0 <= score <= 10.0, (cvss, combo, score))
+
+    def test_result_lists_all_inputs(self):
+        r = prioritize(8.0, Threat.PUBLIC, Asset.CROWN, Exposure.HIGH, Controls.PARTIAL, Patch.PENDING)
+        self.assertEqual(len(r.inputs), 6)
+        for expected in ("CVSS: 8.0", Threat.PUBLIC.value, Asset.CROWN.value, Exposure.HIGH.value,
+                         Controls.PARTIAL.value, Patch.PENDING.value):
+            self.assertTrue(any(expected in line for line in r.inputs), expected)
 
     def test_rejects_bad_cvss(self):
         for bad in ("nan", "inf", "-1", "10.1", "", "abc"):
@@ -111,6 +128,71 @@ class PrioritizeTests(unittest.TestCase):
         self.assertEqual(parse_cvss(" 7.5 "), 7.5)
         with self.assertRaises(ValueError):
             prioritize(float("nan"), Threat.NONE, Asset.STANDARD, Exposure.LOW)
+
+
+class BoundaryTests(unittest.TestCase):
+    def test_public_exploit_line_at_7(self):
+        self.assertEqual(p(7.0, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH), NOW)
+        self.assertEqual(p(6.9, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH), NEXT)
+
+    def test_no_exploit_line_at_7(self):
+        self.assertEqual(p(7.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH), NEXT)
+        self.assertEqual(p(6.9, Threat.NONE, Asset.STANDARD, Exposure.HIGH), NEVER)
+
+    def test_crown_jewel_line_at_9(self):
+        self.assertEqual(p(9.0, Threat.NONE, Asset.CROWN, Exposure.HIGH), NOW)
+        self.assertEqual(p(8.9, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEXT)
+
+    def test_low_severity_cap_at_4(self):
+        self.assertEqual(p(4.0, Threat.ACTIVE, Asset.STANDARD, Exposure.HIGH), NOW)
+        self.assertEqual(p(3.9, Threat.ACTIVE, Asset.STANDARD, Exposure.HIGH), NEXT)
+
+    def test_no_patch_raise_line_at_4(self):
+        self.assertEqual(p(4.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, False, Patch.PENDING), NEXT)
+        self.assertEqual(p(3.9, Threat.NONE, Asset.STANDARD, Exposure.LOW, False, Patch.PENDING), NEVER)
+
+    def test_end_of_life_floor_at_7(self):
+        self.assertEqual(p(7.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEXT)
+        self.assertEqual(p(6.9, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEVER)
+
+    def test_partial_credit_at_the_7_line(self):
+        part = Controls.PARTIAL
+        self.assertEqual(p(8.05, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, part), NOW)
+        self.assertEqual(p(8.04, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH, part), NEXT)
+
+
+RANK = {NEVER: 0, NEXT: 1, NOW: 2}
+# Each list runs from least to most concerning.
+WORSENING = {
+    "threat": [Threat.NONE, Threat.PUBLIC, Threat.ACTIVE],
+    "asset": [Asset.STANDARD, Asset.IMPORTANT, Asset.CROWN],
+    "exposure": [Exposure.LOW, Exposure.MEDIUM, Exposure.HIGH],
+    "controls": [Controls.STRONG, Controls.PARTIAL, Controls.NONE],
+    "patch": [Patch.AVAILABLE, Patch.PENDING, Patch.EOL],
+}
+CVSS_GRID = [x / 10 for x in range(0, 101, 5)]
+
+
+def rank(cvss, args):
+    result = prioritize(cvss, args["threat"], args["asset"], args["exposure"], args["controls"], args["patch"])
+    return RANK[result.priority]
+
+
+class MonotonicityTests(unittest.TestCase):
+    def test_worse_input_never_lowers_priority(self):
+        for cvss in CVSS_GRID:
+            for combo in itertools.product(*WORSENING.values()):
+                args = dict(zip(WORSENING, combo))
+                base = rank(cvss, args)
+                for key, levels in WORSENING.items():
+                    i = levels.index(args[key])
+                    if i + 1 < len(levels):
+                        worse = {**args, key: levels[i + 1]}
+                        with self.subTest(cvss=cvss, changed=key, **{k: v.name for k, v in args.items()}):
+                            self.assertGreaterEqual(rank(cvss, worse), base)
+                if cvss < 10.0:
+                    with self.subTest(cvss=cvss, changed="cvss", **{k: v.name for k, v in args.items()}):
+                        self.assertGreaterEqual(rank(cvss + 0.5, args), base)
 
 
 if __name__ == "__main__":

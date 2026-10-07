@@ -119,5 +119,59 @@ class ExportTests(unittest.TestCase):
         self.assertTrue(any(r["id"].startswith("'=HYPERLINK") for r in rows))
 
 
+class FormulaSafetyTests(unittest.TestCase):
+    PAYLOADS = ["=HYPERLINK(\"http://example.com\")", "+cmd", "-1+1", "@SUM(A1)", "\t=1", "\r=1"]
+
+    def test_safe_prefixes_formula_characters(self):
+        for payload in self.PAYLOADS:
+            self.assertEqual(batch._safe(payload), "'" + payload)
+        for text in ("", "plain", "a=b", "1+1"):
+            self.assertEqual(batch._safe(text), text)
+
+    def test_export_neutralizes_every_text_cell(self):
+        good = batch.score_row(2, {"id": "=ID", "name": "+name", "cvss": "9.8", "threat": "active",
+                                   "asset": "crown", "exposure": "high"})
+        bad = batch.score_row(3, {"id": "-id", "name": "@name", "cvss": "=BAD", "threat": "active",
+                                  "asset": "crown", "exposure": "high"})
+        fd, out = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        self.addCleanup(os.remove, out)
+        batch.write_results(out, [good, bad])
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.DictReader(fh))
+        self.assertEqual(rows[0]["id"], "'=ID")
+        self.assertEqual(rows[0]["name"], "'+name")
+        self.assertEqual(rows[1]["id"], "'-id")
+        self.assertEqual(rows[1]["name"], "'@name")
+        self.assertEqual(rows[1]["cvss"], "'=BAD")
+        for row in rows:
+            for value in row.values():
+                self.assertFalse(value.startswith(tuple("=+-@\t\r")), value)
+
+
+class RankingTests(unittest.TestCase):
+    @staticmethod
+    def item(line, cvss, threat, asset, exposure):
+        return batch.score_row(line, {"cvss": cvss, "threat": threat, "asset": asset, "exposure": exposure})
+
+    def test_bucket_outranks_a_higher_score(self):
+        now = self.item(2, "8.0", "public", "standard", "high")
+        next_ = self.item(3, "8.0", "none", "crown", "medium")
+        self.assertEqual((now.priority, next_.priority), ("NOW", "NEXT"))
+        self.assertGreater(next_.result.score, now.result.score)
+        self.assertEqual(batch.sort_items([next_, now]), [now, next_])
+
+    def test_ties_keep_source_order(self):
+        first = self.item(2, "8.0", "public", "standard", "high")
+        second = self.item(3, "8.0", "public", "standard", "high")
+        self.assertEqual(batch.sort_items([second, first]), [first, second])
+
+    def test_errors_sort_last_by_line(self):
+        bad_late = self.item(9, "abc", "none", "standard", "low")
+        bad_early = self.item(4, "abc", "none", "standard", "low")
+        never = self.item(5, "1.0", "none", "standard", "low")
+        self.assertEqual(batch.sort_items([bad_late, bad_early, never]), [never, bad_early, bad_late])
+
+
 if __name__ == "__main__":
     unittest.main()

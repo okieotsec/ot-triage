@@ -55,6 +55,7 @@ class Result:
     score: float
     reasons: list = field(default_factory=list)
     action: str = ""
+    inputs: list = field(default_factory=list)
 
 
 def parse_cvss(text):
@@ -160,7 +161,7 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         10.0,
         cvss * 0.3 + _THREAT_PTS[threat] * 0.25 + _ASSET_PTS[asset] * 0.25 + _EXPOSURE_PTS[exposure] * 0.2,
     )
-    reasons += [
+    inputs = [
         f"CVSS: {raw_cvss:.1f}",
         f"Threat: {threat.value}",
         f"Asset: {asset.value}",
@@ -168,4 +169,4 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         f"Patch: {patch.value}",
         f"Compensating controls: {controls.value}",
     ]
-    return Result(priority, round(score, 2), reasons, action)
+    return Result(priority, round(score, 2), reasons, action, inputs)

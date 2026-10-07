@@ -18,6 +18,7 @@ MUTED = "#94a3b8"
 ACCENT = "#38bdf8"
 ERROR = "#f87171"
 PRIORITY_COLORS = {"NOW": "#ef4444", "NEXT": "#f59e0b", "NEVER": "#22c55e"}
+PRIORITY_FG = {"NOW": "#ffffff", "NEXT": BG, "NEVER": BG}
 PRIORITY_TEXT = {
     "NOW": ("Act immediately", "Remediate or mitigate right away."),
     "NEXT": ("Schedule remediation", "Plan it into the next patch cycle (roughly 30-90 days)."),
@@ -32,12 +33,19 @@ CVSS_BANDS = [  # (minimum score, label, colour)
 ]
 
 
+def fit_window(win, width, height, min_width, min_height):
+    """Size a window to the requested size, capped to the screen, and set its minimum size."""
+    max_w = int(win.winfo_screenwidth() * 0.92)
+    max_h = int(win.winfo_screenheight() * 0.85)
+    win.geometry(f"{min(width, max_w)}x{min(height, max_h)}")
+    win.minsize(min(min_width, max_w), min(min_height, max_h))
+
+
 class VulnerabilityPrioritizer:
     def __init__(self, root):
         self.root = root
         root.title("Vulnerability Prioritizer")
-        root.geometry("1120x740")
-        root.minsize(980, 660)
+        fit_window(root, 1120, 740, 980, 660)
         root.configure(bg=BG)
 
         self.family = tkfont.nametofont("TkDefaultFont").actual("family")
@@ -252,7 +260,7 @@ class VulnerabilityPrioritizer:
         )
         color = PRIORITY_COLORS[res.priority]
         headline, sub = PRIORITY_TEXT[res.priority]
-        self.badge.config(text=res.priority, bg=color, fg="#ffffff")
+        self.badge.config(text=res.priority, bg=color, fg=PRIORITY_FG[res.priority])
         self.verdict.config(text=headline)
         self.subtitle.config(text=sub)
         self.style.configure("Score.Horizontal.TProgressbar", background=color, lightcolor=color, darkcolor=color)
@@ -263,7 +271,8 @@ class VulnerabilityPrioritizer:
         self._summary = (f"Priority: {res.priority} ({headline})\n"
                          f"Ordering score: {res.score:.2f}/10\n"
                          f"Action: {res.action}\n\n"
-                         + "\n".join(f"- {r}" for r in res.reasons))
+                         "Inputs:\n" + "\n".join(f"- {i}" for i in res.inputs)
+                         + "\n\nRationale:\n" + "\n".join(f"- {r}" for r in res.reasons))
         self.copy_btn.config(state="normal")
 
     def _update_cvss_chip(self, raw):
@@ -311,8 +320,7 @@ class BatchWindow:
         font = app.font
         win = self.win = tk.Toplevel(app.root)
         win.title(f"Batch results - {os.path.basename(path)}")
-        win.geometry("1180x720")
-        win.minsize(900, 560)
+        fit_window(win, 1180, 720, 900, 560)
         win.configure(bg=BG)
         win.transient(app.root)
 
@@ -387,7 +395,8 @@ class BatchWindow:
         label = f"{item.id}  {item.name}".strip() or f"Line {item.line}"
         lines = [f"Source line {item.line}: {label}"]
         if item.result:
-            lines += [f"Action: {item.result.action}"] + [f"•  {r}" for r in item.result.reasons]
+            lines += ([f"Action: {item.result.action}"] + [f"•  {r}" for r in item.result.reasons]
+                      + ["Inputs: " + "; ".join(item.result.inputs)])
         else:
             lines += [f"•  {part}" for part in item.error.split("; ")]
         self.detail.config(state="normal")
