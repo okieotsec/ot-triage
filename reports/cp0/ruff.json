@@ -1,0 +1,1845 @@
+[
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 10
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 10
+    },
+    "message": "Line too long (92 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 10,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 109,
+      "row": 15
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 15
+    },
+    "message": "Line too long (108 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 15,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 92,
+      "row": 35
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 35
+    },
+    "message": "Line too long (91 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 35,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 91,
+      "row": 43
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 43
+    },
+    "message": "Line too long (90 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 43,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 106,
+      "row": 66
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 66
+    },
+    "message": "Line too long (105 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 66,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 75
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 75
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 75,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 98,
+      "row": 91
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 91
+    },
+    "message": "Line too long (97 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 91,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 107
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 107
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 107,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 113
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 113
+    },
+    "message": "Line too long (109 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 113,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 127
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 127
+    },
+    "message": "Line too long (109 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 127,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 90,
+      "row": 138
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 138
+    },
+    "message": "Line too long (89 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 138,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 160
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 160
+    },
+    "message": "Line too long (96 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 160,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 98,
+      "row": 161
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 161
+    },
+    "message": "Line too long (97 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 161,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 170
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 170
+    },
+    "message": "Line too long (93 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 170,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 99,
+      "row": 175
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 175
+    },
+    "message": "Line too long (98 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 175,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 90,
+      "row": 176
+    },
+    "filename": "batch.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 176
+    },
+    "message": "Line too long (89 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 176,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 37
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 37
+    },
+    "message": "Line too long (96 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 37,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 38
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 38
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 38,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 61
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 61
+    },
+    "message": "Line too long (93 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 61,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 72
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 72
+    },
+    "message": "Line too long (101 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 72,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 76
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 76
+    },
+    "message": "Line too long (93 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 76,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 101,
+      "row": 87
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 87
+    },
+    "message": "Line too long (100 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 87,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 99,
+      "row": 92
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 92
+    },
+    "message": "Line too long (98 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 92,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 112,
+      "row": 109
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 109
+    },
+    "message": "Line too long (111 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 109,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 108,
+      "row": 115
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 115
+    },
+    "message": "Line too long (107 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 115,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 108,
+      "row": 124
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 124
+    },
+    "message": "Line too long (107 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 124,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 130
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 130
+    },
+    "message": "Line too long (96 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 130,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 107,
+      "row": 133
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 133
+    },
+    "message": "Line too long (106 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 133,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 105,
+      "row": 134
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 134
+    },
+    "message": "Line too long (104 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 134,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 98,
+      "row": 138
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 138
+    },
+    "message": "Line too long (97 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 138,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 118,
+      "row": 142
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 142
+    },
+    "message": "Line too long (117 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 142,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 115,
+      "row": 145
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 145
+    },
+    "message": "Line too long (114 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 145,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 98,
+      "row": 148
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 148
+    },
+    "message": "Line too long (97 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 148,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 91,
+      "row": 154
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 154
+    },
+    "message": "Line too long (90 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 154,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 112,
+      "row": 157
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 157
+    },
+    "message": "Line too long (111 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 157,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 108,
+      "row": 161
+    },
+    "filename": "prioritizer.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 161
+    },
+    "message": "Line too long (107 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 161,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 23
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 23
+    },
+    "message": "Line too long (96 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 23,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 96,
+      "row": 74
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 74
+    },
+    "message": "Line too long (95 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 74,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 96,
+      "row": 75
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 75
+    },
+    "message": "Line too long (95 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 75,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 83
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 83
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 83,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 84
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 84
+    },
+    "message": "Line too long (92 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 84,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 85
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 85
+    },
+    "message": "Line too long (101 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 85,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 92,
+      "row": 87
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 87
+    },
+    "message": "Line too long (91 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 87,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 89
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 89
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 89,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 96,
+      "row": 91
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 91
+    },
+    "message": "Line too long (95 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 91,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 92,
+      "row": 101
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 101
+    },
+    "message": "Line too long (91 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 101,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 103
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 103
+    },
+    "message": "Line too long (96 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 103,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 104,
+      "row": 110
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 110
+    },
+    "message": "Line too long (103 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 110,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 122,
+      "row": 127
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 127
+    },
+    "message": "Line too long (121 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 127,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 98,
+      "row": 128
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 128
+    },
+    "message": "Line too long (97 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 128,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 130
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 130
+    },
+    "message": "Line too long (109 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 130,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 106,
+      "row": 133
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 133
+    },
+    "message": "Line too long (105 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 133,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 106,
+      "row": 134
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 134
+    },
+    "message": "Line too long (105 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 134,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 109,
+      "row": 150
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 150
+    },
+    "message": "Line too long (108 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 150,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 160
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 160
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 160,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 105,
+      "row": 161
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 161
+    },
+    "message": "Line too long (104 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 161,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 162
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 162
+    },
+    "message": "Line too long (99 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 162,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 165
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 165
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 165,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 167
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 167
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 167,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 178
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 178
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 178,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 184
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 184
+    },
+    "message": "Line too long (101 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 184,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 105,
+      "row": 188
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 188
+    },
+    "message": "Line too long (104 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 188,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 99,
+      "row": 190
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 190
+    },
+    "message": "Line too long (98 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 190,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 108,
+      "row": 193
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 193
+    },
+    "message": "Line too long (107 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 193,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 108,
+      "row": 197
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 197
+    },
+    "message": "Line too long (107 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 197,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 198
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 198
+    },
+    "message": "Line too long (101 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 198,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 200
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 200
+    },
+    "message": "Line too long (99 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 200,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 202
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 202
+    },
+    "message": "Line too long (92 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 202,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 92,
+      "row": 206
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 206
+    },
+    "message": "Line too long (91 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 206,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 116,
+      "row": 209
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 209
+    },
+    "message": "Line too long (115 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 209,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 216
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 216
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 216,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 217
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 217
+    },
+    "message": "Line too long (101 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 217,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 115,
+      "row": 223
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 223
+    },
+    "message": "Line too long (114 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 223,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 224
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 224
+    },
+    "message": "Line too long (99 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 224,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 106,
+      "row": 225
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 225
+    },
+    "message": "Line too long (105 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 225,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 101,
+      "row": 233
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 233
+    },
+    "message": "Line too long (100 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 233,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 115,
+      "row": 258
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 258
+    },
+    "message": "Line too long (114 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 258,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 279
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 279
+    },
+    "message": "Line too long (93 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 279,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 96,
+      "row": 305
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 305
+    },
+    "message": "Line too long (95 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 305,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 321
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 321
+    },
+    "message": "Line too long (92 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 321,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 108,
+      "row": 323
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 323
+    },
+    "message": "Line too long (107 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 323,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 101,
+      "row": 325
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 325
+    },
+    "message": "Line too long (100 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 325,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 333
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 333
+    },
+    "message": "Line too long (96 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 333,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 335
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 335
+    },
+    "message": "Line too long (93 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 335,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 337
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 337
+    },
+    "message": "Line too long (99 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 337,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 339
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 339
+    },
+    "message": "Line too long (99 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 339,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 341
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 341
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 341,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 90,
+      "row": 343
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 343
+    },
+    "message": "Line too long (89 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 343,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 347
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 347
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 347,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 361
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 361
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 361,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 90,
+      "row": 364
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 364
+    },
+    "message": "Line too long (89 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 364,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 365
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 365
+    },
+    "message": "Line too long (94 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 365,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 91,
+      "row": 367
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 367
+    },
+    "message": "Line too long (90 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 367,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 371
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 371
+    },
+    "message": "Line too long (109 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 371,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 103,
+      "row": 372
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 372
+    },
+    "message": "Line too long (102 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 372,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 98,
+      "row": 390
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 390
+    },
+    "message": "Line too long (97 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 390,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 410
+    },
+    "filename": "vuln_prioritizer_gui.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 410
+    },
+    "message": "Line too long (99 > 88)",
+    "name": "line-too-long",
+    "noqa_row": 410,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  }
+]
