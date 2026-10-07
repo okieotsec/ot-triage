@@ -56,4 +56,4 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 
 ## Security testing
 
-Checkpoint reports are in `reports/`, and the SBOM is in `sbom/`.
+The test approach is defined in [SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md). Checkpoint reports are in `reports/`, and the SBOM is in `sbom/`.
