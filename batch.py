@@ -1,9 +1,4 @@
-"""Batch scoring of vulnerabilities from a CSV file (no GUI dependencies).
-
-Required columns: cvss, threat, asset, exposure
-Optional columns: id, name, patch (default: available), controls (default: none)
-Extra columns are ignored. Enum cells accept short aliases or the full dropdown labels.
-"""
+"""Batch scoring of vulnerabilities from a CSV file (no GUI dependencies)."""
 import csv
 import os
 from dataclasses import dataclass, field
@@ -71,6 +66,7 @@ def _parse_enum(field_name, text):
 
 @dataclass
 class BatchItem:
+    """One CSV row with its parsed inputs and result or error."""
     line: int
     id: str = ""
     name: str = ""
@@ -120,6 +116,7 @@ def read_rows(path):
 
 
 def score_row(line, row):
+    """Parse one normalized row and score it, recording any errors on the item."""
     item = BatchItem(line=line, id=row.get("id", ""), name=row.get("name", ""), cvss_raw=row.get("cvss", ""))
     errors = []
     try:
@@ -143,6 +140,7 @@ _BUCKET = {NOW: 0, NEXT: 1, NEVER: 2}
 
 
 def sort_items(items):
+    """Order items by bucket, then ordering score, then CVSS, with errors last."""
     ok = [i for i in items if i.result]
     bad = [i for i in items if not i.result]
     ok.sort(key=lambda i: (_BUCKET[i.result.priority], -i.result.score, -i.cvss, i.line))
@@ -151,10 +149,12 @@ def sort_items(items):
 
 
 def process_file(path):
+    """Read a CSV file and return its scored rows in ranked order."""
     return sort_items([score_row(line, row) for line, row in read_rows(path)])
 
 
 def summarize(items):
+    """Count items per priority bucket and errors."""
     counts = {NOW: 0, NEXT: 0, NEVER: 0, "ERROR": 0}
     for i in items:
         counts[i.priority] += 1
@@ -172,6 +172,7 @@ OUTPUT_COLUMNS = ["rank", "id", "name", "priority", "ordering_score", "cvss", "t
 
 
 def write_results(path, items):
+    """Write ranked results to a CSV file with formula-safe text cells."""
     with open(path, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.DictWriter(fh, fieldnames=OUTPUT_COLUMNS)
         writer.writeheader()

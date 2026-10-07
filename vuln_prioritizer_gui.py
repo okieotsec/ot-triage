@@ -1,3 +1,4 @@
+"""Tkinter GUI for the Now / Next / Never vulnerability prioritizer."""
 import csv
 import os
 import tkinter as tk
@@ -42,6 +43,8 @@ def fit_window(win, width, height, min_width, min_height):
 
 
 class VulnerabilityPrioritizer:
+    """Main window: a single-vulnerability form with the computed priority."""
+
     def __init__(self, root):
         self.root = root
         root.title("Vulnerability Prioritizer")
@@ -72,7 +75,6 @@ class VulnerabilityPrioritizer:
         self._update()
         self.cvss_entry.focus_set()
 
-    # ---- helpers -------------------------------------------------------
     def font(self, size, weight="normal"):
         return (self.family, size, weight)
 
@@ -126,7 +128,6 @@ class VulnerabilityPrioritizer:
         box.bind("<<ComboboxSelected>>", lambda _e: box.selection_clear())
         return var
 
-    # ---- layout --------------------------------------------------------
     def _build_header(self):
         header = tk.Frame(self.root, bg=HEADER)
         header.pack(fill=tk.X)
@@ -233,7 +234,6 @@ class VulnerabilityPrioritizer:
                                   relief="flat", bd=0, padx=12, pady=5, cursor="hand2", state="disabled")
         self.copy_btn.pack(anchor="e", pady=(10, 0))
 
-    # ---- behaviour -----------------------------------------------------
     def _update(self, *_args):
         raw = self.cvss_var.get().strip()
         self._update_cvss_chip(raw)

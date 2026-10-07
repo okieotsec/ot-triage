@@ -12,8 +12,7 @@ def p(cvss, threat, asset, exposure, controls=False, patch=Patch.AVAILABLE):
 
 
 class PrioritizeTests(unittest.TestCase):
-    def test_active_exploit_low_exposure_standard_was_next_bug(self):
-        # Old weighted sum put actively exploited CVSS 9.0 / standard / low into NEXT (6.55).
+    def test_active_exploit_by_exposure(self):
         self.assertEqual(p(9.0, Threat.ACTIVE, Asset.STANDARD, Exposure.MEDIUM), NOW)
         self.assertEqual(p(9.0, Threat.ACTIVE, Asset.STANDARD, Exposure.LOW), NEXT)
         self.assertEqual(p(9.0, Threat.ACTIVE, Asset.CROWN, Exposure.LOW), NOW)

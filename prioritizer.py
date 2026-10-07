@@ -5,45 +5,48 @@ from enum import Enum
 
 
 class Threat(Enum):
+    """Exploitation status of a vulnerability."""
     ACTIVE = "Active exploitation in wild"
     PUBLIC = "Public exploit available"
     NONE = "No known exploitation"
 
 
 class Asset(Enum):
+    """Business criticality of the affected asset."""
     CROWN = "Critical crown jewel asset"
     IMPORTANT = "Important asset"
     STANDARD = "Standard asset"
 
 
 class Exposure(Enum):
+    """How reachable the affected asset is from outside its trust zone."""
     HIGH = "High exposure (internet connected)"
     MEDIUM = "Medium exposure"
     LOW = "Low exposure"
 
 
 class Patch(Enum):
+    """Remediation availability."""
     AVAILABLE = "Patch available"
     PENDING = "No patch yet (vendor supported, fix pending)"
     EOL = "No patch ever (end-of-life / unsupported)"
 
 
 class Controls(Enum):
+    """Compensating controls in place."""
     NONE = "None"
     PARTIAL = "Partial (e.g. ACLs, monitoring only)"
     STRONG = "Strong (e.g. segmentation, virtual patching, allow-listing)"
 
 
-# Partial controls earn 35% of the 3-point span between "High" (7.0) and "Critical" (10.0) CVSS.
-# Buckets are discrete, so fractional credit is applied to the CVSS the rules see (it only changes the
-# outcome near a threshold); strong controls instead move the item a full level.
+# CVSS credit for partial controls: 35% of the 3-point span from 7.0 to 10.0
 PARTIAL_CREDIT_FRACTION = 0.35
 PARTIAL_CVSS_CREDIT = PARTIAL_CREDIT_FRACTION * 3.0
 
 NOW, NEXT, NEVER = "NOW", "NEXT", "NEVER"
 _ORDER = [NOW, NEXT, NEVER]
 
-# Used only to order items within a bucket; it never decides the bucket.
+# Points used to order items within a bucket
 _THREAT_PTS = {Threat.ACTIVE: 10, Threat.PUBLIC: 7, Threat.NONE: 3}
 _ASSET_PTS = {Asset.CROWN: 10, Asset.IMPORTANT: 7, Asset.STANDARD: 3}
 _EXPOSURE_PTS = {Exposure.HIGH: 10, Exposure.MEDIUM: 7, Exposure.LOW: 3}
@@ -51,6 +54,7 @@ _EXPOSURE_PTS = {Exposure.HIGH: 10, Exposure.MEDIUM: 7, Exposure.LOW: 3}
 
 @dataclass
 class Result:
+    """Outcome of a prioritization."""
     priority: str
     score: float
     reasons: list = field(default_factory=list)
@@ -75,6 +79,7 @@ def _shift(priority, steps):
 
 
 def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patch.AVAILABLE):
+    """Return the priority, ordering score, reasons, action and inputs for one vulnerability."""
     if not math.isfinite(cvss) or not 0.0 <= cvss <= 10.0:
         raise ValueError("CVSS score must be between 0.0 and 10.0")
 
@@ -115,14 +120,14 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
             priority = NEVER
             reasons.append("No known exploitation and low combined risk; re-evaluate if conditions change")
 
-    # Very low severity can never justify more than NEXT.
+    # Cap low-severity items at NEXT
     if cvss < 4.0 and priority == NOW:
         priority = NEXT
         reasons.append("Capped at NEXT: CVSS < 4.0")
 
     if patch is Patch.AVAILABLE:
         action = "Apply the patch"
-        # Strong controls are defense in depth: one level down, but never below NEXT if actively exploited.
+        # Strong controls lower the priority one level, never below NEXT when actively exploited
         if controls is Controls.STRONG:
             lowered = _shift(priority, 1)
             if threat is Threat.ACTIVE and lowered == NEVER:
@@ -131,9 +136,7 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
                 reasons.append(f"Lowered {priority} -> {lowered}: strong compensating controls")
                 priority = lowered
     else:
-        # With no patch, controls are the only defense. Without strong ones the open-ended exposure raises
-        # urgency (partial controls only helped via the CVSS credit above). Strong controls withhold the
-        # raise but earn no extra downgrade, since nothing backs them up.
+        # Without a patch, raise the priority one level unless strong controls are in place
         if raw_cvss >= 4.0:
             if controls is Controls.STRONG:
                 reasons.append("No patch, but strong compensating controls: priority not raised")
