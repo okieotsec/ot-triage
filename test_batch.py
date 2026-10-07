@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 import batch
+import threatdata as td
 from prioritizer import Asset, Controls, Exposure, Patch, Threat
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -171,6 +172,119 @@ class RankingTests(unittest.TestCase):
         bad_early = self.item(4, "abc", "none", "standard", "low")
         never = self.item(5, "1.0", "none", "standard", "low")
         self.assertEqual(batch.sort_items([bad_late, bad_early, never]), [never, bad_early, bad_late])
+
+
+def make_threatdata(kev=None, epss=None, kev_loaded=True, epss_loaded=True):
+    entries = {c: td.KevEntry(c, "Acme", "Widget", "Flaw", "2024-01-02", action, "2024-01-23", ransomware)
+               for c, action, ransomware in (kev or [])}
+    return td.ThreatData(td.KevData("2026.10.04", "2026-10-04", entries) if kev_loaded else None,
+                         td.EpssData("v2026.06.15", "2026-10-07", dict(epss or {})) if epss_loaded else None)
+
+
+class CveColumnTests(unittest.TestCase):
+    BASE = {"cvss": "8.0", "asset": "standard", "exposure": "high"}
+
+    def row(self, **changes):
+        return {**self.BASE, **changes}
+
+    def test_kev_derives_active_when_the_threat_cell_is_blank(self):
+        data = make_threatdata(kev=[("CVE-2024-0001", "Apply updates.", False)])
+        item = batch.score_row(2, self.row(cve="cve-2024-0001"), threatdata=data)
+        self.assertEqual((item.priority, item.inputs["threat"], item.cve), ("NOW", Threat.ACTIVE, "CVE-2024-0001"))
+        self.assertEqual(item.threat_sources, "In CISA KEV")
+        self.assertIn("CISA required action: Apply updates.", item.result.action)
+
+    def test_cve_without_signals_is_none_and_elevated_epss_is_public(self):
+        data = make_threatdata(epss={"CVE-2024-0002": (0.4, 0.99), "CVE-2024-0003": (0.001, 0.2)})
+        elevated = batch.score_row(2, self.row(cve="CVE-2024-0002"), threatdata=data)
+        quiet = batch.score_row(3, self.row(cve="CVE-2024-0003"), threatdata=data)
+        unknown = batch.score_row(4, self.row(cve="CVE-2030-9999"), threatdata=data)
+        self.assertEqual([i.inputs["threat"] for i in (elevated, quiet, unknown)],
+                         [Threat.PUBLIC, Threat.NONE, Threat.NONE])
+        self.assertTrue(elevated.threat_sources.startswith("Elevated EPSS"))
+
+    def test_the_threat_column_can_raise_but_never_lower_the_derived_level(self):
+        data = make_threatdata(kev=[("CVE-2024-0001", "", False)])
+        lowered = batch.score_row(2, self.row(cve="CVE-2024-0001", threat="none"), threatdata=data)
+        raised = batch.score_row(3, self.row(cve="CVE-2024-0009", threat="active"), threatdata=data)
+        self.assertEqual(lowered.inputs["threat"], Threat.ACTIVE)
+        self.assertEqual(raised.inputs["threat"], Threat.ACTIVE)
+        self.assertIn("Analyst-confirmed", raised.threat_sources)
+
+    def test_missing_data_is_never_treated_as_safe(self):
+        empty = make_threatdata(kev_loaded=False, epss_loaded=False)
+        for data in (None, empty):
+            item = batch.score_row(2, self.row(cve="CVE-2024-0001"), threatdata=data)
+            self.assertEqual(item.priority, "ERROR")
+            self.assertIn("threat: value is required (no threat data loaded", item.error)
+        with_threat = batch.score_row(2, self.row(cve="CVE-2024-0001", threat="public"), threatdata=empty)
+        self.assertEqual(with_threat.inputs["threat"], Threat.PUBLIC)
+        partial = make_threatdata(kev=[("CVE-2024-0001", "", False)], epss_loaded=False)
+        self.assertEqual(batch.score_row(2, self.row(cve="CVE-2024-0001"), threatdata=partial).priority, "NOW")
+
+    def test_invalid_cve_is_an_error_row(self):
+        item = batch.score_row(2, self.row(cve="nonsense", threat="active"), threatdata=make_threatdata())
+        self.assertEqual(item.priority, "ERROR")
+        self.assertIn("cve:", item.error)
+        blank = batch.score_row(2, self.row(cve="nonsense"), threatdata=make_threatdata())
+        self.assertNotIn("no threat data loaded", blank.error)
+
+    def test_rows_without_a_cve_keep_working(self):
+        item = batch.score_row(2, self.row(threat="public"), threatdata=make_threatdata())
+        self.assertEqual((item.priority, item.threat_sources), ("NOW", "Manual (threat column)"))
+
+    def test_header_needs_threat_or_cve(self):
+        path = write_csv("cvss,asset,exposure\n9.8,crown,high\n")
+        self.addCleanup(os.remove, path)
+        with self.assertRaisesRegex(ValueError, "threat \\(or cve\\)"):
+            batch.process_file(path)
+        path2 = write_csv("cvss,asset,exposure,cve\n9.8,crown,high,CVE-2024-0001\n")
+        self.addCleanup(os.remove, path2)
+        self.assertTrue(batch.has_cve_column(path2))
+        self.assertFalse(batch.has_cve_column(path))
+        item = batch.process_file(path2, threatdata=make_threatdata(kev=[("CVE-2024-0001", "", False)]))[0]
+        self.assertEqual(item.priority, "NOW")
+
+    def test_ransomware_ranks_first_within_a_bucket_only(self):
+        data = make_threatdata(kev=[("CVE-2024-0001", "", False), ("CVE-2024-0002", "", True)])
+        plain = batch.score_row(2, self.row(cve="CVE-2024-0001"), threatdata=data)
+        ransom = batch.score_row(3, self.row(cve="CVE-2024-0002"), threatdata=data)
+        self.assertEqual((plain.priority, ransom.priority), ("NOW", "NOW"))
+        self.assertEqual(batch.sort_items([plain, ransom]), [ransom, plain])
+
+    def test_export_has_sources_versions_and_neutralizes_kev_text(self):
+        hostile = '=HYPERLINK("http://example.invalid","x")'
+        data = make_threatdata(kev=[("CVE-2024-0001", hostile, False)])
+        item = batch.score_row(2, self.row(cve="CVE-2024-0001", id="A-1"), threatdata=data)
+        fd, out = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        self.addCleanup(os.remove, out)
+        batch.write_results(out, [item], data)
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.DictReader(fh))
+        row = rows[0]
+        self.assertEqual((row["cve"], row["threat"], row["threat_source"]),
+                         ("CVE-2024-0001", Threat.ACTIVE.value, "In CISA KEV"))
+        self.assertEqual(row["threat_data"], data.versions())
+        self.assertIn("KEV 2026.10.04", row["threat_data"])
+        self.assertIn("CISA required action:", row["action"])
+        self.assertIn(hostile, row["action"])
+        for column in ("action", "rationale", "threat_source", "threat_data", "cve"):
+            self.assertFalse(row[column].startswith(tuple("=+-@\t\r")), column)
+
+    def test_exported_text_that_starts_like_a_formula_is_neutralized(self):
+        data = make_threatdata(kev=[("CVE-2024-0001", "x", False)])
+        item = batch.score_row(2, self.row(cve="CVE-2024-0001"), threatdata=data)
+        item.result.action = "=1+1"
+        item.result.reasons = ["=2+2"]
+        item.threat_sources = "+cmd"
+        fd, out = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        self.addCleanup(os.remove, out)
+        batch.write_results(out, [item])
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            row = next(csv.DictReader(fh))
+        self.assertEqual((row["action"], row["rationale"], row["threat_source"]), ("'=1+1", "'=2+2", "'+cmd"))
 
 
 if __name__ == "__main__":

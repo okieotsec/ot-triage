@@ -1,4 +1,5 @@
 import csv
+import gzip
 import math
 import os
 import tempfile
@@ -6,6 +7,7 @@ import unittest
 
 import batch
 import settings
+import threatdata
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, NOW, NEXT, NEVER, parse_cvss, prioritize
 
 try:
@@ -93,6 +95,76 @@ class PropertyTests(unittest.TestCase):
             self.assertTrue(result.cvss_high + settings.MIN_LINE_GAP <= result.cvss_critical <= 10.0)
             self.assertTrue(0.5 <= result.epss_percentile_cutoff <= 0.999)
             self.assertTrue(1 <= result.stale_days <= 90)
+
+        KEV_SEED = (b'{"catalogVersion": "1", "dateReleased": "2024-01-02", "count": 1, "vulnerabilities": '
+                    b'[{"cveID": "CVE-2024-0001", "vendorProject": "A", "product": "B", "vulnerabilityName": "C", '
+                    b'"dateAdded": "2024-01-02", "requiredAction": "D", "dueDate": "", '
+                    b'"knownRansomwareCampaignUse": "Known"}]}')
+        EPSS_SEED = b"#model_version:v1,score_date:2026-10-07\ncve,epss,percentile\nCVE-2024-0001,0.1,0.2\n"
+
+        @staticmethod
+        def mutate(seed, position, replacement):
+            position %= len(seed) + 1
+            return seed[:position] + replacement + seed[position + 1:]
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.binary(max_size=3000))
+        def test_kev_parser_only_raises_threat_data_error(self, data):
+            try:
+                threatdata.parse_kev(data)
+            except threatdata.ThreatDataError:
+                pass
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.integers(min_value=0, max_value=1000), st.binary(max_size=4))
+        def test_kev_parser_survives_mutated_valid_files(self, position, replacement):
+            try:
+                threatdata.parse_kev(self.mutate(self.KEV_SEED, position, replacement))
+            except threatdata.ThreatDataError:
+                pass
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.binary(max_size=3000), st.booleans())
+        def test_epss_parser_only_raises_threat_data_error(self, data, compressed):
+            try:
+                threatdata.parse_epss(gzip.compress(data) if compressed else data)
+            except threatdata.ThreatDataError:
+                pass
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.integers(min_value=0, max_value=1000), st.binary(max_size=4))
+        def test_epss_parser_survives_mutated_valid_files(self, position, replacement):
+            try:
+                threatdata.parse_epss(self.mutate(self.EPSS_SEED, position, replacement))
+            except threatdata.ThreatDataError:
+                pass
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.text(max_size=200))
+        def test_normalize_cve_accepts_only_cve_ids(self, text):
+            try:
+                cve = threatdata.normalize_cve(text)
+            except ValueError:
+                return
+            self.assertRegex(cve, r"^CVE-\d{4}-\d{4,}$")
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.booleans(), st.one_of(st.none(), st.floats(0, 1)), st.booleans(), st.booleans(), st.booleans(),
+               st.booleans())
+        def test_more_evidence_never_lowers_the_threat_level(self, kev, percentile, kev_loaded, epss_loaded,
+                                                             analyst, public):
+            order = {Threat.NONE: 0, Threat.PUBLIC: 1, Threat.ACTIVE: 2}
+            entry = threatdata.KevEntry("CVE-2024-0001", "", "", "", "2024-01-02", "", "", False) if kev else None
+            info = threatdata.CveInfo("CVE-2024-0001", entry, None if percentile is None else 0.1, percentile,
+                                      kev_loaded, epss_loaded)
+            base = threatdata.derive_threat(info, settings.DEFAULT_SETTINGS, analyst, public).level
+            for extra in (dict(analyst_confirmed=True), dict(public_exploit=True)):
+                kwargs = dict(analyst_confirmed=analyst, public_exploit=public)
+                kwargs.update(extra)
+                raised = threatdata.derive_threat(info, settings.DEFAULT_SETTINGS, **kwargs).level
+                self.assertGreaterEqual(order[raised], order[base])
+            missing = threatdata.derive_threat(None, settings.DEFAULT_SETTINGS, analyst, public).level
+            self.assertGreaterEqual(order[base], order[missing])
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # Vulnerability Prioritizer
 
 Rule-based Now / Next / Never triage for vulnerabilities, with a Tkinter GUI and CSV batch mode.
-Pure standard library: no third-party dependencies, and no network access.
+Pure standard library: no third-party dependencies. It works fully offline; the only network access is a threat-data update that you start yourself.
 
 ## Run
 
@@ -45,8 +45,9 @@ Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [
 
 ## Batch CSV
 
-Required columns: `cvss`, `threat`, `asset`, `exposure`.
+Required columns: `cvss`, `asset`, `exposure`, and `threat` (or `cve`).
 Optional columns: `id`, `name`, `patch` (default available), `controls` (default none).
+An optional `cve` column looks the CVE up in local KEV and EPSS data (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)); with it, `threat` can be left blank.
 Other columns are ignored. Header names accept common aliases, and enum cells accept short aliases or the full dropdown labels.
 
 Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are rejected. Exported CSVs prefix text cells that start with `=`, `+`, `-`, `@`, tab or carriage return with `'` so spreadsheets do not run them as formulas.
@@ -54,6 +55,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 ## Documentation
 
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
+- [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV and EPSS threat data, offline updates and safety checks
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned work, order and design decisions
 

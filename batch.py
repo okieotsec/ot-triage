@@ -6,10 +6,11 @@ from dataclasses import dataclass, field
 from prioritizer import (Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Result, Threat,
                          parse_cvss, prioritize)
 from settings import DEFAULT_SETTINGS
+from threatdata import apply_threat_context, derive_threat, normalize_cve
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_ROWS = 50_000
-REQUIRED = ["cvss", "threat", "asset", "exposure"]
+REQUIRED = ["cvss", "asset", "exposure"]
 DEFAULTS = {"patch": Patch.AVAILABLE, "controls": Controls.NONE}
 FIELD_ENUMS = {"threat": Threat, "asset": Asset, "exposure": Exposure, "patch": Patch, "controls": Controls}
 
@@ -71,6 +72,8 @@ class BatchItem:
     line: int
     id: str = ""
     name: str = ""
+    cve: str = ""
+    threat_sources: str = ""
     cvss_raw: str = ""
     inputs: dict = field(default_factory=dict)   # field -> enum member, for successfully parsed cells
     cvss: float = None
@@ -102,6 +105,8 @@ def read_rows(path):
         if duplicates:
             raise ValueError(f"Duplicate column(s): {', '.join(duplicates)}")
         missing = [c for c in REQUIRED if c not in columns]
+        if "threat" not in columns and "cve" not in columns:
+            missing.insert(1, "threat (or cve)")
         if missing:
             raise ValueError(f"Missing required column(s): {', '.join(missing)}. "
                              f"Found: {', '.join(h.strip() for h in header)}")
@@ -116,15 +121,43 @@ def read_rows(path):
         return rows
 
 
-def score_row(line, row, settings=DEFAULT_SETTINGS):
+def has_cve_column(path):
+    """Return True if the CSV file has a cve column."""
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        header = next(csv.reader(fh), [])
+    return "cve" in [_norm_header(h) for h in header]
+
+
+def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None):
     """Parse one normalized row and score it, recording any errors on the item."""
     item = BatchItem(line=line, id=row.get("id", ""), name=row.get("name", ""), cvss_raw=row.get("cvss", ""))
-    errors = []
+    errors, info, cve_valid = [], None, False
+    if row.get("cve"):
+        try:
+            item.cve = normalize_cve(row["cve"])
+            cve_valid = True
+            info = threatdata.lookup(item.cve) if threatdata is not None else None
+        except ValueError as e:
+            item.cve = row["cve"]
+            errors.append(f"cve: {e}")
+    if info is not None and not (info.kev_loaded or info.epss_loaded):
+        info = None
     try:
         item.cvss = parse_cvss(item.cvss_raw)
     except ValueError as e:
         errors.append(f"cvss: {e}")
+    manual = None
+    if row.get("threat", "").strip():
+        try:
+            manual = _parse_enum("threat", row["threat"])
+        except ValueError as e:
+            errors.append(str(e))
+    elif info is None:
+        hint = " (no threat data loaded for the cve column)" if cve_valid else ""
+        errors.append(f"threat: value is required{hint}")
     for field_name in FIELD_ENUMS:
+        if field_name == "threat":
+            continue
         try:
             item.inputs[field_name] = _parse_enum(field_name, row.get(field_name, ""))
         except ValueError as e:
@@ -132,8 +165,19 @@ def score_row(line, row, settings=DEFAULT_SETTINGS):
     if errors:
         item.error = "; ".join(errors)
         return item
+    decision = None
+    if info is not None:
+        decision = derive_threat(info, settings, analyst_confirmed=manual is Threat.ACTIVE,
+                                 public_exploit=manual is Threat.PUBLIC)
+        item.inputs["threat"] = decision.level
+        item.threat_sources = "; ".join(decision.sources)
+    else:
+        item.inputs["threat"] = manual
+        item.threat_sources = "Manual (threat column)"
     item.result = prioritize(item.cvss, item.inputs["threat"], item.inputs["asset"], item.inputs["exposure"],
                              item.inputs["controls"], item.inputs["patch"], settings)
+    if decision is not None:
+        item.result = apply_threat_context(item.result, decision, info)
     return item
 
 
@@ -149,9 +193,9 @@ def sort_items(items):
     return ok + bad
 
 
-def process_file(path, settings=DEFAULT_SETTINGS):
+def process_file(path, settings=DEFAULT_SETTINGS, threatdata=None):
     """Read a CSV file and return its scored rows in ranked order."""
-    return sort_items([score_row(line, row, settings) for line, row in read_rows(path)])
+    return sort_items([score_row(line, row, settings, threatdata) for line, row in read_rows(path)])
 
 
 def summarize(items):
@@ -168,24 +212,27 @@ def _safe(text):
     return "'" + text if text and text[0] in "=+-@\t\r" else text
 
 
-OUTPUT_COLUMNS = ["rank", "id", "name", "priority", "ordering_score", "cvss", "threat", "asset",
-                  "exposure", "patch", "controls", "action", "rationale", "scoring_settings", "error", "source_line"]
+OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cvss", "threat", "asset",
+                  "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
+                  "scoring_settings", "error", "source_line"]
 
 
-def write_results(path, items):
+def write_results(path, items, threatdata=None):
     """Write ranked results to a CSV file with formula-safe text cells."""
+    data_versions = threatdata.versions() if threatdata is not None else ""
     with open(path, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.DictWriter(fh, fieldnames=OUTPUT_COLUMNS)
         writer.writeheader()
         rank = 0
         for item in items:
-            row = {"id": _safe(item.id), "name": _safe(item.name), "priority": item.priority,
-                   "source_line": item.line}
+            row = {"id": _safe(item.id), "cve": _safe(item.cve), "name": _safe(item.name),
+                   "priority": item.priority, "source_line": item.line}
             if item.result:
                 rank += 1
                 row.update(
                     rank=rank, ordering_score=f"{item.result.score:.2f}", cvss=f"{item.cvss:.1f}",
-                    action=item.result.action, rationale=" | ".join(item.result.reasons),
+                    action=_safe(item.result.action), rationale=_safe(" | ".join(item.result.reasons)),
+                    threat_source=_safe(item.threat_sources), threat_data=_safe(data_versions),
                     scoring_settings=item.result.profile,
                     **{k: item.inputs[k].value for k in FIELD_ENUMS},
                 )

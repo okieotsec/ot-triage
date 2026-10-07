@@ -3,10 +3,12 @@ import os
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 import batch
 import malicious_cases
 import settings
+import threatdata
 
 ALLOWED_ERRORS = (ValueError, OSError, UnicodeDecodeError, csv.Error)
 TIME_LIMIT_SECONDS = 30
@@ -96,6 +98,51 @@ class MaliciousSettingsTests(unittest.TestCase):
                     self.assertEqual(len(result.warnings), 1)
                     self.assertLess(len(result.warnings[0]), 600)
             self.assertEqual(sorted(os.listdir(directory)), before)
+
+
+class MaliciousThreatDataTests(unittest.TestCase):
+    GOOD_KEV = '{"catalogVersion": "1", "dateReleased": "2024-01-02", "count": 0, "vulnerabilities": []}'
+    SANITIZED = ("kev_formula_text", "kev_control_characters")
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.work = Path(tmp.name)
+        (self.work / "cases").mkdir()
+        self.store = self.work / "store"
+
+    def snapshot(self):
+        return {p.name: p.read_bytes() for p in self.store.iterdir()}
+
+    def test_hostile_files_are_rejected_without_touching_stored_data(self):
+        cases = malicious_cases.build_threat_data(str(self.work / "cases"))
+        good = self.work / "good.json"
+        good.write_text(self.GOOD_KEV, encoding="utf-8")
+        self.assertTrue(threatdata.import_from_files(good, None, self.store)[0].ok)
+        before = self.snapshot()
+        for name, (kind, path) in cases.items():
+            if name in self.SANITIZED:
+                continue
+            with self.subTest(case=name):
+                start = time.monotonic()
+                args = (path, None) if kind == "kev" else (None, path)
+                results = threatdata.import_from_files(*args, self.store)
+                self.assertLess(time.monotonic() - start, TIME_LIMIT_SECONDS)
+                self.assertEqual(len(results), 1)
+                self.assertFalse(results[0].ok, results[0].message)
+                self.assertIn("previous copy was kept", results[0].message)
+                self.assertLess(len(results[0].message), 400)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_text_fields_with_formulas_or_control_characters_are_stored_cleaned(self):
+        cases = malicious_cases.build_threat_data(str(self.work / "cases"))
+        results = threatdata.import_from_files(cases["kev_control_characters"][1], None, self.store)
+        self.assertTrue(results[0].ok)
+        entry = threatdata.ThreatData.load(self.store).kev.entries["CVE-2024-0001"]
+        self.assertNotRegex(entry.product, r"[\x00-\x1f\x7f]")
+        results = threatdata.import_from_files(cases["kev_formula_text"][1], None, self.store)
+        entry = threatdata.ThreatData.load(self.store).kev.entries["CVE-2024-0001"]
+        self.assertEqual(entry.required_action, "=1+1")
 
 
 if __name__ == "__main__":

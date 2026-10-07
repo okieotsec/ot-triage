@@ -1,4 +1,6 @@
 """Generate hostile batch CSV files for security testing."""
+import gzip
+import json
 import os
 
 HEADER = b"id,name,cvss,threat,asset,exposure,patch,controls\n"
@@ -65,3 +67,50 @@ def build_settings(directory):
         "not_an_object": b"[1, 2, 3]",
     }
     return {name: _write(directory, name + ".json", data) for name, data in cases.items()}
+
+
+def with_entry(doc, entry, **changes):
+    """Return KEV JSON bytes whose single entry has the given fields replaced."""
+    return json.dumps({**doc, "vulnerabilities": [{**entry, **changes}]}).encode()
+
+
+def build_threat_data(directory):
+    """Write hostile KEV and EPSS files into `directory` and return {case name: (kind, path)}."""
+    entry = {"cveID": "CVE-2024-0001", "vendorProject": "A", "product": "B", "vulnerabilityName": "C",
+             "dateAdded": "2024-01-02", "requiredAction": "Apply.", "dueDate": "2024-01-23",
+             "knownRansomwareCampaignUse": "Unknown"}
+    kev = {"catalogVersion": "1", "dateReleased": "2024-01-02", "count": 1, "vulnerabilities": [entry]}
+    epss_head = b"#model_version:v1,score_date:2026-10-07\ncve,epss,percentile\n"
+    cases = {
+        "kev_empty": ("kev", b""),
+        "kev_malformed_json": ("kev", b'{"catalogVersion": '),
+        "kev_wrong_types": ("kev", json.dumps({**kev, "vulnerabilities": "x", "count": "1"}).encode()),
+        "kev_wrong_entry_types": ("kev", json.dumps({**kev, "vulnerabilities": [{**entry, "cveID": 5}]}).encode()),
+        "kev_deeply_nested": ("kev", b"[" * 200_000 + b"]" * 200_000),
+        "kev_formula_text": ("kev", with_entry(kev, entry, requiredAction="=1+1")),
+        "kev_control_characters": ("kev", with_entry(kev, entry, product="a\x00\x1b[2Jb")),
+        "kev_huge_sparse": ("kev", 500 * 1024 * 1024),
+        "epss_empty": ("epss", b""),
+        "epss_missing_header_line": ("epss", b"cve,epss,percentile\nCVE-2024-0001,0.1,0.1\n"),
+        "epss_wrong_columns": ("epss", b"#model_version:v1,score_date:2026-10-07\ncve,score,rank\nCVE-2024-1,0.1,1\n"),
+        "epss_bad_rows": ("epss", epss_head + b"CVE-2024-0001,nan,0.1\nnot-a-cve,0.1,0.1\n"),
+        "epss_truncated_gzip": ("epss", gzip.compress(epss_head + b"CVE-2024-0001,0.1,0.1\n" * 1000)[:60]),
+        "epss_gzip_bomb": ("epss", "bomb"),
+    }
+    paths = {}
+    for name, (kind, data) in cases.items():
+        path = os.path.join(directory, name + (".json" if kind == "kev" else ".csv.gz"))
+        if isinstance(data, int):
+            with open(path, "wb") as fh:
+                fh.truncate(data)
+        elif data == "bomb":
+            with gzip.open(path, "wb", compresslevel=1) as fh:
+                fh.write(epss_head)
+                block = b"0" * (1024 * 1024)
+                for _ in range(300):
+                    fh.write(block)
+        else:
+            with open(path, "wb") as fh:
+                fh.write(data)
+        paths[name] = (kind, path)
+    return paths

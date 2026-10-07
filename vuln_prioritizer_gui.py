@@ -7,6 +7,7 @@ import tkinter.font as tkfont
 
 import batch
 import settings as scoring_settings
+import threatdata
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss, prioritize
 
 # Palette
@@ -59,6 +60,7 @@ class VulnerabilityPrioritizer:
         self._summary = ""
         loaded = scoring_settings.load()
         self.settings = loaded.settings
+        self.threat_data = None
 
         self._build_header()
         body = tk.Frame(root, bg=BG)
@@ -156,6 +158,14 @@ class VulnerabilityPrioritizer:
                         cursor="hand2", **kwargs)
         return btn
 
+    def load_threat_data(self):
+        """Load stored KEV and EPSS data on first use and warn about unusable files."""
+        if self.threat_data is None:
+            self.threat_data = threatdata.ThreatData.load()
+            if self.threat_data.warnings:
+                messagebox.showwarning("Threat data", "\n\n".join(self.threat_data.warnings), parent=self.root)
+        return self.threat_data
+
     def open_batch(self):
         path = filedialog.askopenfilename(
             parent=self.root, title="Select a CSV of vulnerabilities",
@@ -163,14 +173,15 @@ class VulnerabilityPrioritizer:
         if not path:
             return
         try:
-            items = batch.process_file(path, self.settings)
+            data = self.load_threat_data() if batch.has_cve_column(path) else None
+            items = batch.process_file(path, self.settings, data)
         except (OSError, UnicodeDecodeError, csv.Error, ValueError) as e:
             messagebox.showerror("Batch import failed", str(e), parent=self.root)
             return
         if not items:
             messagebox.showinfo("Batch import", "The file has a header but no data rows.", parent=self.root)
             return
-        BatchWindow(self, path, items)
+        BatchWindow(self, path, items, data)
 
     def _build_inputs(self, parent):
         vuln = self._card(parent, "Vulnerability")
@@ -333,8 +344,8 @@ class BatchWindow:
                ("priority", "Priority", 80, "center"), ("score", "Score", 70, "center"),
                ("cvss", "CVSS", 60, "center"), ("action", "Action / error", 420, "w")]
 
-    def __init__(self, app, path, items):
-        self.app, self.path, self.items = app, path, items
+    def __init__(self, app, path, items, data=None):
+        self.app, self.path, self.items, self.data = app, path, items, data
         font = app.font
         win = self.win = tk.Toplevel(app.root)
         win.title(f"Batch results - {os.path.basename(path)}")
@@ -431,7 +442,7 @@ class BatchWindow:
         if not out:
             return
         try:
-            batch.write_results(out, self.items)
+            batch.write_results(out, self.items, self.data)
         except OSError as e:
             messagebox.showerror("Export failed", str(e), parent=self.win)
             return
