@@ -5,7 +5,7 @@ from tkinter import ttk
 import explain
 from explain import SHORT_LABELS, AssessInputs
 from gui_widgets import (Expander, FlowFrame, ScrollFrame, Segmented, ask_text, button, card, chip, field_label,
-                         priority_badge)
+                         priority_badge, set_enabled)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -42,7 +42,8 @@ class AssessState:
 
 
 def _options(enum):
-    return [(member.name, SHORT_LABELS[enum][member]) for member in enum]
+    """Return the choices for a segmented control, least concerning first."""
+    return [(member.name, label) for member, label in SHORT_LABELS[enum].items()]
 
 
 class AssessView:
@@ -416,7 +417,7 @@ class AssessView:
         self.reasoning_text.configure(text="")
         self._set_whatif([])
         for b in (self.copy_button, self.markdown_button):
-            b.configure(state="disabled")
+            set_enabled(b, False)
 
     def _show_result(self, result, inputs, decision):
         s = self.style
@@ -439,7 +440,7 @@ class AssessView:
         found = explain.what_would_change(inputs, self.ctx.settings)
         self._set_whatif(explain.what_if_lines(found), found)
         for b in (self.copy_button, self.markdown_button):
-            b.configure(state="normal")
+            set_enabled(b, True)
 
     def _set_whatif(self, lines, found=None):
         t, s = self.style.theme, self.style

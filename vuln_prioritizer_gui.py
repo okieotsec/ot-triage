@@ -1,41 +1,26 @@
-"""Tkinter GUI for the Now / Next / Never vulnerability prioritizer."""
-import csv
-import os
+"""Tkinter GUI for the Now / Next / Never vulnerability prioritizer: window shell, navigation and status bar."""
+import gc
+import sys
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-import tkinter.font as tkfont
+import traceback
+from tkinter import messagebox
 
-import batch
-import settings as scoring_settings
-import threatdata
-from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss, prioritize
+import settings as scoring
+import uiprefs
+from gui_about import AboutView
+from gui_assess import AssessView
+from gui_batch import BatchView
+from gui_context import Context
+from gui_settings import SettingsView
+from gui_theme import THEMES, Style, apply_ttk_styles
+from gui_threat import ThreatUpdater, ThreatView
+from gui_widgets import chip
+from version import __version__
 
-# Palette
-BG = "#0f172a"
-HEADER = "#111c33"
-CARD = "#1e293b"
-FIELD = "#0f172a"
-BORDER = "#334155"
-TEXT = "#e2e8f0"
-MUTED = "#94a3b8"
-ACCENT = "#38bdf8"
-ERROR = "#f87171"
-PRIORITY_COLORS = {"NOW": "#ef4444", "NEXT": "#f59e0b", "NEVER": "#22c55e"}
-PRIORITY_FG = {"NOW": "#ffffff", "NEXT": BG, "NEVER": BG}
-PRIORITY_TEXT = {
-    "NOW": ("Act immediately", "Remediate or mitigate right away."),
-    "NEXT": ("Schedule remediation", "Plan it into the next patch cycle (roughly 30-90 days)."),
-    "NEVER": ("No scheduled remediation", "Re-evaluate if conditions change."),
-}
-EXPOSURE_HELP = ("Low means no routable path from IT or the internet, verified by testing, "
-                 "not assumed from a firewall's existence.")
-CVSS_BANDS = [  # (minimum score, label, colour)
-    (9.0, "CRITICAL", "#ef4444"),
-    (7.0, "HIGH", "#f97316"),
-    (4.0, "MEDIUM", "#f59e0b"),
-    (0.1, "LOW", "#22c55e"),
-    (0.0, "NONE", MUTED),
-]
+VIEWS = [("assess", "Assess", AssessView), ("batch", "Batch", BatchView), ("threat", "Threat data", ThreatView),
+         ("settings", "Settings", SettingsView), ("about", "About", AboutView)]
+NARROW_BELOW = 900
+SUBTITLE = "Now / Next / Never triage from CVSS, threat intel, asset value, exposure and mitigations"
 
 
 def fit_window(win, width, height, min_width, min_height):
@@ -46,410 +31,230 @@ def fit_window(win, width, height, min_width, min_height):
     win.minsize(min(min_width, max_w), min(min_height, max_h))
 
 
-class VulnerabilityPrioritizer:
-    """Main window: a single-vulnerability form with the computed priority."""
+class App:
+    """The application window."""
 
-    def __init__(self, root):
+    def __init__(self, root, settings_path=None, prefs_path=None, data_dir=None):
         self.root = root
+        loaded = scoring.load(settings_path)
+        prefs_loaded = uiprefs.load(prefs_path)
+        self.style = Style(THEMES[prefs_loaded.prefs.theme], prefs_loaded.prefs.text_scale)
+        apply_ttk_styles(root, self.style)
+        self.ctx = Context(root, self.style, loaded.settings, prefs_loaded.prefs, shell=self)
+        self.ctx.settings_path, self.ctx.prefs_path, self.ctx.data_dir = settings_path, prefs_path, data_dir
+        self.ctx.updater = ThreatUpdater(self.ctx)
+        self.ctx.updater.listeners.append(self.refresh_status)
+        self.views, self.current, self.narrow = {}, "assess", None
         root.title("Vulnerability Prioritizer")
-        fit_window(root, 1120, 740, 980, 660)
-        root.configure(bg=BG)
+        fit_window(root, 1180, 800, 700, 560)
+        root.report_callback_exception = self.report_exception
+        self._bind_shortcuts()
+        self.build()
+        warnings = list(loaded.warnings) + list(prefs_loaded.warnings)
+        if warnings:
+            root.after(200, lambda: self.ctx.warn("Settings", "\n\n".join(warnings)))
+        if self.ctx.prefs.startup_update:
+            root.after(600, lambda: self.ctx.updater.update(ask=False))
 
-        self.family = tkfont.nametofont("TkDefaultFont").actual("family")
-        self._init_styles()
-        self._summary = ""
-        loaded = scoring_settings.load()
-        self.settings = loaded.settings
-        self.threat_data = None
+    # ---- building ----
+    def build(self):
+        """Create the header, navigation, content area and status bar from the current theme and text size."""
+        for child in self.root.winfo_children():
+            child.destroy()
+        self.views = {}
+        gc.collect()
+        self.style = Style(THEMES[self.ctx.prefs.theme], self.ctx.prefs.text_scale)
+        self.ctx.style = self.style
+        apply_ttk_styles(self.root, self.style)
+        t, s = self.style.theme, self.style
+        self.root.configure(bg=t.bg)
+        shell = self.shell = tk.Frame(self.root, bg=t.bg)
+        shell.pack(fill=tk.BOTH, expand=True)
+        shell.columnconfigure(1, weight=1)
+        shell.rowconfigure(1, weight=1)
+        self._build_header(shell)
+        self.nav = tk.Frame(shell, bg=t.header, highlightthickness=0)
+        self.nav_buttons = {}
+        for index, (name, label, _cls) in enumerate(VIEWS, start=1):
+            self.nav_buttons[name] = tk.Button(
+                self.nav, text=f"{label}   Ctrl+{index}", anchor="w", relief="flat", bd=0, padx=14, pady=9,
+                font=s.font(10), cursor="hand2", highlightthickness=2, command=lambda n=name: self.show_view(n))
+        self.content = tk.Frame(shell, bg=t.bg)
+        self.status_bar = tk.Frame(shell, bg=t.header, highlightthickness=1, highlightbackground=t.border)
+        self.narrow = None
+        width = self.root.winfo_width()
+        self._layout(1 < width < NARROW_BELOW)
+        self.root.bind("<Configure>", self._on_resize)
+        self.show_view(self.current)
+        self.refresh_status()
 
-        self._build_header()
-        body = tk.Frame(root, bg=BG)
-        body.pack(fill=tk.BOTH, expand=True, padx=24, pady=20)
-        body.columnconfigure(1, weight=1)
-        body.rowconfigure(0, weight=1)
+    def _build_header(self, parent):
+        t, s = self.style.theme, self.style
+        self.header = tk.Frame(parent, bg=t.header)
+        self.header.grid(row=0, column=0, columnspan=2, sticky="ew")
+        tk.Frame(self.header, bg=t.accent, height=3).pack(side=tk.BOTTOM, fill=tk.X)
+        text = tk.Frame(self.header, bg=t.header)
+        text.pack(side=tk.LEFT, padx=20, pady=12)
+        tk.Label(text, text="Vulnerability Prioritizer", font=s.font(18, "bold"), bg=t.header, fg=t.text).pack(
+            anchor="w")
+        subtitle = tk.Label(text, text=SUBTITLE, font=s.font(9), bg=t.header, fg=t.muted, anchor="w", justify="left")
+        subtitle.pack(anchor="w")
+        subtitle.bind("<Configure>", lambda e: subtitle.configure(wraplength=max(e.width, 200)))
+        self.badge = tk.Label(self.header, text="⚠ Custom scoring", font=s.font(9, "bold"), bg=t.next,
+                              fg=t.on_next, padx=10, pady=4)
+        self._update_badge()
 
-        left = tk.Frame(body, bg=BG)
-        left.grid(row=0, column=0, sticky="ns", padx=(0, 20))
-        right = tk.Frame(body, bg=BG)
-        right.grid(row=0, column=1, sticky="nsew")
-
-        self._build_inputs(left)
-        self._build_results(right)
-
-        for var in (self.cvss_var, self.threat_var, self.asset_var,
-                    self.exposure_var, self.patch_var, self.controls_var):
-            var.trace_add("write", self._update)
-        self._update()
-        self.cvss_entry.focus_set()
-        if loaded.warnings:
-            root.after(200, lambda: messagebox.showwarning("Scoring settings", "\n\n".join(loaded.warnings),
-                                                           parent=root))
-
-    def font(self, size, weight="normal"):
-        return (self.family, size, weight)
-
-    def _init_styles(self):
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TCombobox", fieldbackground=FIELD, background=BORDER, foreground=TEXT,
-                        arrowcolor=TEXT, bordercolor=BORDER, lightcolor=FIELD, darkcolor=FIELD,
-                        selectbackground=FIELD, selectforeground=TEXT, padding=6)
-        style.map("TCombobox",
-                  fieldbackground=[("readonly", FIELD)],
-                  foreground=[("readonly", TEXT)],
-                  selectbackground=[("readonly", FIELD)],
-                  selectforeground=[("readonly", TEXT)],
-                  bordercolor=[("focus", ACCENT)])
-        style.configure("Score.Horizontal.TProgressbar", troughcolor=FIELD, background=ACCENT,
-                        bordercolor=CARD, lightcolor=ACCENT, darkcolor=ACCENT, thickness=10)
-        style.configure("Vertical.TScrollbar", background=BORDER, troughcolor=CARD, bordercolor=CARD,
-                        arrowcolor=TEXT, lightcolor=BORDER, darkcolor=BORDER)
-        style.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT,
-                        borderwidth=0, rowheight=28, font=(self.family, 10))
-        style.configure("Treeview.Heading", background=BORDER, foreground=TEXT, relief="flat",
-                        padding=6, font=(self.family, 9, "bold"))
-        style.map("Treeview", background=[("selected", ACCENT)], foreground=[("selected", BG)])
-        style.map("Treeview.Heading", background=[("active", BORDER)])
-        self.style = style
-        self.root.option_add("*TCombobox*Listbox.background", FIELD)
-        self.root.option_add("*TCombobox*Listbox.foreground", TEXT)
-        self.root.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
-        self.root.option_add("*TCombobox*Listbox.selectForeground", BG)
-        self.root.option_add("*TCombobox*Listbox.font", self.font(10))
-
-    def _card(self, parent, title, expand=False):
-        outer = tk.Frame(parent, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
-        outer.pack(fill=tk.BOTH if expand else tk.X, expand=expand, pady=(0, 14))
-        tk.Label(outer, text=title.upper(), font=self.font(9, "bold"), bg=CARD, fg=ACCENT).pack(
-            anchor="w", padx=16, pady=(12, 4))
-        inner = tk.Frame(outer, bg=CARD)
-        inner.pack(fill=tk.BOTH, expand=expand, padx=16, pady=(0, 14))
-        return inner
-
-    def _field_label(self, parent, text):
-        tk.Label(parent, text=text, font=self.font(9), bg=CARD, fg=MUTED).pack(anchor="w", pady=(8, 3))
-
-    def _combo(self, parent, label, enum_cls, default):
-        self._field_label(parent, label)
-        var = tk.StringVar(value=default.value)
-        box = ttk.Combobox(parent, textvariable=var, values=[m.value for m in enum_cls],
-                           state="readonly", font=self.font(10))
-        box.pack(fill=tk.X)
-        box.bind("<<ComboboxSelected>>", lambda _e: box.selection_clear())
-        return var
-
-    def _build_header(self):
-        header = tk.Frame(self.root, bg=HEADER)
-        header.pack(fill=tk.X)
-        tk.Label(header, text="Vulnerability Prioritizer", font=self.font(20, "bold"),
-                 bg=HEADER, fg=TEXT).pack(anchor="w", padx=24, pady=(16, 0))
-        tk.Label(header, text=("Now / Next / Never triage from CVSS, threat intel, asset value, "
-                               "exposure and mitigations"),
-                 font=self.font(10), bg=HEADER, fg=MUTED).pack(anchor="w", padx=24, pady=(2, 14))
-        tk.Frame(header, bg=ACCENT, height=3).pack(fill=tk.X)
-        self._button(header, "Batch import (CSV)", self.open_batch).place(relx=1.0, x=-24, y=22, anchor="ne")
-        if not self.settings.is_default:
-            tk.Label(header, text="Custom scoring", font=self.font(9, "bold"), bg=PRIORITY_COLORS["NEXT"], fg=BG,
-                     padx=10, pady=4).place(relx=1.0, x=-24, y=66, anchor="ne")
-
-    def _button(self, parent, text, command, **kwargs):
-        btn = tk.Button(parent, text=text, command=command, font=self.font(10, "bold"), bg=ACCENT, fg=BG,
-                        activebackground=TEXT, activeforeground=BG, relief="flat", bd=0, padx=16, pady=8,
-                        cursor="hand2", **kwargs)
-        return btn
-
-    def load_threat_data(self):
-        """Load stored KEV and EPSS data on first use and warn about unusable files."""
-        if self.threat_data is None:
-            self.threat_data = threatdata.ThreatData.load()
-            if self.threat_data.warnings:
-                messagebox.showwarning("Threat data", "\n\n".join(self.threat_data.warnings), parent=self.root)
-        return self.threat_data
-
-    def open_batch(self):
-        path = filedialog.askopenfilename(
-            parent=self.root, title="Select a CSV of vulnerabilities",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
-        if not path:
-            return
-        try:
-            data = self.load_threat_data() if batch.has_cve_column(path) else None
-            items = batch.process_file(path, self.settings, data)
-        except (OSError, UnicodeDecodeError, csv.Error, ValueError) as e:
-            messagebox.showerror("Batch import failed", str(e), parent=self.root)
-            return
-        if not items:
-            messagebox.showinfo("Batch import", "The file has a header but no data rows.", parent=self.root)
-            return
-        BatchWindow(self, path, items, data)
-
-    def _build_inputs(self, parent):
-        vuln = self._card(parent, "Vulnerability")
-        self._field_label(vuln, "CVSS base score")
-        row = tk.Frame(vuln, bg=CARD)
-        row.pack(fill=tk.X)
-        self.cvss_var = tk.StringVar()
-        self.cvss_entry = tk.Entry(row, textvariable=self.cvss_var, width=6, justify="center",
-                                   font=self.font(18, "bold"), bg=FIELD, fg=TEXT, insertbackground=TEXT,
-                                   relief="flat", highlightthickness=1, highlightbackground=BORDER,
-                                   highlightcolor=ACCENT)
-        self.cvss_entry.pack(side=tk.LEFT, ipady=6)
-        self.cvss_chip = tk.Label(row, text="", font=self.font(10, "bold"), bg=CARD, fg=MUTED)
-        self.cvss_chip.pack(side=tk.LEFT, padx=14)
-        self.cvss_hint = tk.Label(vuln, text="Enter a base score from 0.0 to 10.0", font=self.font(9),
-                                  bg=CARD, fg=MUTED)
-        self.cvss_hint.pack(anchor="w", pady=(4, 0))
-        self.threat_var = self._combo(vuln, "Threat status", Threat, Threat.NONE)
-
-        env = self._card(parent, "Asset & environment")
-        self.asset_var = self._combo(env, "Asset criticality", Asset, Asset.STANDARD)
-        self.exposure_var = self._combo(env, "Network exposure", Exposure, Exposure.LOW)
-        self.exposure_hint = tk.Label(env, text=EXPOSURE_HELP, font=self.font(8), bg=CARD, fg=MUTED,
-                                      anchor="w", justify="left")
-        self.exposure_hint.pack(fill=tk.X, pady=(4, 0))
-        self.exposure_hint.bind("<Configure>", lambda e: self.exposure_hint.config(wraplength=max(e.width - 4, 100)))
-
-        rem = self._card(parent, "Remediation & mitigation")
-        self.patch_var = self._combo(rem, "Patch status", Patch, Patch.AVAILABLE)
-        self.controls_var = self._combo(rem, "Compensating controls", Controls, Controls.NONE)
-
-    def _build_results(self, parent):
-        result = self._card(parent, "Priority")
-        top = tk.Frame(result, bg=CARD)
-        top.pack(fill=tk.X)
-        self.badge = tk.Label(top, text="-", width=7, font=self.font(34, "bold"), bg=FIELD, fg=MUTED)
-        self.badge.pack(side=tk.LEFT, ipady=12)
-        info = tk.Frame(top, bg=CARD)
-        info.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=18)
-        self.verdict = tk.Label(info, text="", font=self.font(16, "bold"), bg=CARD, fg=TEXT, anchor="w")
-        self.verdict.pack(fill=tk.X)
-        self.subtitle = tk.Label(info, text="", font=self.font(10), bg=CARD, fg=MUTED, anchor="w",
-                                 justify="left")
-        self.subtitle.pack(fill=tk.X, pady=(4, 0))
-        self.subtitle.bind("<Configure>", lambda e: self.subtitle.config(wraplength=max(e.width - 4, 100)))
-
-        score_row = tk.Frame(result, bg=CARD)
-        score_row.pack(fill=tk.X, pady=(16, 4))
-        tk.Label(score_row, text="Ordering score", font=self.font(9), bg=CARD, fg=MUTED).pack(side=tk.LEFT)
-        self.score_label = tk.Label(score_row, text="", font=self.font(10, "bold"), bg=CARD, fg=TEXT)
-        self.score_label.pack(side=tk.RIGHT)
-        self.score_bar = ttk.Progressbar(result, maximum=10, style="Score.Horizontal.TProgressbar")
-        self.score_bar.pack(fill=tk.X)
-        tk.Label(result, text="Ranks items within a bucket; it does not decide the bucket.",
-                 font=self.font(8), bg=CARD, fg=MUTED).pack(anchor="w", pady=(4, 0))
-
-        action = self._card(parent, "Recommended action")
-        self.action_label = tk.Label(action, text="", font=self.font(11), bg=CARD, fg=TEXT,
-                                     anchor="w", justify="left")
-        self.action_label.pack(fill=tk.X)
-        self.action_label.bind("<Configure>", lambda e: self.action_label.config(wraplength=max(e.width - 4, 100)))
-
-        why = self._card(parent, "Rationale", expand=True)
-        holder = tk.Frame(why, bg=CARD)
-        holder.pack(fill=tk.BOTH, expand=True)
-        scroll = ttk.Scrollbar(holder, orient=tk.VERTICAL)
-        scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.rationale = tk.Text(holder, wrap=tk.WORD, height=8, font=self.font(10), bg=CARD, fg=TEXT,
-                                 relief="flat", highlightthickness=0, padx=2, pady=2, cursor="arrow",
-                                 yscrollcommand=scroll.set, state="disabled")
-        self.rationale.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scroll.config(command=self.rationale.yview)
-        self.rationale.tag_config("item", lmargin1=0, lmargin2=16, spacing3=5)
-
-        self.copy_btn = tk.Button(why, text="Copy summary", command=self._copy_summary, font=self.font(9, "bold"),
-                                  bg=BORDER, fg=TEXT, activebackground=ACCENT, activeforeground=BG,
-                                  relief="flat", bd=0, padx=12, pady=5, cursor="hand2", state="disabled")
-        self.copy_btn.pack(anchor="e", pady=(10, 0))
-
-    def _update(self, *_args):
-        raw = self.cvss_var.get().strip()
-        self._update_cvss_chip(raw)
-        if not raw:
-            self._show_idle("Waiting for input", "Enter a CVSS base score to calculate a priority.")
-            return
-        try:
-            cvss = parse_cvss(raw)
-        except ValueError as e:
-            self.cvss_entry.config(highlightbackground=ERROR, highlightcolor=ERROR)
-            self.cvss_hint.config(text=str(e), fg=ERROR)
-            self._show_idle("Invalid input", str(e), error=True)
-            return
-
-        self.cvss_entry.config(highlightbackground=BORDER, highlightcolor=ACCENT)
-        self.cvss_hint.config(text="Enter a base score from 0.0 to 10.0", fg=MUTED)
-        res = prioritize(
-            cvss,
-            Threat(self.threat_var.get()),
-            Asset(self.asset_var.get()),
-            Exposure(self.exposure_var.get()),
-            Controls(self.controls_var.get()),
-            Patch(self.patch_var.get()),
-            self.settings,
-        )
-        color = PRIORITY_COLORS[res.priority]
-        headline, sub = PRIORITY_TEXT[res.priority]
-        self.badge.config(text=res.priority, bg=color, fg=PRIORITY_FG[res.priority])
-        self.verdict.config(text=headline)
-        self.subtitle.config(text=sub)
-        self.style.configure("Score.Horizontal.TProgressbar", background=color, lightcolor=color, darkcolor=color)
-        self.score_bar.config(value=res.score)
-        self.score_label.config(text=f"{res.score:.2f} / 10")
-        self.action_label.config(text=res.action)
-        self._set_rationale(res.reasons)
-        self._summary = (f"Priority: {res.priority} ({headline})\n"
-                         f"Ordering score: {res.score:.2f}/10\n"
-                         f"Action: {res.action}\n\n"
-                         "Inputs:\n" + "\n".join(f"- {i}" for i in res.inputs)
-                         + f"\n- Scoring settings: {res.profile}"
-                         + "\n\nRationale:\n" + "\n".join(f"- {r}" for r in res.reasons))
-        self.copy_btn.config(state="normal")
-
-    def _update_cvss_chip(self, raw):
-        try:
-            value = parse_cvss(raw)
-        except ValueError:
-            self.cvss_chip.config(text="")
-            return
-        _min, label, color = next(b for b in CVSS_BANDS if value >= b[0])
-        self.cvss_chip.config(text=label, fg=color)
-
-    def _show_idle(self, headline, sub, error=False):
-        self.badge.config(text="!" if error else "-", bg=FIELD, fg=ERROR if error else MUTED)
-        self.verdict.config(text=headline)
-        self.subtitle.config(text=sub)
-        self.score_bar.config(value=0)
-        self.score_label.config(text="")
-        self.action_label.config(text="")
-        self._set_rationale([])
-        self._summary = ""
-        self.copy_btn.config(state="disabled")
-
-    def _set_rationale(self, reasons):
-        self.rationale.config(state="normal")
-        self.rationale.delete("1.0", tk.END)
-        for reason in reasons:
-            self.rationale.insert(tk.END, f"•  {reason}\n", "item")
-        self.rationale.config(state="disabled")
-
-    def _copy_summary(self):
-        if self._summary:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(self._summary)
-
-
-class BatchWindow:
-    """Ranked results of a batch import, with a detail pane and CSV export."""
-
-    COLUMNS = [("rank", "#", 50, "center"), ("id", "ID", 100, "w"), ("name", "Name", 280, "w"),
-               ("priority", "Priority", 80, "center"), ("score", "Score", 70, "center"),
-               ("cvss", "CVSS", 60, "center"), ("action", "Action / error", 420, "w")]
-
-    def __init__(self, app, path, items, data=None):
-        self.app, self.path, self.items, self.data = app, path, items, data
-        font = app.font
-        win = self.win = tk.Toplevel(app.root)
-        win.title(f"Batch results - {os.path.basename(path)}")
-        fit_window(win, 1180, 720, 900, 560)
-        win.configure(bg=BG)
-        win.transient(app.root)
-
-        top = tk.Frame(win, bg=HEADER)
-        top.pack(fill=tk.X)
-        tk.Label(top, text="Batch results", font=font(18, "bold"), bg=HEADER, fg=TEXT).pack(
-            anchor="w", padx=24, pady=(14, 0))
-        tk.Label(top, text=path, font=font(9), bg=HEADER, fg=MUTED).pack(anchor="w", padx=24, pady=(2, 12))
-        tk.Frame(top, bg=ACCENT, height=3).pack(fill=tk.X)
-        app._button(top, "Export ranked CSV", self.export).place(relx=1.0, x=-24, y=18, anchor="ne")
-
-        body = tk.Frame(win, bg=BG)
-        body.pack(fill=tk.BOTH, expand=True, padx=24, pady=16)
-
-        counts = batch.summarize(items)
-        chips = tk.Frame(body, bg=BG)
-        chips.pack(fill=tk.X, pady=(0, 12))
-        for label, color in (("NOW", PRIORITY_COLORS["NOW"]), ("NEXT", PRIORITY_COLORS["NEXT"]),
-                             ("NEVER", PRIORITY_COLORS["NEVER"]), ("ERROR", ERROR)):
-            chip = tk.Frame(chips, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
-            chip.pack(side=tk.LEFT, padx=(0, 10))
-            tk.Label(chip, text=str(counts[label]), font=font(18, "bold"), bg=CARD, fg=color).pack(
-                side=tk.LEFT, padx=(14, 6), pady=8)
-            tk.Label(chip, text=label.title() if label == "ERROR" else label, font=font(9, "bold"),
-                     bg=CARD, fg=MUTED).pack(side=tk.LEFT, padx=(0, 14))
-        tk.Label(chips, text=f"{len(items)} rows", font=font(10), bg=BG, fg=MUTED).pack(side=tk.RIGHT)
-
-        table = tk.Frame(body, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
-        table.pack(fill=tk.BOTH, expand=True)
-        scroll = ttk.Scrollbar(table, orient=tk.VERTICAL)
-        scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.tree = ttk.Treeview(table, columns=[c[0] for c in self.COLUMNS], show="headings",
-                                 selectmode="browse", yscrollcommand=scroll.set)
-        scroll.config(command=self.tree.yview)
-        for key, title, width, anchor in self.COLUMNS:
-            self.tree.heading(key, text=title)
-            self.tree.column(key, width=width, anchor=anchor, stretch=(key == "action"))
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        for name, color in list(PRIORITY_COLORS.items()) + [("ERROR", ERROR)]:
-            self.tree.tag_configure(name, foreground=color)
-
-        rank = 0
-        for index, item in enumerate(items):
-            if item.result:
-                rank += 1
-                values = (rank, item.id, item.name, item.priority, f"{item.result.score:.2f}",
-                          f"{item.cvss:.1f}", item.result.action)
-            else:
-                values = ("", item.id, item.name, "ERROR", "", item.cvss_raw, item.error)
-            self.tree.insert("", tk.END, iid=str(index), values=values, tags=(item.priority,))
-
-        detail = tk.Frame(body, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
-        detail.pack(fill=tk.X, pady=(12, 0))
-        tk.Label(detail, text="DETAILS", font=font(9, "bold"), bg=CARD, fg=ACCENT).pack(
-            anchor="w", padx=16, pady=(10, 2))
-        self.detail = tk.Text(detail, wrap=tk.WORD, height=7, font=font(10), bg=CARD, fg=TEXT, relief="flat",
-                              highlightthickness=0, padx=14, pady=4, cursor="arrow", state="disabled")
-        self.detail.pack(fill=tk.X, padx=2, pady=(0, 10))
-        self.detail.tag_config("item", lmargin1=0, lmargin2=16, spacing3=4)
-
-        self.tree.bind("<<TreeviewSelect>>", self._on_select)
-        if self.tree.get_children():
-            first = self.tree.get_children()[0]
-            self.tree.selection_set(first)
-            self.tree.focus(first)
-
-    def _on_select(self, _event):
-        selection = self.tree.selection()
-        if not selection:
-            return
-        item = self.items[int(selection[0])]
-        label = f"{item.id}  {item.name}".strip() or f"Line {item.line}"
-        lines = [f"Source line {item.line}: {label}"]
-        if item.result:
-            lines += ([f"Action: {item.result.action}"] + [f"•  {r}" for r in item.result.reasons]
-                      + ["Inputs: " + "; ".join(item.result.inputs),
-                         "Scoring settings: " + item.result.profile])
+    def _update_badge(self):
+        if self.ctx.settings.is_default:
+            self.badge.pack_forget()
         else:
-            lines += [f"•  {part}" for part in item.error.split("; ")]
-        self.detail.config(state="normal")
-        self.detail.delete("1.0", tk.END)
-        self.detail.insert(tk.END, "\n".join(lines), "item")
-        self.detail.config(state="disabled")
+            self.badge.pack(side=tk.RIGHT, padx=20)
 
-    def export(self):
-        stem = os.path.splitext(os.path.basename(self.path))[0]
-        out = filedialog.asksaveasfilename(
-            parent=self.win, title="Export ranked results", defaultextension=".csv",
-            initialfile=f"{stem}_ranked.csv", filetypes=[("CSV files", "*.csv")])
-        if not out:
+    def _layout(self, narrow):
+        if narrow == self.narrow:
             return
+        self.narrow = narrow
+        self.nav.grid_forget()
+        self.content.grid_forget()
+        self.status_bar.grid_forget()
+        for button in self.nav_buttons.values():
+            button.pack_forget()
+        if narrow:
+            self.shell.rowconfigure(1, weight=0)
+            self.shell.rowconfigure(2, weight=1)
+            self.nav.grid(row=1, column=0, columnspan=2, sticky="new")
+            self.content.grid(row=2, column=0, columnspan=2, sticky="nsew")
+            self.status_bar.grid(row=3, column=0, columnspan=2, sticky="ew")
+            for button in self.nav_buttons.values():
+                button.pack(side=tk.LEFT, padx=2, pady=4)
+        else:
+            self.shell.rowconfigure(2, weight=0)
+            self.shell.rowconfigure(1, weight=1)
+            self.nav.grid(row=1, column=0, sticky="ns")
+            self.content.grid(row=1, column=1, sticky="nsew")
+            self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
+            self.nav.configure(width=int(190 * self.style.scale))
+            for button in self.nav_buttons.values():
+                button.pack(fill=tk.X, padx=8, pady=2)
+        self._mark_current()
+
+    def _on_resize(self, event):
+        if event.widget is self.root:
+            self._layout(event.width < NARROW_BELOW)
+
+    # ---- navigation ----
+    def show_view(self, name):
+        """Show one view, creating it the first time."""
+        if name not in self.views:
+            cls = next(c for n, _label, c in VIEWS if n == name)
+            self.views[name] = cls(self.ctx, self.content)
+        for view_name, view in self.views.items():
+            if view_name == name:
+                view.frame.pack(fill=tk.BOTH, expand=True)
+            else:
+                view.frame.pack_forget()
+        self.current = name
+        self._mark_current()
+        view = self.views[name]
+        if hasattr(view, "focus_first"):
+            view.focus_first()
+
+    def _mark_current(self):
+        t = self.style.theme
+        for name, button in self.nav_buttons.items():
+            on = name == self.current
+            button.configure(bg=t.card if on else t.header, fg=t.text if on else t.muted,
+                             activebackground=t.card, activeforeground=t.text,
+                             font=self.style.font(10, "bold" if on else "normal"),
+                             highlightbackground=t.accent if on else t.header, highlightcolor=t.accent)
+
+    def _bind_shortcuts(self):
+        for index, (name, _label, _cls) in enumerate(VIEWS, start=1):
+            self.root.bind_all(f"<Control-Key-{index}>", lambda _e, n=name: self.show_view(n))
+        for sequence in ("<Control-l>", "<Control-L>"):
+            self.root.bind_all(sequence, self._focus_cve)
+        for sequence in ("<Control-Shift-C>", "<Control-Shift-c>"):
+            self.root.bind_all(sequence, self._copy_summary)
+
+    def _focus_cve(self, _event=None):
+        self.show_view("assess")
+        self.views["assess"].focus_cve()
+        return "break"
+
+    def _copy_summary(self, _event=None):
+        view = self.views.get(self.current)
+        if hasattr(view, "copy_summary"):
+            view.copy_summary()
+        return "break"
+
+    # ---- status bar ----
+    def refresh_status(self):
+        """Redraw the status bar: freshness of each data source, scoring mode and the Update button."""
+        if not self.status_bar.winfo_exists():
+            return
+        t, s = self.style.theme, self.style
+        for child in self.status_bar.winfo_children():
+            child.destroy()
+        for status in self.ctx.status():
+            fresh = status.freshness(self.ctx.settings.stale_days)
+            if status.problem:
+                direction, text = "error", f"{status.label} problem"
+            elif not status.loaded:
+                direction, text = "warn", f"{status.label} not loaded"
+            else:
+                direction = "warn" if fresh.stale else "ok"
+                age = fresh.text.rsplit("retrieved ", 1)[-1].replace(" ago", "") if "retrieved" in fresh.text else "?"
+                text = f"{status.label} {status.version} · {age}" + (" (stale)" if fresh.stale else "")
+            widget = chip(self.status_bar, s, text, direction, bg=t.header)
+            widget.pack(side=tk.LEFT, padx=(12, 0), pady=6)
+            widget.bind("<Button-1>", lambda _e: self.show_view("threat"))
+            widget.configure(cursor="hand2")
+        busy = self.ctx.updater is not None and self.ctx.updater.busy
+        tk.Button(self.status_bar, text="Updating…" if busy else "Update", font=s.font(9), relief="flat", bd=0,
+                  padx=10, pady=3, bg=t.field, fg=t.text, activebackground=t.card, activeforeground=t.text,
+                  highlightthickness=2, highlightbackground=t.field, highlightcolor=t.accent,
+                  state="disabled" if busy else "normal", disabledforeground=t.muted,
+                  command=self.start_update).pack(side=tk.RIGHT, padx=12, pady=4)
+        tk.Label(self.status_bar, text="Scoring: " + ("defaults" if self.ctx.settings.is_default else "custom"),
+                 font=s.font(9), bg=t.header, fg=t.warn if not self.ctx.settings.is_default else t.muted).pack(
+            side=tk.RIGHT)
+
+    def start_update(self):
+        """Open the Threat data view and start an update (after confirmation)."""
+        self.show_view("threat")
+        self.ctx.updater.update()
+
+    # ---- changes from the views ----
+    def settings_changed(self):
+        """Apply new scoring settings: update the badge, status bar and any view that shows results."""
+        self._update_badge()
+        self.refresh_status()
+        for name in ("assess", "batch"):
+            if name in self.views:
+                self.views[name].refresh()
+
+    def prefs_changed(self):
+        """Rebuild the whole window with new appearance preferences."""
+        self.build()
+
+    def report_exception(self, exc_type, exc, tb):
+        """Show a short message for an unexpected error and keep the details on the terminal only."""
+        traceback.print_exception(exc_type, exc, tb, file=sys.stderr)
         try:
-            batch.write_results(out, self.items, self.data)
-        except OSError as e:
-            messagebox.showerror("Export failed", str(e), parent=self.win)
-            return
-        messagebox.showinfo("Exported", f"Saved {len(self.items)} rows to\n{out}", parent=self.win)
+            messagebox.showerror("Something went wrong", f"An unexpected error occurred ({exc_type.__name__}). "
+                                                         "Your data was not changed. You can keep working.",
+                                 parent=self.root)
+        except tk.TclError:
+            pass
+
+
+def main():
+    """Start the application."""
+    root = tk.Tk()
+    App(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    VulnerabilityPrioritizer(root)
-    root.mainloop()
+    print(f"Vulnerability Prioritizer {__version__}", file=sys.stderr)
+    main()

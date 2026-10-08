@@ -3,7 +3,7 @@ import tkinter as tk
 
 import settings as scoring
 import uiprefs
-from gui_widgets import ScrollFrame, Segmented, button, card
+from gui_widgets import ScrollFrame, Segmented, button, card, set_enabled
 from settings import SPEC, Settings
 
 TITLES = {"cvss_high": "CVSS High line", "cvss_critical": "CVSS Critical line",
@@ -68,7 +68,7 @@ class SettingsView:
         self.entries, self.messages, self._traces = {}, {}, []
         self._build_scoring(self.scroll.body)
         self._build_appearance(self.scroll.body)
-        for name, var in self.state.vars.items():
+        for var in self.state.vars.values():
             self._traces.append((var, var.trace_add("write", self.validate)))
         self.frame.bind("<Destroy>", self._on_destroy)
         self.validate()
@@ -169,7 +169,7 @@ class SettingsView:
                                                     "badge is shown."), fg=t.muted)
         else:
             self.status.configure(text="Not saved yet.", fg=t.warn)
-        self.save_button.configure(state="normal" if parsed is not None and parsed != self.ctx.settings else "disabled")
+        set_enabled(self.save_button, parsed is not None and parsed != self.ctx.settings)
 
     def save(self):
         """Save the typed values and use them everywhere."""

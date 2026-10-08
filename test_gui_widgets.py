@@ -16,6 +16,22 @@ class WidgetTests(DisplayTestCase):
             gw.button(inner, self.style, kind, lambda: clicked.append(1), kind).invoke()
         self.assertEqual(len(clicked), 2)
 
+    def test_disabled_buttons_look_disabled_and_readable(self):
+        frame = self.make_frame()
+        clicked = []
+        for kind in ("primary", "secondary"):
+            b = gw.button(frame, self.style, "Save", lambda: clicked.append(1), kind)
+            enabled_look = (str(b.cget("bg")), str(b.cget("fg")))
+            gw.set_enabled(b, False)
+            self.assertEqual(str(b.cget("state")), "disabled")
+            self.assertEqual((str(b.cget("bg")), str(b.cget("fg"))), (self.style.theme.border, self.style.theme.muted))
+            self.assertNotEqual((str(b.cget("bg")), str(b.cget("fg"))), enabled_look)
+            b.invoke()
+            gw.set_enabled(b, True)
+            self.assertEqual((str(b.cget("bg")), str(b.cget("fg")), str(b.cget("state"))), (*enabled_look, "normal"))
+            b.invoke()
+        self.assertEqual(len(clicked), 2)
+
     def test_chips_carry_a_symbol_and_a_word(self):
         frame = self.make_frame()
         for direction, symbol in (("raise", "\u25b2"), ("lower", "\u25bc"), ("neutral", "\u25ac"), ("ok", "\u2713"),
@@ -25,9 +41,9 @@ class WidgetTests(DisplayTestCase):
             self.assertEqual(str(chip.cget("fg")), self.style.direction(direction))
 
     def test_flow_frame_wraps_chips_to_the_width(self):
-        frame = self.make_frame(width=260)
+        frame = self.make_frame()
         flow = gw.FlowFrame(frame, self.style.theme.card)
-        flow.pack(fill=tk.X)
+        flow.place(x=0, y=0, width=260)
         self.root.update()
         one_row = gw.chip(flow, self.style, "In CISA KEV").winfo_reqheight()
         flow.set_items([gw.chip(flow, self.style, f"Factor number {i}", "raise") for i in range(8)])
@@ -132,6 +148,42 @@ class WidgetTests(DisplayTestCase):
         helped = gw.field_label(frame, self.style, "Exposure", "Explained")
         self.assertEqual(len(plain.winfo_children()), 1)
         self.assertEqual(len(helped.winfo_children()), 2)
+
+
+class ScrollFrameTests(DisplayTestCase):
+    def build(self, rows):
+        frame = self.make_frame(width=300, height=200)
+        scroll = gw.ScrollFrame(frame, self.style.theme.card)
+        scroll.pack(fill=tk.BOTH, expand=True)
+        for i in range(rows):
+            tk.Label(scroll.body, text=f"row {i}", pady=8).pack()
+        self.pump(0.2)
+        return scroll
+
+    def test_the_scrollbar_appears_only_when_the_content_does_not_fit(self):
+        short = self.build(2)
+        self.assertFalse(short.bar.winfo_ismapped())
+        tall = self.build(40)
+        self.assertTrue(tall.bar.winfo_ismapped())
+
+    def test_the_scrollbar_follows_the_content_size(self):
+        scroll = self.build(40)
+        for child in scroll.body.winfo_children()[2:]:
+            child.destroy()
+        self.pump(0.2)
+        self.assertFalse(scroll.bar.winfo_ismapped())
+
+    def test_scrolling_moves_the_view_and_returns_to_the_top(self):
+        scroll = self.build(40)
+        scroll.canvas.yview_scroll(5, "units")
+        self.pump()
+        self.assertGreater(scroll.canvas.yview()[0], 0)
+        scroll.scroll_to_top()
+        self.assertEqual(scroll.canvas.yview()[0], 0)
+
+    def test_the_body_follows_the_window_width(self):
+        scroll = self.build(2)
+        self.assertEqual(scroll.canvas.itemcget(scroll._window, "width"), str(scroll.canvas.winfo_width()))
 
 
 class WorkerTests(DisplayTestCase):

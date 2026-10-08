@@ -287,6 +287,24 @@ class AssessCveTests(AssessTestCase):
         self.assertEqual(self.ctx.assess_state.threat.get(), "NONE")
 
 
+class AssessOptionTests(unittest.TestCase):
+    def test_choices_run_from_least_to_most_concerning(self):
+        names = lambda enum: [value for value, _label in gui_assess._options(enum)]  # noqa: E731
+        self.assertEqual(names(Threat), ["NONE", "PUBLIC", "ACTIVE"])
+        self.assertEqual(names(Asset), ["STANDARD", "IMPORTANT", "CROWN"])
+        self.assertEqual(names(Exposure), ["LOW", "MEDIUM", "HIGH"])
+        self.assertEqual(names(Patch), ["AVAILABLE", "PENDING", "EOL"])
+        self.assertEqual(names(Controls), ["NONE", "PARTIAL", "STRONG"])
+
+    def test_every_choice_has_a_short_label_and_maps_back_to_a_member(self):
+        for enum in (Threat, Asset, Exposure, Patch, Controls):
+            options = gui_assess._options(enum)
+            self.assertEqual(len(options), len(enum))
+            for value, label in options:
+                self.assertTrue(label)
+                self.assertIn(value, enum.__members__)
+
+
 class AssessLayoutTests(AssessTestCase):
     def test_columns_stack_when_narrow_and_return_when_wide(self):
         view = self.build()

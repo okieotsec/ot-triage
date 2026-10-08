@@ -32,13 +32,22 @@ def field_label(parent, style, text, help_text=None, bg=None):
 
 
 def button(parent, style, text, command, kind="primary", **options):
-    """Create a flat button; kind is primary or secondary."""
+    """Create a flat button; kind is primary or secondary. Use set_enabled to enable or disable it."""
     t = style.theme
     bg, fg = (t.accent, t.on_accent) if kind == "primary" else (t.field, t.text)
-    return tk.Button(parent, text=text, command=command, font=style.font(10, "bold" if kind == "primary" else "normal"),
-                     bg=bg, fg=fg, activebackground=t.text, activeforeground=t.bg, relief="flat", bd=0, padx=14,
-                     pady=7, cursor="hand2", highlightthickness=2, highlightbackground=bg, highlightcolor=t.accent,
-                     disabledforeground=t.muted, **options)
+    weight = "bold" if kind == "primary" else "normal"
+    widget = tk.Button(parent, text=text, command=command, font=style.font(10, weight), bg=bg, fg=fg,
+                       activebackground=t.text, activeforeground=t.bg, relief="flat", bd=0, padx=14, pady=7,
+                       cursor="hand2", highlightthickness=2, highlightbackground=bg, highlightcolor=t.accent,
+                       disabledforeground=t.muted, **options)
+    widget.look = {"normal": (bg, fg, "hand2"), "disabled": (t.border, t.muted, "arrow")}
+    return widget
+
+
+def set_enabled(widget, enabled):
+    """Enable or disable a button made by button(), with a clearly different look when disabled."""
+    bg, fg, cursor = widget.look["normal" if enabled else "disabled"]
+    widget.configure(state="normal" if enabled else "disabled", bg=bg, fg=fg, cursor=cursor, highlightbackground=bg)
 
 
 class ScrollFrame(tk.Frame):
@@ -49,15 +58,30 @@ class ScrollFrame(tk.Frame):
         self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
         self.bar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.bar.set)
-        self.bar.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.body = tk.Frame(self.canvas, bg=bg)
         self._window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
-        self.body.bind("<Configure>", lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self._window, width=e.width))
+        self.body.bind("<Configure>", self._on_body_resize)
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
         for widget in (self.canvas, self.body):
             widget.bind("<Enter>", self._bind_wheel)
             widget.bind("<Leave>", self._unbind_wheel)
+
+    def _on_body_resize(self, _event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self._toggle_bar()
+
+    def _on_canvas_resize(self, event):
+        self.canvas.itemconfigure(self._window, width=event.width)
+        self._toggle_bar()
+
+    def _toggle_bar(self):
+        """Show the scrollbar only when the content is taller than the visible area."""
+        needed = self.body.winfo_reqheight() > self.canvas.winfo_height() > 1
+        if needed and not self.bar.winfo_ismapped():
+            self.bar.pack(side=tk.RIGHT, fill=tk.Y, before=self.canvas)
+        elif not needed and self.bar.winfo_ismapped():
+            self.bar.pack_forget()
 
     def _bind_wheel(self, _event):
         self.bind_all("<MouseWheel>", self._wheel)

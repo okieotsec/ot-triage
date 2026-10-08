@@ -7,7 +7,7 @@ import batch
 import explain
 import threatdata
 from gui_theme import PRIORITY_SYMBOLS
-from gui_widgets import FlowFrame, button, card, chip
+from gui_widgets import FlowFrame, button, card, chip, set_enabled
 
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
 COLUMNS = [("rank", "#", 50, "center"), ("id", "ID", 100, "w"), ("cve", "CVE", 130, "w"), ("name", "Name", 240, "w"),
@@ -156,7 +156,7 @@ class BatchView:
         if not ctx.worker.start(job, lambda result, error: self._loaded(path, result, error), self._progress):
             ctx.info("Batch import", "Another task is still running. Wait for it to finish or cancel it.")
             return
-        self.open_button.configure(state="disabled")
+        set_enabled(self.open_button, False)
         self.progress_row.pack(fill=tk.X, pady=(8, 0))
         self.progress_bar.start(12)
 
@@ -169,7 +169,7 @@ class BatchView:
         if alive:
             self.progress_bar.stop()
             self.progress_row.pack_forget()
-            self.open_button.configure(state="normal")
+            set_enabled(self.open_button, True)
         if self.ctx.worker.cancel_event.is_set():
             return
         if error:
@@ -259,13 +259,18 @@ class BatchView:
                              values=(rank, item.id, item.cve, item.name, f"{symbol} {item.priority}", score, cvss,
                                      source))
         if state.items:
-            self.file_label.configure(text=f"{os.path.basename(state.path)}  ·  {len(state.items)} rows"
-                                      + (f"  ·  {state.data.versions()}" if state.data else ""))
+            scored = next((i for i in state.items if i.result), None)
+            outdated = scored is not None and scored.result.profile != self.ctx.settings.describe()
+            self.file_label.configure(
+                text=f"{os.path.basename(state.path)}  ·  {len(state.items)} rows"
+                + (f"  ·  {state.data.versions()}" if state.data else "")
+                + ("  ·  scored with different scoring settings; open the file again to re-score" if outdated else ""),
+                fg=self.style.theme.warn if outdated else self.style.theme.muted)
             self.count_label.configure(text=f"Showing {len(shown)} of {len(state.items)}")
         else:
             self.file_label.configure(text="No file loaded")
             self.count_label.configure(text="")
-        self.export_button.configure(state="normal" if state.items else "disabled")
+        set_enabled(self.export_button, bool(state.items))
         self._clear_details()
         if shown:
             self.tree.selection_set(str(index_of[id(shown[0])]))

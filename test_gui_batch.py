@@ -341,6 +341,14 @@ class BatchThreatDataTests(BatchViewTestCase):
         self.assertTrue(self.ctx.error.called)
         self.assertEqual(self.ctx.error.call_args[0][0], "Export failed")
 
+    def test_changing_settings_after_loading_flags_the_results_as_outdated(self):
+        view = self.load()
+        self.assertNotIn("different scoring settings", view.file_label.cget("text"))
+        self.ctx.settings = Settings(cvss_high=7.5)
+        view.refresh()
+        self.assertIn("open the file again to re-score", view.file_label.cget("text"))
+        self.assertEqual(str(view.file_label.cget("fg")), self.style.theme.warn)
+
     def test_custom_settings_are_used_when_scoring(self):
         self.ctx.settings = Settings(cvss_high=7.5)
         view = self.load(self.write_csv("one.csv", "cvss,threat,asset,exposure\n7.2,public,standard,high\n"))

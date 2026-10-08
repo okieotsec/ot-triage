@@ -209,10 +209,10 @@ class ThreatViewTests(ThreatViewTestCase):
             view.update()
             self.wait_idle()
         view.frame.destroy()
-        self.assertIsNone(self.ctx.updater.on_change)
+        self.assertEqual(self.ctx.updater.listeners, [])
         rebuilt = self.build()
         self.assertEqual(len(self.results_text()), 2)
-        self.assertEqual(self.ctx.updater.on_change, rebuilt.refresh)
+        self.assertEqual(self.ctx.updater.listeners, [rebuilt.refresh])
 
     def test_a_job_finishing_after_the_view_is_gone_does_not_crash(self):
         view = self.build()

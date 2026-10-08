@@ -1,4 +1,5 @@
 """Helpers for tests that need a real Tk display."""
+import gc
 import time
 import tkinter as tk
 import unittest
@@ -21,10 +22,18 @@ class DisplayTestCase(unittest.TestCase):
         cls.root.withdraw()
         cls.style = Style(cls.theme, cls.scale)
         apply_ttk_styles(cls.root, cls.style)
+        # Cyclic garbage must be freed on the main thread: a tkinter variable freed on a worker thread blocks while
+        # the test loop is not inside mainloop().
+        gc.disable()
 
     @classmethod
     def tearDownClass(cls):
         cls.root.destroy()
+        gc.collect()
+        gc.enable()
+
+    def tearDown(self):
+        gc.collect()
 
     def pump(self, seconds=0.0, until=None):
         """Process Tk events, optionally until a condition holds or time runs out."""

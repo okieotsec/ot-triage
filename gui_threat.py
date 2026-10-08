@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import threatdata
-from gui_widgets import ScrollFrame, button, card, chip
+from gui_widgets import ScrollFrame, button, card, chip, set_enabled
 
 HOSTS = ("www.cisa.gov", "epss.empiricalsecurity.com")
 CONFIRM_TEXT = ("This will download two public files over HTTPS from:\n\n" + "\n".join(f"  • {h}" for h in HOSTS)
@@ -16,7 +16,7 @@ class ThreatUpdater:
     def __init__(self, ctx):
         self.ctx = ctx
         self.results, self.message = [], ""
-        self.on_change = None
+        self.listeners = []
         self.confirmed = False
 
     @property
@@ -25,8 +25,8 @@ class ThreatUpdater:
         return self.ctx.worker.running
 
     def _notify(self):
-        if self.on_change:
-            self.on_change()
+        for listener in list(self.listeners):
+            listener()
 
     def update(self, ask=True):
         """Download both sources. Returns False if cancelled by the user or another task is running."""
@@ -93,13 +93,13 @@ class ThreatView:
         self.body = self.scroll.body
         self.body.configure(padx=20, pady=20)
         self._build()
-        self.updater.on_change = self.refresh
+        self.updater.listeners.append(self.refresh)
         self.frame.bind("<Destroy>", self._on_destroy)
         self.refresh()
 
     def _on_destroy(self, event):
-        if event.widget is self.frame and self.updater.on_change == self.refresh:
-            self.updater.on_change = None
+        if event.widget is self.frame and self.refresh in self.updater.listeners:
+            self.updater.listeners.remove(self.refresh)
 
     def _build(self):
         s, t = self.style, self.style.theme
@@ -206,8 +206,8 @@ class ThreatView:
                 detail.configure(text=status.problem or "Nothing stored yet. Update or import the file. Until then, "
                                                         "CVE lookups cannot use this source.")
         busy = self.updater.busy
-        self.update_button.configure(state="disabled" if busy else "normal")
-        self.import_button.configure(state="disabled" if busy else "normal")
+        set_enabled(self.update_button, not busy)
+        set_enabled(self.import_button, not busy)
         if busy:
             self.progress_label.configure(text=self.updater.message)
             self.progress_row.pack(fill=tk.X, pady=(10, 0))

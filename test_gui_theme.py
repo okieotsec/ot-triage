@@ -14,6 +14,11 @@ class ThemeContrastTests(unittest.TestCase):
                 with self.subTest(theme=theme.name, pair=f"{foreground} on {background}"):
                     self.assertGreaterEqual(ratio, MIN_TEXT_CONTRAST, f"{ratio:.2f}")
 
+    def test_disabled_button_text_is_still_readable(self):
+        for theme in THEMES.values():
+            with self.subTest(theme=theme.name):
+                self.assertGreaterEqual(contrast(theme.muted, theme.border), 3.0)
+
     def test_contrast_helper_matches_known_values(self):
         self.assertAlmostEqual(contrast("#000000", "#ffffff"), 21.0, places=2)
         self.assertAlmostEqual(contrast("#ffffff", "#ffffff"), 1.0, places=2)
