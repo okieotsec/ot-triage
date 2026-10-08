@@ -8,6 +8,7 @@ import unittest
 import batch
 import settings
 import threatdata
+import uiprefs
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, NOW, NEXT, NEVER, parse_cvss, prioritize
 
 try:
@@ -165,6 +166,26 @@ class PropertyTests(unittest.TestCase):
                 self.assertGreaterEqual(order[raised], order[base])
             missing = threatdata.derive_threat(None, settings.DEFAULT_SETTINGS, analyst, public).level
             self.assertGreaterEqual(order[base], order[missing])
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.binary(max_size=2048))
+        def test_preferences_loader_survives_arbitrary_bytes(self, data):
+            with tempfile.TemporaryDirectory() as directory:
+                path = os.path.join(directory, "ui.json")
+                with open(path, "wb") as fh:
+                    fh.write(data)
+                result = uiprefs.load(path)
+            self.assertIsInstance(result.prefs, uiprefs.UiPrefs)
+            self.assertLessEqual(len(result.warnings), 1)
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.dictionaries(st.text(max_size=12),
+                               st.one_of(st.none(), st.booleans(), st.integers(), st.text(max_size=8)), max_size=6))
+        def test_preferences_from_dict_only_raises_value_error(self, data):
+            try:
+                uiprefs.UiPrefs.from_dict(data)
+            except ValueError:
+                pass
 
 
 if __name__ == "__main__":

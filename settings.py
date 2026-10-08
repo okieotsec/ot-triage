@@ -1,11 +1,11 @@
 """Adjustable scoring settings with validation and safe loading and saving (no GUI dependencies)."""
-import json
 import math
 import os
 import sys
-import tempfile
 from dataclasses import dataclass, fields
 from pathlib import Path
+
+import jsonfile
 
 SETTINGS_VERSION = 1
 MAX_SETTINGS_BYTES = 16 * 1024
@@ -129,30 +129,13 @@ def default_path():
     return base / "vuln-prioritizer" / "settings.json"
 
 
-def _reject_constant(name):
-    raise ValueError(f"invalid number {name}")
-
-
-def _reject_duplicates(pairs):
-    keys = [k for k, _v in pairs]
-    if len(keys) != len(set(keys)):
-        raise ValueError("duplicate keys")
-    return dict(pairs)
-
-
 def load(path=None):
     """Load settings, falling back to defaults with a warning if the file is unusable."""
     path = Path(path) if path else default_path()
     if not path.exists():
         return LoadResult(DEFAULT_SETTINGS)
     try:
-        if not path.is_file():
-            raise ValueError("not a regular file")
-        if path.stat().st_size > MAX_SETTINGS_BYTES:
-            raise ValueError(f"file is larger than {MAX_SETTINGS_BYTES // 1024} KB")
-        text = path.read_bytes().decode("utf-8-sig")
-        data = json.loads(text, parse_constant=_reject_constant, object_pairs_hook=_reject_duplicates)
-        return LoadResult(Settings.from_dict(data))
+        return LoadResult(Settings.from_dict(jsonfile.read_json(path, MAX_SETTINGS_BYTES)))
     except (OSError, ValueError, RecursionError) as error:
         warning = f"Scoring settings in {path} could not be used ({error}). Default settings are in effect."
         return LoadResult(DEFAULT_SETTINGS, (warning,))
@@ -160,22 +143,7 @@ def load(path=None):
 
 def save(settings, path=None):
     """Write settings atomically with user-only permissions."""
-    path = Path(path) if path else default_path()
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=".settings-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(settings.to_dict(), fh, indent=2)
-            fh.write("\n")
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(temp_name, path)
-    except BaseException:
-        try:
-            os.remove(temp_name)
-        except OSError:
-            pass
-        raise
+    jsonfile.write_json_atomic(Path(path) if path else default_path(), settings.to_dict())
 
 
 def restore_defaults(path=None):

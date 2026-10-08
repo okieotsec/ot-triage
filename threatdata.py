@@ -20,7 +20,7 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from prioritizer import Threat
+from prioritizer import Factor, Threat
 
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 EPSS_URL = "https://epss.empiricalsecurity.com/epss_scores-current.csv.gz"
@@ -583,4 +583,22 @@ def apply_threat_context(result, decision, info):
         if entry.ransomware:
             score = min(10.0, round(score + RANSOMWARE_SCORE_BONUS, 2))
             reasons.append("Known ransomware campaign use: ranked higher within the bucket; the bucket is unchanged")
-    return dataclasses.replace(result, reasons=reasons, action=action, score=score)
+    threat_factors = [_source_factor(source, info) for source in decision.sources
+                      if not source.startswith("No KEV or elevated EPSS")]
+    generic = {"Actively exploited", "Public or likely exploit"}
+    factors = [f for f in result.factors if not (threat_factors and f.label in generic)]
+    if threat_factors:
+        position = next((i for i, f in enumerate(factors) if f.label.startswith("CVSS ")), -1) + 1
+        factors[position:position] = threat_factors
+    if info is not None and info.kev is not None and info.kev.ransomware:
+        factors.insert(position + len(threat_factors) if threat_factors else 1, Factor("Ransomware use", "raise"))
+    return dataclasses.replace(result, reasons=reasons, action=action, score=score, factors=factors)
+
+
+def _source_factor(source, info):
+    """Return a short chip for one threat-level source."""
+    if source.startswith("Elevated EPSS") and info is not None and info.percentile is not None:
+        return Factor(f"Elevated EPSS ({info.percentile * 100:.0f}th percentile)", "raise")
+    if source.startswith("Manual override"):
+        return Factor("Manual threat override", "neutral")
+    return Factor(source.split(" (")[0], "raise")

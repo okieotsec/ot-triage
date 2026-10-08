@@ -53,6 +53,14 @@ _ASSET_PTS = {Asset.CROWN: 10, Asset.IMPORTANT: 7, Asset.STANDARD: 3}
 _EXPOSURE_PTS = {Exposure.HIGH: 10, Exposure.MEDIUM: 7, Exposure.LOW: 3}
 
 
+@dataclass(frozen=True)
+class Factor:
+    """One input or rule effect that raised, lowered or did not change urgency."""
+
+    label: str
+    direction: str
+
+
 @dataclass
 class Result:
     """Outcome of a prioritization."""
@@ -62,6 +70,7 @@ class Result:
     action: str = ""
     inputs: list = field(default_factory=list)
     profile: str = ""
+    factors: list = field(default_factory=list)
 
 
 def parse_cvss(text):
@@ -86,6 +95,26 @@ def _fmt(value):
     return text + "0" if text.endswith(".") else text
 
 
+def _factors(cvss, threat, asset, exposure, controls, patch, high, notes):
+    """Describe each input and rule effect as a labelled raise, lower or neutral factor."""
+    factors = [
+        Factor(f"CVSS {cvss:.1f}", "raise" if cvss >= high else "lower" if cvss < 4.0 else "neutral"),
+        {Threat.ACTIVE: Factor("Actively exploited", "raise"),
+         Threat.PUBLIC: Factor("Public or likely exploit", "raise"),
+         Threat.NONE: Factor("No known exploitation", "neutral")}[threat],
+        {Asset.CROWN: Factor("Crown jewel", "raise"), Asset.IMPORTANT: Factor("Important asset", "neutral"),
+         Asset.STANDARD: Factor("Standard asset", "neutral")}[asset],
+        {Exposure.HIGH: Factor("Exposure: High", "raise"), Exposure.MEDIUM: Factor("Exposure: Medium", "raise"),
+         Exposure.LOW: Factor("Exposure: Low", "lower")}[exposure],
+        {Patch.AVAILABLE: Factor("Patch available", "neutral"), Patch.PENDING: Factor("Patch pending", "raise"),
+         Patch.EOL: Factor("End of life, no patch", "raise")}[patch],
+        {Controls.NONE: Factor("No controls", "neutral"),
+         Controls.PARTIAL: Factor("Partial controls (ranking only)", "neutral"),
+         Controls.STRONG: Factor("Strong controls", "lower")}[controls],
+    ]
+    return factors + notes
+
+
 def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patch.AVAILABLE,
                settings=DEFAULT_SETTINGS):
     """Return the priority, ordering score, reasons, action, inputs and settings profile."""
@@ -96,6 +125,7 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
     reachable = exposure in (Exposure.HIGH, Exposure.MEDIUM)
     exposed_crown = asset is Asset.CROWN and exposure is Exposure.HIGH
     reasons = []
+    notes = []
 
     if threat is Threat.ACTIVE:
         if reachable:
@@ -129,9 +159,11 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
     if cvss < 4.0 and priority == NOW:
         if threat is Threat.ACTIVE and exposed_crown:
             reasons.append("Kept at NOW despite CVSS < 4.0: actively exploited, exposed crown jewel")
+            notes.append(Factor("Low-CVSS cap waived: exposed crown jewel", "raise"))
         else:
             priority = NEXT
             reasons.append("Capped at NEXT: CVSS < 4.0")
+            notes.append(Factor("Capped at NEXT: CVSS below 4.0", "lower"))
 
     if patch is Patch.AVAILABLE:
         action = "Apply the patch"
@@ -168,17 +200,20 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
                 priority = NEXT
                 reasons.append(f"Floored at NEXT: unpatchable device with CVSS >= {_fmt(high)} "
                                "needs a replacement plan")
+                notes.append(Factor("Floored at NEXT: end of life", "raise"))
 
     # Exposed crown jewels with meaningful severity are never left at NEVER
     if exposed_crown and cvss >= 4.0 and priority == NEVER:
         priority = NEXT
         reasons.append("Floored at NEXT: internet-exposed crown jewel with CVSS >= 4.0")
+        notes.append(Factor("Floored at NEXT: exposed crown jewel", "raise"))
 
     score = cvss * 0.3 + _THREAT_PTS[threat] * 0.25 + _ASSET_PTS[asset] * 0.25 + _EXPOSURE_PTS[exposure] * 0.2
     if controls is Controls.PARTIAL:
         score -= PARTIAL_SCORE_CREDIT
         reasons.append("Partial controls: ranked lower within the bucket; the bucket itself is unchanged")
     score = max(0.0, min(10.0, score))
+    factors = _factors(cvss, threat, asset, exposure, controls, patch, high, notes)
     inputs = [
         f"CVSS: {cvss:.1f}",
         f"Threat: {threat.value}",
@@ -187,4 +222,4 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         f"Patch: {patch.value}",
         f"Compensating controls: {controls.value}",
     ]
-    return Result(priority, round(score, 2), reasons, action, inputs, settings.describe())
+    return Result(priority, round(score, 2), reasons, action, inputs, settings.describe(), factors)

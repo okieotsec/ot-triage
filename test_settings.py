@@ -180,7 +180,7 @@ class SettingsFileTests(unittest.TestCase):
     def test_failed_save_keeps_the_previous_file_and_leaves_no_temp_files(self):
         original = Settings(stale_days=21)
         settings.save(original, self.path)
-        with mock.patch("settings.json.dump", side_effect=OSError("disk full")), self.assertRaises(OSError):
+        with mock.patch("jsonfile.json.dump", side_effect=OSError("disk full")), self.assertRaises(OSError):
             settings.save(Settings(stale_days=3), self.path)
         self.assertEqual(settings.load(self.path).settings, original)
         self.assertEqual([p.name for p in self.dir.iterdir()], ["settings.json"])
