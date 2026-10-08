@@ -10,6 +10,31 @@ python3 vuln_prioritizer_gui.py     # GUI
 python3 -m unittest                 # tests
 ```
 
+The tests that need a display skip themselves when none is available. `pip install hypothesis` adds the optional
+property-based tests.
+
+## Using the GUI
+
+| View | What it does |
+| --- | --- |
+| **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV and EPSS data to fill in the threat level. Shows the bucket, why-chips, the recommended action, and what single change would move the result. |
+| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. |
+| **Threat data** | See how fresh the KEV and EPSS data is. Update it (after a confirmation) or import files for offline use. |
+| **Settings** | Change the four scoring settings with live validation, and choose the theme and text size. |
+| **About** | Version, the exposure definition, where the categories come from, and the documentation. |
+
+The status bar always shows how fresh the KEV and EPSS data is, and a **Custom scoring** badge appears whenever the
+scoring settings differ from the defaults.
+
+| Shortcut | Action |
+| --- | --- |
+| Ctrl+1 to Ctrl+5 | Switch views |
+| Ctrl+L | Go to the CVE field |
+| Ctrl+Shift+C | Copy the summary of the current result |
+| Arrow keys | Change the choice in a focused segmented control |
+
+See [docs/GUI_TESTING.md](docs/GUI_TESTING.md) for how the GUI is tested.
+
 ## Inputs
 
 | Input | Values |

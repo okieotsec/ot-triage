@@ -1,6 +1,6 @@
 # GUI refresh proposal
 
-Status: **proposal, awaiting approval.** Nothing in this document has been built yet.
+Status: **approved and built** (see [GUI_TESTING.md](GUI_TESTING.md)). This page is kept as the design record. Where the finished GUI differs from the proposal, the differences are listed at the end.
 Open [gui-mockup.html](gui-mockup.html) in a browser to click through all five views, in dark and light themes, at any window width. The mockup uses synthetic example data, and every number in it was produced by the real rules.
 
 ## Goals
@@ -136,3 +136,12 @@ Each milestone ends with all tests passing and a commit.
 | 5 | Add `factors` to `Result` so chips come from the rules? | Yes |
 | 6 | Show a short "Override with a reason" dialog for lowering a KEV threat level? | Yes, and record the reason in every summary and export |
 | 7 | Any view, label or feature you want added, removed or renamed? | Tell me after looking at the mockup |
+
+## What changed during the build
+
+- **Choices run least to most concerning** (None, Public exploit, Active), matching the mockup. The first build had them reversed; a test now pins the order.
+- **Disabled buttons** get a distinct, readable look instead of dimmed text on a coloured button.
+- **Scroll areas** show their scrollbar only when the content is taller than the window.
+- **Threat data status** is read cheaply from file headers and metadata, so the status bar does not parse all of EPSS.
+- **Batch results scored under older settings** are flagged, so a settings change never silently leaves stale rankings looking current.
+- **Window size:** tiling window managers may ignore the requested size; the layout switches to the narrow form by the window's real width.
