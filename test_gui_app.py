@@ -176,6 +176,49 @@ class ShellTests(AppTestCase):
         self.assertEqual(int(app.content.grid_info()["column"]), 1)
         self.assertTrue(all(i.pack_info()["fill"] == "x" for i in app.nav_items.values()))
 
+    def test_ctrl_plus_minus_and_zero_change_the_text_size_and_remember_it(self):
+        app = self.make()
+        self.root.deiconify()
+        self.root.geometry("1100x800+0+0")
+        self.root.focus_force()
+        self.pump(0.2)
+        before = app.style.font(10)[1]
+
+        def press(key):
+            self.root.focus_force()
+            self.pump(0.1)
+            self.root.event_generate(key)
+            self.pump(0.2)
+
+        press("<Control-plus>")
+        if self.app.ctx.prefs.text_percent != 115:
+            self.skipTest("the window manager did not give the test window keyboard focus")
+        self.assertGreater(self.app.style.font(10)[1], before)
+        self.assertEqual(uiprefs.load(self.prefs_path).prefs.text_percent, 115)
+        press("<Control-minus>")
+        press("<Control-minus>")
+        self.assertEqual(self.app.ctx.prefs.text_percent, 90)
+        press("<Control-Key-0>")
+        self.assertEqual(self.app.ctx.prefs.text_percent, 100)
+
+    def test_zoom_stops_at_the_smallest_and_largest_size_and_keeps_the_inputs(self):
+        app = self.make()
+        app.ctx.assess_state.cvss.set("7.5")
+        for _ in range(10):
+            app.zoom(+1)
+        self.assertEqual(app.ctx.prefs.text_percent, max(uiprefs.TEXT_PERCENTS))
+        for _ in range(10):
+            app.zoom(-1)
+        self.assertEqual(app.ctx.prefs.text_percent, min(uiprefs.TEXT_PERCENTS))
+        self.assertEqual(app.ctx.assess_state.cvss.get(), "7.5")
+
+    def test_zoom_that_cannot_be_saved_explains_and_changes_nothing(self):
+        app = self.make()
+        with mock.patch("uiprefs.save", side_effect=OSError(13, "Permission denied")):
+            app.zoom(+1)
+        self.assertEqual(app.ctx.prefs.text_percent, 100)
+        self.assertTrue(self.mocks["showerror"].called)
+
     def test_the_header_accent_line_spans_the_whole_width(self):
         app = self.make()
         self.root.deiconify()

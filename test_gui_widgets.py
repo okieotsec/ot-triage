@@ -434,9 +434,13 @@ class AskTextTests(DisplayTestCase):
         calls = self.flaky_grab(failures=4)
 
         def act(dialog, entry):
-            self.pump(2, until=lambda: calls["n"] > 4)
-            entry.insert(0, "Compensating control verified")
-            entry.event_generate("<Return>")
+            def answer_once_retries_are_done():
+                if calls["n"] <= 4:
+                    dialog.after(20, answer_once_retries_are_done)
+                    return
+                entry.insert(0, "Compensating control verified")
+                entry.event_generate("<Return>")
+            answer_once_retries_are_done()
         self.drive(act)
         self.assertEqual(gw.ask_text(self.root, self.style, "Override", "Why?"), "Compensating control verified")
         self.assertGreater(calls["n"], 4)
