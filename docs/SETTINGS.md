@@ -67,4 +67,8 @@ Example:
 
 ## Resetting
 
-Delete the settings file, or call `settings.restore_defaults()`. A settings screen with a "Restore defaults" button, including a confirmation prompt, comes with the new GUI.
+Use **Restore defaults…** on the Settings view (it asks for confirmation), delete the settings file, or call `settings.restore_defaults()`.
+
+## Editing in the GUI
+
+The Settings view shows each value with its description, default and allowed range. Values are checked as you type: a problem is shown next to the field in words and **Save** stays disabled until every value is valid. Appearance choices (theme, text size, update on start) are saved in a separate `ui.json` file next to `settings.json`.

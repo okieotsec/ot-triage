@@ -1,6 +1,7 @@
 import csv
 import tempfile
 import threading
+import time
 import tkinter as tk
 import unittest
 from pathlib import Path
@@ -195,6 +196,46 @@ class BatchLoadTests(BatchViewTestCase):
         self.assertEqual(len(view.tree.get_children()), 20000)
         view.set_filter("NOW")
         self.assertLess(len(view.tree.get_children()), 20000)
+
+
+class BatchHostileFileTests(BatchViewTestCase):
+    def test_every_hostile_csv_ends_in_a_message_or_a_table_never_a_crash(self):
+        import malicious_cases
+        view = self.build()
+        cases = malicious_cases.build(str(self.work))
+        for name, path in cases.items():
+            with self.subTest(case=name):
+                self.ctx.error.reset_mock()
+                self.ctx.info.reset_mock()
+                view.state.items = []
+                start = time.monotonic()
+                view.load(path)
+                self.assertTrue(self.pump(30, until=lambda: not self.ctx.worker.running), name)
+                self.pump(0.1)
+                self.assertLess(time.monotonic() - start, 30)
+                shown = bool(view.state.items) or self.ctx.error.called or self.ctx.info.called
+                self.assertTrue(shown, name)
+                if self.ctx.error.called:
+                    message = self.ctx.error.call_args[0][1]
+                    self.assertNotIn("Traceback", message)
+                    self.assertLess(len(message), 600, name)
+                self.assertEqual(str(view.open_button.cget("state")), "normal")
+                self.assertFalse(view.progress_row.winfo_ismapped())
+
+    def test_formula_payloads_are_displayed_as_plain_text_and_neutralized_on_export(self):
+        import malicious_cases
+        view = self.build()
+        path = malicious_cases.build(str(self.work))["formula_payloads"]
+        view.load(path)
+        self.pump(10, until=lambda: bool(view.state.items))
+        self.assertTrue(any(str(v).startswith("=") for r in self.rows() for v in r))
+        out = self.work / "out.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(out))
+        view.export()
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            for row in csv.DictReader(fh):
+                for key in ("id", "name", "cve", "action", "rationale", "threat_source"):
+                    self.assertFalse(row[key].startswith(tuple("=+-@\t\r")), (key, row[key]))
 
 
 class BatchFilterSortTests(BatchViewTestCase):

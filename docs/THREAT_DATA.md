@@ -86,9 +86,14 @@ Add an optional `cve` column. Then:
 - With no data loaded and a blank `threat` cell, the row is reported as an error that says so. It is **not** scored as "no known exploitation".
 - The export adds `cve`, `threat_source` (why the level was chosen) and `threat_data` (the KEV and EPSS versions used) columns, so results can be reproduced.
 
-## Not built yet
+## In the GUI
 
-The GUI does not have an Update button, an Import button, a CVE field on the single-assessment screen, or the freshness chips yet. They come with the new GUI. Until then, data can be loaded from Python:
+- The **Threat data** view shows each source's version, dates, entry count and freshness, with **Update threat data** and **Import from files…** buttons. The first update shows exactly which two hosts will be contacted and asks for confirmation. Updates run in the background with a Cancel button.
+- The **Assess** view has a CVE field. Press Enter or **Look up** to check the local data. The threat level is filled in with its source shown. Two checkboxes can only raise it, and changing it by hand asks for a written reason that appears in every summary.
+- The **status bar** shows freshness at all times.
+- **Settings** has an optional "Update threat data when the app starts" checkbox, off by default.
+
+The same functions can be used from Python:
 
 ```python
 import threatdata

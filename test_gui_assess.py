@@ -322,6 +322,37 @@ class AssessLayoutTests(AssessTestCase):
         self.assertEqual((rebuilt.badge.cget("text"), self.chip_texts(rebuilt.chips)), before)
         self.assertEqual(self.ctx.assess_state.cvss.get(), "8.8")
 
+    def test_tab_order_follows_reading_order(self):
+        view = self.build()
+        order, widget = [], view.cve_entry
+        for _ in range(60):
+            order.append(widget)
+            widget = widget.tk_focusNext()
+            if widget is None or widget is view.cve_entry:
+                break
+        segmented = [w for w in order if isinstance(w, gui_assess.Segmented)]
+        self.assertEqual(len(segmented), 5)
+        expected = [view.cve_entry, view.cvss_entry]
+        positions = [order.index(w) for w in expected + segmented if w in order]
+        self.assertEqual(positions, sorted(positions))
+        self.assertLess(order.index(view.cve_entry), order.index(view.cvss_entry))
+        self.assertLess(order.index(view.cvss_entry), order.index(segmented[0]))
+        copy_positions = [order.index(b) for b in (view.copy_button, view.markdown_button) if b in order]
+        self.assertTrue(all(p > order.index(segmented[-1]) for p in copy_positions))
+
+    def test_every_interactive_control_can_take_keyboard_focus(self):
+        view = self.build()
+        self.fill("8.0")
+        stack, controls = [view.frame], []
+        while stack:
+            node = stack.pop()
+            stack.extend(node.winfo_children())
+            if isinstance(node, (tk.Entry, tk.Button, gui_assess.Segmented)):
+                controls.append(node)
+        self.assertGreaterEqual(len(controls), 9)
+        for control in controls:
+            self.assertNotEqual(str(control.cget("takefocus")), "0", control)
+
     def test_focus_helpers_target_the_right_fields(self):
         view = self.build()
         self.holder.focus_force()

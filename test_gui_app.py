@@ -261,6 +261,57 @@ class SettingsAndAppearanceTests(AppTestCase):
         self.assertEqual(app.current, "settings")
 
 
+class HostileConfigTests(AppTestCase):
+    def test_every_hostile_settings_file_starts_the_app_with_defaults_and_one_warning(self):
+        import malicious_cases
+        cases = malicious_cases.build_settings(str(self.work))
+        for name, path in cases.items():
+            with self.subTest(case=name):
+                self.mocks["showwarning"].reset_mock()
+                self.settings_path = Path(path)
+                app = self.make()
+                self.pump(0.4)
+                self.assertEqual(app.ctx.settings, DEFAULT_SETTINGS, name)
+                self.assertEqual(self.mocks["showwarning"].call_count, 1, name)
+                self.assertLess(len(self.mocks["showwarning"].call_args[0][1]), 800)
+                self.assertFalse(app.badge.winfo_manager())
+                for child in self.root.winfo_children():
+                    child.destroy()
+                gc.collect()
+
+    def test_hostile_preference_files_fall_back_to_defaults(self):
+        cases = {"empty": "", "truncated": '{"version": 1, "the', "theme": '{"version": 1, "theme": "<script>", '
+                 '"text_percent": 100, "startup_update": false}', "big": " " * 10000,
+                 "types": '{"version": 1, "theme": 1, "text_percent": "100", "startup_update": "no"}',
+                 "extra": '{"version": 1, "theme": "dark", "text_percent": 100, "startup_update": false, "x": 1}'}
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                self.prefs_path.write_text(text, encoding="utf-8")
+                self.mocks["showwarning"].reset_mock()
+                app = self.make()
+                self.pump(0.4)
+                self.assertEqual(app.ctx.prefs, uiprefs.DEFAULT_PREFS, name)
+                self.assertEqual(self.mocks["showwarning"].call_count, 1, name)
+                for child in self.root.winfo_children():
+                    child.destroy()
+                gc.collect()
+
+    def test_hostile_stored_threat_data_shows_problem_chips_and_the_app_keeps_working(self):
+        self.data_dir.mkdir(parents=True)
+        (self.data_dir / td.KEV_FILE).write_bytes(b"{ not json")
+        (self.data_dir / td.EPSS_FILE).write_bytes(b"\x1f\x8b broken")
+        app = self.make()
+        chips = [w.cget("text") for w in app.status_bar.winfo_children() if isinstance(w, tk.Label)]
+        self.assertEqual(chips[:2], ["! KEV problem", "! EPSS problem"])
+        app.show_view("assess")
+        app.ctx.assess_state.cvss.set("8")
+        app.ctx.assess_state.cve.set("CVE-2024-0001")
+        app.views["assess"].lookup()
+        self.pump(0.2)
+        self.assertEqual(app.views["assess"].badge.cget("text"), "NEVER")
+        self.assertIn("No threat data is loaded", app.views["assess"].cve_message.cget("text"))
+
+
 class StatusBarTests(AppTestCase):
     def test_no_data_says_so(self):
         self.make()
