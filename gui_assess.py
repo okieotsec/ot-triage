@@ -201,8 +201,10 @@ class AssessView:
         self.badge.pack(side=tk.LEFT)
         info = tk.Frame(top, bg=t.card)
         info.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=18)
-        self.verdict = tk.Label(info, text="", font=s.font(16, "bold"), bg=t.card, fg=t.text, anchor="w")
+        self.verdict = tk.Label(info, text="", font=s.font(16, "bold"), bg=t.card, fg=t.text, anchor="w",
+                                justify="left")
         self.verdict.pack(fill=tk.X)
+        self.verdict.bind("<Configure>", lambda e: self.verdict.configure(wraplength=max(e.width - 4, 100)))
         self.subtitle = tk.Label(info, text="", font=s.font(10), bg=t.card, fg=t.muted, anchor="w", justify="left")
         self.subtitle.pack(fill=tk.X, pady=(4, 0))
         self.subtitle.bind("<Configure>", lambda e: self.subtitle.configure(wraplength=max(e.width - 4, 100)))

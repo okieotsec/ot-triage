@@ -483,6 +483,14 @@ class AssessLayoutTests(AssessTestCase):
         view._layout(wide=True)
         self.assertEqual((int(view.left.grid_info()["column"]), int(view.right.grid_info()["column"])), (0, 1))
 
+    def test_no_headline_is_clipped_in_a_narrow_priority_card(self):
+        self.holder.geometry("760x900+0+0")
+        view = self.build()
+        for headline, _sub in explain.HEADLINES.values():
+            view.verdict.configure(text=headline)
+            self.pump(0.1)
+            self.assertLessEqual(view.verdict.winfo_reqwidth(), view.verdict.winfo_width() + 1, headline)
+
     def test_a_rebuild_keeps_the_inputs_and_the_result(self):
         view = self.build()
         self.fill("8.8", Threat.ACTIVE, Asset.CROWN, Exposure.HIGH)
