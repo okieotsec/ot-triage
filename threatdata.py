@@ -308,8 +308,8 @@ class _SafeRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def fetch(url, max_bytes, allowed_hosts, context=None, timeout=FETCH_TIMEOUT_SECONDS,
-          deadline=FETCH_DEADLINE_SECONDS):
-    """Download a URL over HTTPS from an allowed host, with size and time limits."""
+          deadline=FETCH_DEADLINE_SECONDS, cancel=None):
+    """Download a URL over HTTPS from an allowed host, with size and time limits; cancel is a threading.Event."""
     parts = urllib.parse.urlsplit(url)
     if parts.scheme != "https" or parts.hostname not in allowed_hosts or parts.username or parts.password:
         raise FetchError("only HTTPS downloads from the expected hosts are allowed")
@@ -337,6 +337,8 @@ def fetch(url, max_bytes, allowed_hosts, context=None, timeout=FETCH_TIMEOUT_SEC
                     raise FetchError(f"the download is larger than {max_bytes // MB} MB")
                 if time.monotonic() - started > deadline:
                     raise FetchError("the download took too long")
+                if cancel is not None and cancel.is_set():
+                    raise FetchError("the download was cancelled")
     except FetchError:
         raise
     except urllib.error.HTTPError as error:
@@ -455,13 +457,21 @@ def _run(name, produce, source, data_dir, now):
     return SourceResult(name, True, f"{label} updated.")
 
 
-def update_from_network(data_dir=None, fetcher=fetch, now=None):
+def update_from_network(data_dir=None, fetcher=fetch, now=None, cancel=None, progress=None):
     """Download both sources, replacing each stored copy only if its new data validates."""
     data_dir = data_dir or default_data_dir()
     now = now or _now()
-    specs = (("kev", KEV_URL, KEV_MAX_BYTES, KEV_HOSTS), ("epss", EPSS_URL, EPSS_MAX_COMPRESSED, EPSS_HOSTS))
-    return [_run(name, lambda u=url, c=cap, h=hosts: fetcher(u, c, h), url, data_dir, now)
-            for name, url, cap, hosts in specs]
+    specs = (("kev", "KEV", KEV_URL, KEV_MAX_BYTES, KEV_HOSTS), ("epss", "EPSS", EPSS_URL, EPSS_MAX_COMPRESSED,
+                                                                   EPSS_HOSTS))
+    results = []
+    for name, label, url, cap, hosts in specs:
+        if cancel is not None and cancel.is_set():
+            results.append(SourceResult(name, False, f"{label} not updated: cancelled. The previous copy was kept."))
+            continue
+        if progress:
+            progress(f"Downloading {label}...")
+        results.append(_run(name, lambda u=url, c=cap, h=hosts: fetcher(u, c, h), url, data_dir, now))
+    return results
 
 
 def import_from_files(kev_path=None, epss_path=None, data_dir=None, now=None):

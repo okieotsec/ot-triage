@@ -220,6 +220,19 @@ class StorageTests(unittest.TestCase):
         self.assertIsNotNone(data.epss)
         self.assertEqual(data.warnings, [])
 
+    def test_cancel_and_progress_in_update(self):
+        cancel, seen = threading.Event(), []
+        results = td.update_from_network(self.dir, self.fetcher(kev_bytes(), epss_bytes()), self.now, cancel,
+                                         seen.append)
+        self.assertEqual((seen, [r.ok for r in results]), (["Downloading KEV...", "Downloading EPSS..."], [True, True]))
+        cancel.set()
+        before = {n: (self.dir / n).read_bytes() for n in os.listdir(self.dir)}
+        results = td.update_from_network(self.dir, self.fetcher(kev_bytes([kev_entry("CVE-2024-0009")]), None),
+                                         self.now, cancel)
+        self.assertEqual([r.ok for r in results], [False, False])
+        self.assertIn("cancelled", results[0].message)
+        self.assertEqual({n: (self.dir / n).read_bytes() for n in os.listdir(self.dir)}, before)
+
     def test_failed_write_leaves_previous_data_and_no_temp_files(self):
         self.update()
         before = {n: (self.dir / n).read_bytes() for n in os.listdir(self.dir)}
@@ -565,6 +578,14 @@ class FetchTests(unittest.TestCase):
         with self.assertRaisesRegex(td.FetchError, "timed out"):
             self.get("/hang", timeout=1)
         self.assertLess(time.monotonic() - started, 3.5)
+
+    def test_a_download_can_be_cancelled_mid_stream(self):
+        cancel = threading.Event()
+        threading.Timer(0.4, cancel.set).start()
+        started = time.monotonic()
+        with self.assertRaisesRegex(td.FetchError, "cancelled"):
+            self.get("/drip", cancel=cancel, deadline=30)
+        self.assertLess(time.monotonic() - started, 3)
 
     def test_a_connection_cut_mid_download_is_a_clear_error(self):
         with self.assertRaisesRegex(td.FetchError, "cut off"):
