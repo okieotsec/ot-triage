@@ -6,8 +6,9 @@ from tkinter import ttk
 import batch
 import explain
 import threatdata
+from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
-from gui_widgets import FlowFrame, button, card, chip, set_enabled
+from gui_widgets import FlowFrame, button, card, chip, rounded_entry, set_enabled
 
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
 COLUMNS = [("rank", "#", 50, "center"), ("id", "ID", 100, "w"), ("cve", "CVE", 130, "w"), ("name", "Name", 240, "w"),
@@ -43,7 +44,7 @@ class BatchView:
             ctx.batch_state = BatchState()
         self.state = ctx.batch_state
         self.frame = tk.Frame(parent, bg=t.bg)
-        self.body = tk.Frame(self.frame, bg=t.bg, padx=20, pady=16)
+        self.body = tk.Frame(self.frame, bg=t.bg, padx=28, pady=20)
         self.body.pack(fill=tk.BOTH, expand=True)
         self.search_var = tk.StringVar(self.frame, self.state.search)
         self._build_toolbar()
@@ -66,9 +67,7 @@ class BatchView:
         self.file_label.pack(side=tk.LEFT, padx=12)
         self.export_button = button(bar, s, "Export ranked CSV", self.export, "secondary")
         self.export_button.pack(side=tk.RIGHT)
-        self.search_entry = tk.Entry(bar, textvariable=self.search_var, width=26, font=s.font(10), bg=t.field,
-                                     fg=t.text, insertbackground=t.text, relief="flat", highlightthickness=2,
-                                     highlightbackground=t.border, highlightcolor=t.accent)
+        self.search_entry = rounded_entry(bar, s, self.search_var, width=26, size=10, outside=t.bg)
         self.search_entry.pack(side=tk.RIGHT, padx=10, ipady=5)
         tk.Label(bar, text="Search", font=s.font(9), bg=t.bg, fg=t.muted).pack(side=tk.RIGHT)
         self.progress_row = tk.Frame(self.body, bg=t.bg)
@@ -94,6 +93,7 @@ class BatchView:
             word = tk.Label(box, text=f"{PRIORITY_SYMBOLS.get(key, '')} {label}".strip(), font=s.font(9, "bold"),
                             bg=t.card, fg=t.muted)
             word.pack(anchor="w", padx=14, pady=(0, 6))
+            round_corners(box, 10, t.border, t.bg, ring_width=2, fill=t.card)
             for widget in (box, number, word):
                 widget.bind("<Button-1>", lambda _e, k=key: self.set_filter(k))
             for sequence in ("<Return>", "<space>"):
@@ -104,7 +104,8 @@ class BatchView:
 
     def _build_table(self):
         s, t = self.style, self.style.theme
-        wrap = tk.Frame(self.body, bg=t.card, highlightthickness=1, highlightbackground=t.border)
+        wrap = tk.Frame(self.body, bg=t.card, highlightthickness=1, highlightbackground=t.border,
+                        highlightcolor=t.border)
         wrap.pack(fill=tk.BOTH, expand=True)
         scroll = ttk.Scrollbar(wrap, orient=tk.VERTICAL)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -117,6 +118,7 @@ class BatchView:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         for priority in ("NOW", "NEXT", "NEVER", "ERROR"):
             self.tree.tag_configure(priority, foreground=s.priority_text_color(priority))
+        round_corners(wrap, 10, t.border, t.bg, fill={"tl": t.border, "tr": t.border, "bl": t.card, "br": t.card})
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
     def _build_details(self):
@@ -242,6 +244,7 @@ class BatchView:
             number.configure(text=str(counts.get(key, 0)))
             selected = state.filter == key
             box.configure(highlightbackground=t.accent if selected else t.border)
+            recolor_corners(box, 10, t.accent if selected else t.border, t.bg, ring_width=2, fill=t.card)
         for key, title, _w, _a in COLUMNS:
             arrow = HEADING_ARROWS[state.sort_desc] if key == state.sort_key else ""
             self.tree.heading(key, text=title + arrow)

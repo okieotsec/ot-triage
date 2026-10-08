@@ -42,6 +42,9 @@ LIGHT = Theme("light", bg="#f1f5f9", header="#ffffff", card="#ffffff", field="#f
               raise_="#b91c1c", lower="#15803d", neutral="#475569", ok="#15803d", warn="#b45309")
 THEMES = {"dark": DARK, "light": LIGHT}
 
+PREFERRED_FONTS = ("Inter", "Adwaita Sans", "Cantarell", "Noto Sans", "Segoe UI", "SF Pro Text", "Helvetica Neue")
+FONT_BOOST = 1.1
+
 SYMBOLS = {"raise": "▲", "lower": "▼", "neutral": "▬", "ok": "✓", "warn": "⚠",
            "error": "!"}
 PRIORITY_SYMBOLS = {"NOW": "▲", "NEXT": "▬", "NEVER": "▼", "ERROR": "!"}
@@ -66,6 +69,15 @@ def contrast(foreground, background):
     return (high + 0.05) / (low + 0.05)
 
 
+def choose_family(root):
+    """Return the nicest installed UI font, falling back to the system default."""
+    available = set(tkfont.families(root))
+    for family in PREFERRED_FONTS:
+        if family in available:
+            return family
+    return tkfont.nametofont("TkDefaultFont", root=root).actual("family")
+
+
 class Style:
     """A theme plus a text scale, handing out colours and fonts to widgets."""
 
@@ -75,7 +87,7 @@ class Style:
 
     def font(self, size, weight="normal"):
         """Return a Tk font tuple scaled by the text size preference."""
-        return (self.family, max(7, round(size * self.scale)), weight)
+        return (self.family, max(7, round(size * FONT_BOOST * self.scale)), weight)
 
     def bucket(self, priority):
         """Return (background, foreground) colours for a priority badge."""
@@ -98,7 +110,7 @@ class Style:
 def apply_ttk_styles(root, style):
     """Configure the ttk widgets (table, scrollbar, progress bar) for the theme."""
     t, s = style.theme, ttk.Style(root)
-    style.family = tkfont.nametofont("TkDefaultFont").actual("family")
+    style.family = choose_family(root)
     s.theme_use("clam")
     s.configure("Treeview", background=t.card, fieldbackground=t.card, foreground=t.text, borderwidth=0,
                 rowheight=round(28 * style.scale), font=style.font(10))

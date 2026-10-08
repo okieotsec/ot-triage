@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import threatdata
+from gui_round import round_corners
 from gui_widgets import ScrollFrame, button, card, chip, set_enabled
 
 HOSTS = ("www.cisa.gov", "epss.empiricalsecurity.com")
@@ -91,7 +92,7 @@ class ThreatView:
         self.scroll = ScrollFrame(self.frame, t.bg)
         self.scroll.pack(fill=tk.BOTH, expand=True)
         self.body = self.scroll.body
-        self.body.configure(padx=20, pady=20)
+        self.body.configure(padx=28, pady=24)
         self._build()
         self.updater.listeners.append(self.refresh)
         self.frame.bind("<Destroy>", self._on_destroy)
@@ -108,7 +109,8 @@ class ThreatView:
         row.columnconfigure((0, 1), weight=1, uniform="cards")
         self.cards = {}
         for column, (name, title, host) in enumerate((("kev", "CISA KEV", HOSTS[0]), ("epss", "EPSS", HOSTS[1]))):
-            outer = tk.Frame(row, bg=t.card, highlightthickness=1, highlightbackground=t.border)
+            outer = tk.Frame(row, bg=t.card, highlightthickness=1, highlightbackground=t.border,
+                             highlightcolor=t.border)
             outer.grid(row=0, column=column, sticky="nsew", padx=(0, 14) if column == 0 else 0)
             tk.Label(outer, text=title.upper(), font=s.font(9, "bold"), bg=t.card, fg=t.accent).pack(
                 anchor="w", padx=16, pady=(12, 4))
@@ -123,6 +125,7 @@ class ThreatView:
             detail.bind("<Configure>", lambda e, w=detail: w.configure(wraplength=max(e.width - 4, 100)))
             tk.Label(outer, text=f"Source: {host}", font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
                 fill=tk.X, padx=16, pady=(0, 14))
+            round_corners(outer, 12, t.border, t.bg, fill=t.card)
             self.cards[name] = (state_slot, version, detail)
 
         update = card(self.body, s, "Update", pady=(14, 14))

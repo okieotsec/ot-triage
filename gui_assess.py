@@ -5,7 +5,7 @@ from tkinter import ttk
 import explain
 from explain import SHORT_LABELS, AssessInputs
 from gui_widgets import (Expander, FlowFrame, ScrollFrame, Segmented, ask_text, button, card, chip, field_label,
-                         priority_badge, set_enabled)
+                         priority_badge, rounded_entry, set_enabled)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -66,7 +66,7 @@ class AssessView:
         self.scroll = ScrollFrame(self.frame, ctx.style.theme.bg)
         self.scroll.pack(fill=tk.BOTH, expand=True)
         body = self.scroll.body
-        body.configure(padx=20, pady=20)
+        body.configure(padx=28, pady=24)
         self.left = tk.Frame(body, bg=ctx.style.theme.bg)
         self.right = tk.Frame(body, bg=ctx.style.theme.bg)
         body.columnconfigure(1, weight=1)
@@ -161,10 +161,7 @@ class AssessView:
         Segmented(rem, s, _options(Controls), state.controls).pack(fill=tk.X)
 
     def _entry(self, parent, variable, width, size=11, bold=False):
-        t, s = self.style.theme, self.style
-        return tk.Entry(parent, textvariable=variable, width=width, font=s.font(size, "bold" if bold else "normal"),
-                        bg=t.field, fg=t.text, insertbackground=t.text, relief="flat", highlightthickness=2,
-                        highlightbackground=t.border, highlightcolor=t.accent)
+        return rounded_entry(parent, self.style, variable, width, size, bold)
 
     def _check(self, parent, text, variable):
         t = self.style.theme
@@ -178,7 +175,7 @@ class AssessView:
         top = tk.Frame(result, bg=t.card)
         top.pack(fill=tk.X)
         self.badge = priority_badge(top, s, "-")
-        self.badge.pack(side=tk.LEFT, ipady=10)
+        self.badge.pack(side=tk.LEFT)
         info = tk.Frame(top, bg=t.card)
         info.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=18)
         self.verdict = tk.Label(info, text="", font=s.font(16, "bold"), bg=t.card, fg=t.text, anchor="w")
@@ -331,10 +328,12 @@ class AssessView:
             cvss = parse_cvss(raw)
         except ValueError as error:
             self.cvss_entry.configure(highlightbackground=t.error, highlightcolor=t.error)
+            self.cvss_entry.repaint()
             self.cvss_hint.configure(text=str(error), fg=t.error)
             self._idle("Invalid input", str(error), error=True)
             return
         self.cvss_entry.configure(highlightbackground=t.border, highlightcolor=t.accent)
+        self.cvss_entry.repaint()
         self.cvss_hint.configure(text="Enter a base score from 0.0 to 10.0", fg=t.muted)
         decision = self._decision() if self.auto_threat else None
         threat = decision.level if decision else Threat[state.threat.get()]
@@ -407,7 +406,7 @@ class AssessView:
     def _idle(self, headline, sub, error=False):
         t = self.style.theme
         self.result = None
-        self.badge.configure(text="!" if error else "-", bg=t.field, fg=t.error if error else t.muted)
+        self.badge.show("!" if error else "-", t.field, t.error if error else t.muted, ring=t.border)
         self.verdict.configure(text=headline)
         self.subtitle.configure(text=sub)
         self.score_bar.configure(value=0)
@@ -423,7 +422,7 @@ class AssessView:
         s = self.style
         bg, fg = s.bucket(result.priority)
         headline, sub = explain.HEADLINES[result.priority]
-        self.badge.configure(text=result.priority, bg=bg, fg=fg)
+        self.badge.show(result.priority, bg, fg)
         self.verdict.configure(text=headline)
         self.subtitle.configure(text=sub)
         s_style = ttk.Style(self.frame)

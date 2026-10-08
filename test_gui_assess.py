@@ -7,6 +7,7 @@ from unittest import mock
 
 import explain
 import gui_assess
+import gui_theme
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
@@ -80,8 +81,7 @@ class AssessResultTests(AssessTestCase):
             self.fill(str(args[0]), *args[1:])
             expected = prioritize(*args)
             self.assertEqual(view.badge.cget("text"), expected.priority)
-            self.assertEqual((str(view.badge.cget("bg")), str(view.badge.cget("fg"))),
-                             self.style.bucket(expected.priority))
+            self.assertEqual((view.badge.fill, str(view.badge.cget("fg"))), self.style.bucket(expected.priority))
             self.assertEqual(view.score_label.cget("text"), f"{expected.score:.2f} / 10")
             self.assertEqual(view.action_label.cget("text"), expected.action)
 
@@ -373,7 +373,7 @@ class AssessLightThemeTests(AssessTestCase):
     def test_builds_and_colours_in_the_light_theme(self):
         view = self.build()
         self.fill("8.0")
-        self.assertEqual((str(view.badge.cget("bg")), str(view.badge.cget("fg"))), Style(LIGHT).bucket("NOW"))
+        self.assertEqual((view.badge.fill, str(view.badge.cget("fg"))), Style(LIGHT).bucket("NOW"))
         self.assertEqual(str(view.frame.cget("bg")), LIGHT.bg)
 
 
@@ -383,7 +383,8 @@ class AssessTextScaleTests(AssessTestCase):
     def test_larger_text_is_used_and_the_content_still_scrolls(self):
         view = self.build()
         self.fill("8.0")
-        self.assertEqual(tkfont.Font(root=self.root, font=view.verdict.cget("font")).actual("size"), 21)
+        expected = round(16 * gui_theme.FONT_BOOST * 1.3)
+        self.assertEqual(tkfont.Font(root=self.root, font=view.verdict.cget("font")).actual("size"), expected)
         self.assertGreater(view.scroll.body.winfo_reqheight(), 0)
 
 

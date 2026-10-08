@@ -145,3 +145,13 @@ Each milestone ends with all tests passing and a commit.
 - **Threat data status** is read cheaply from file headers and metadata, so the status bar does not parse all of EPSS.
 - **Batch results scored under older settings** are flagged, so a settings change never silently leaves stale rankings looking current.
 - **Window size:** tiling window managers may ignore the requested size; the layout switches to the narrow form by the window's real width.
+
+## Visual polish after the first build
+
+The first build was functional but flatter than the mockup. A second pass, checked against screenshots of the running app, added:
+
+- **A modern typeface:** the best installed of Inter, Adwaita Sans, Cantarell and Noto Sans, instead of the default Arial-like font, with slightly larger text.
+- **Rounded shapes:** cards, buttons, chips (pills), the priority badge, segmented controls, inputs and the Batch counters now have anti-aliased rounded corners. Tk 8.6 cannot draw these natively, so small images are generated in pure Python (no third-party packages) and used as backgrounds or corner overlays.
+- **A refined sidebar:** an accent bar marks the current view and the keyboard shortcut is shown at the right of each item, instead of a boxed outline.
+- **Roomier, more consistent spacing** between cards and fields.
+- **A bug fix found along the way:** in Tk, a frame that contains the focused widget draws its focus colour (black by default) as its border. Cards containing the focused field had a black outline; every bordered frame now uses its own border colour for focus too.

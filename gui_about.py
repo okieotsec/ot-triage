@@ -27,7 +27,7 @@ class AboutView:
         self.frame = tk.Frame(parent, bg=t.bg)
         scroll = ScrollFrame(self.frame, t.bg)
         scroll.pack(fill=tk.BOTH, expand=True)
-        scroll.body.configure(padx=20, pady=20)
+        scroll.body.configure(padx=28, pady=24)
         self._paragraphs(card(scroll.body, self.style, "About"), [
             (f"Vulnerability Prioritizer {__version__}", True),
             ("Rule-based Now / Next / Never triage. It works fully offline; the only network access is a "
