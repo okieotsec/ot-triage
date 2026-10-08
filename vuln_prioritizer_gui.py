@@ -40,7 +40,7 @@ class App:
         prefs_loaded = uiprefs.load(prefs_path)
         self.style = Style(THEMES[prefs_loaded.prefs.theme], prefs_loaded.prefs.text_scale)
         apply_ttk_styles(root, self.style)
-        self.ctx = Context(root, self.style, loaded.settings, prefs_loaded.prefs, shell=self)
+        self.ctx = Context(root, self.style, loaded.settings, prefs_loaded.prefs, app=self)
         self.ctx.settings_path, self.ctx.prefs_path, self.ctx.data_dir = settings_path, prefs_path, data_dir
         self.ctx.updater = ThreatUpdater(self.ctx)
         self.ctx.updater.listeners.append(self.refresh_status)

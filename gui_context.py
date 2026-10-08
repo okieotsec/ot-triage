@@ -6,10 +6,10 @@ from gui_widgets import Worker
 
 
 class Context:
-    """Everything a view needs from the application, so views can be tested without the window shell."""
+    """Everything a view needs from the application, so views can be tested without the application window."""
 
-    def __init__(self, root, style, settings, prefs, shell=None):
-        self.root, self.style, self.settings, self.prefs, self.shell = root, style, settings, prefs, shell
+    def __init__(self, root, style, settings, prefs, app=None):
+        self.root, self.style, self.settings, self.prefs, self.app = root, style, settings, prefs, app
         self.worker = Worker(root)
         self.threat_data = None
         self.assess_state = None
@@ -42,28 +42,28 @@ class Context:
         """Return the loaded KEV and EPSS versions, or an empty string if no data has been loaded."""
         return self.threat_data.versions() if self.threat_data is not None else ""
 
-    # ---- shell hooks ----
+    # ---- window hooks ----
     def status_changed(self):
-        """Ask the shell to redraw the status bar."""
-        if self.shell is not None:
-            self.shell.refresh_status()
+        """Ask the window to redraw the status bar."""
+        if self.app is not None:
+            self.app.refresh_status()
 
     def show_view(self, name):
         """Switch to another view."""
-        if self.shell is not None:
-            self.shell.show_view(name)
+        if self.app is not None:
+            self.app.show_view(name)
 
     def settings_changed(self, settings):
         """Use new scoring settings everywhere."""
         self.settings = settings
-        if self.shell is not None:
-            self.shell.settings_changed()
+        if self.app is not None:
+            self.app.settings_changed()
 
     def prefs_changed(self, prefs):
         """Use new appearance preferences, rebuilding the window."""
         self.prefs = prefs
-        if self.shell is not None:
-            self.shell.prefs_changed()
+        if self.app is not None:
+            self.app.prefs_changed()
 
     # ---- services views call, which tests replace ----
     def warn(self, title, message):
