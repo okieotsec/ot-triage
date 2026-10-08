@@ -74,7 +74,7 @@ Manual checklist (6.1)
 - Output and integrity: Pass for the batch export (inputs, settings profile, KEV and EPSS versions, formula neutralization of every text cell). Pending for the copied single-assessment summary, which gets a CVE field with the GUI refresh. The custom scoring badge is shown.
 - Logic: Pass. NaN, infinity, negative and out-of-range values are rejected in CVSS, settings and EPSS data. A cve with no loaded data is never scored as "no known exploitation"; the row is reported as an error unless a threat value is given.
 
-Policy confirmation needed from the project lead
+Policy confirmation (all three accepted by the project lead on 2026-10-07)
 - The EPSS cutoff default of 0.95 is provisional (docs/SETTINGS.md).
 - The comparison is "at or above" the cutoff, slightly more cautious than the wording "above" in the design notes.
 - Data is stored in the per-user data folder (not an app-local data/ folder) so it works when the app is installed read-only (docs/THREAT_DATA.md).

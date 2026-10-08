@@ -17,7 +17,7 @@ Only four values can be changed. Everything else (the rule structure, the 4.0 lo
 
 - **7.0 and 9.0:** these are the CVSS standard's own boundaries for High and Critical. Staying on them means the tool's idea of "high" matches the scores people already see in advisories.
 - **Why the ranges stop where they do:** below 5.0, "High" would start to include Medium scores. Above 8.0, most High scores would no longer count. The Critical line stays between 8.0 and 10.0 for the same reason.
-- **0.95 (EPSS):** the top 5% of EPSS scores. EPSS scores are mostly very low, so a high percentile keeps the "likely exploited" label meaningful. **This default is provisional** and will be confirmed when the threat-data layer is built.
+- **0.95 (EPSS):** the top 5% of EPSS scores. EPSS scores are mostly very low, so a high percentile keeps the "likely exploited" label meaningful. This default was accepted by the project lead on 2026-10-07. Revisit it after using real data.
 - **7 days (stale):** the KEV catalog and EPSS scores change often, so a week-old copy is a reasonable limit for a warning. It is only a warning; the tool keeps working.
 
 ## What is deliberately not adjustable

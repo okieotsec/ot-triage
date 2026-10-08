@@ -2,6 +2,8 @@
 
 The tool can look up a CVE in two public data sets and use what it finds as the **threat** input. It works fully offline. Internet access is needed only when you choose to update the data.
 
+Decisions confirmed by the project lead on 2026-10-07: the EPSS cutoff defaults to 0.95, the comparison is "at or above", and data is stored in the per-user data folder.
+
 ## The two sources
 
 | Source | What it tells you | Where it comes from |
