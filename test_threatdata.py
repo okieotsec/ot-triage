@@ -638,6 +638,17 @@ class FetchTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaisesRegex(td.FetchError, f"HTTP {code}"):
                 self.get(path)
 
+
+    def test_a_missing_issuer_on_windows_gets_a_helpful_hint_and_nothing_else_does(self):
+        error = ssl.SSLCertVerificationError(1, "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed")
+        error.verify_message = "unable to get local issuer certificate"
+        with mock.patch("threatdata.sys.platform", "win32"):
+            self.assertIn("Microsoft Edge", str(td._tls_error(error)))
+        with mock.patch("threatdata.sys.platform", "linux"):
+            self.assertNotIn("Edge", str(td._tls_error(error)))
+        error.verify_message = "certificate has expired"
+        with mock.patch("threatdata.sys.platform", "win32"):
+            self.assertNotIn("Edge", str(td._tls_error(error)))
     def test_untrusted_certificate_is_refused(self):
         with self.assertRaisesRegex(td.FetchError, "could not be verified"):
             self.get("/ok", context=ssl.create_default_context())
