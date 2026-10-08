@@ -2,6 +2,7 @@
 
 ## 0.4.0 (release candidate)
 
+- **Fixed:** changing the threat level in the Assess view could show an extra "unexpected error (TclError)" box after the override reason prompt, because the dialog tried to take the keyboard grab before the window manager had shown it. The grab is now retried until the window is visible and can never raise.
 - **CVSS vectors:** paste a CVSS 3.0, 3.1 or 4.0 vector in the Assess view to fill in the base score, or add a `cvss_vector` column to batch files. Scores match FIRST's official calculators for every possible base vector. See [docs/CVSS.md](docs/CVSS.md).
 - **New GUI:** Assess, Batch, Threat data, Settings and About views with dark and light themes, a status bar showing threat data freshness, keyboard shortcuts, and a "What would change this?" panel.
 - **Visual polish:** modern typeface, rounded cards, buttons, chips and inputs, a refined sidebar, and layouts that work down to a 700 px wide window.

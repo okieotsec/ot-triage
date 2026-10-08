@@ -444,6 +444,18 @@ class Worker:
             self.root.after(self.interval, self._poll)
 
 
+GRAB_RETRIES, GRAB_RETRY_MS = 100, 20
+
+
+def grab_when_visible(window, retries=GRAB_RETRIES):
+    """Make a dialog modal once the window manager has shown it; a failed grab is retried, never raised."""
+    try:
+        window.grab_set()
+    except tk.TclError:
+        if retries > 0 and window.winfo_exists():
+            window.after(GRAB_RETRY_MS, lambda: grab_when_visible(window, retries - 1))
+
+
 def ask_text(parent, style, title, prompt, ok_text="OK"):
     """Show a modal dialog asking for a line of text; return the text, or None if cancelled."""
     t = style.theme
@@ -475,6 +487,8 @@ def ask_text(parent, style, title, prompt, ok_text="OK"):
     button(buttons, style, "Cancel", dialog.destroy, "secondary").pack(side=tk.RIGHT, padx=(0, 8))
     dialog.bind("<Return>", accept)
     dialog.bind("<Escape>", lambda _e: dialog.destroy())
-    dialog.grab_set()
+    dialog.lift()
+    dialog.focus_force()
+    grab_when_visible(dialog)
     parent.wait_window(dialog)
     return result["value"]
