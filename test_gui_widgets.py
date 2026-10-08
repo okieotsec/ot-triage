@@ -1,6 +1,7 @@
 import threading
 import tkinter as tk
 import unittest
+from unittest import mock
 
 import gui_widgets as gw
 from gui_testing import DisplayTestCase
@@ -205,7 +206,7 @@ class RoundedLookTests(DisplayTestCase):
         seg.pack()
         self.root.update()
         t = self.style.theme
-        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
         tl, tr = seg.corner_labels[0].image, seg.corner_labels[1].image
         radius = tl.width()
         self.assertEqual(tl.get(radius - 1, radius - 1), rgb(t.accent))
@@ -225,7 +226,7 @@ class RoundedLookTests(DisplayTestCase):
         entry.pack(ipady=4)
         self.root.update()
         t = self.style.theme
-        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
         radius = entry.corner_labels[0].image.width()
         self.assertEqual(len(entry.corner_labels), 4)
         self.assertEqual(entry.corner_labels[0].image.get(radius - 1, 0), rgb(t.border))
@@ -413,6 +414,53 @@ class AskTextTests(DisplayTestCase):
             entry.event_generate("<Return>")
         self.drive(act)
         self.assertEqual(gw.ask_text(self.root, self.style, "Override", "Why?"), "Patched by vendor hotfix")
+
+    def flaky_grab(self, failures):
+        """Make Toplevel.grab_set fail like a window that is not yet viewable, the given number of times."""
+        real, calls = tk.Toplevel.grab_set, {"n": 0}
+
+        def grab_set(window):
+            calls["n"] += 1
+            if calls["n"] <= failures:
+                raise tk.TclError("grab failed: window not viewable")
+            return real(window)
+
+        patcher = mock.patch.object(tk.Toplevel, "grab_set", grab_set)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return calls
+
+    def test_a_dialog_that_is_not_yet_viewable_is_retried_and_still_works(self):
+        calls = self.flaky_grab(failures=4)
+
+        def act(dialog, entry):
+            self.pump(2, until=lambda: calls["n"] > 4)
+            entry.insert(0, "Compensating control verified")
+            entry.event_generate("<Return>")
+        self.drive(act)
+        self.assertEqual(gw.ask_text(self.root, self.style, "Override", "Why?"), "Compensating control verified")
+        self.assertGreater(calls["n"], 4)
+
+    def test_a_dialog_that_can_never_grab_still_works_and_never_raises(self):
+        calls = self.flaky_grab(failures=10 ** 6)
+
+        def act(dialog, entry):
+            entry.insert(0, "Reason given")
+            entry.event_generate("<Return>")
+        self.drive(act)
+        self.assertEqual(gw.ask_text(self.root, self.style, "Override", "Why?"), "Reason given")
+        self.pump(0.3)
+        self.assertGreaterEqual(calls["n"], 1)
+        self.assertLessEqual(calls["n"], gw.GRAB_RETRIES + 1)
+
+    def test_retries_stop_once_the_dialog_is_gone(self):
+        calls = self.flaky_grab(failures=10 ** 6)
+        window = tk.Toplevel(self.root)
+        gw.grab_when_visible(window)
+        window.destroy()
+        count = calls["n"]
+        self.pump(0.2)
+        self.assertEqual(calls["n"], count)
 
     def test_empty_reason_is_refused_then_cancel_returns_none(self):
         labels = []
