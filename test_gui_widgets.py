@@ -176,6 +176,21 @@ class RoundedLookTests(DisplayTestCase):
         self.assertEqual(str(outer.cget("highlightbackground")), self.style.theme.border)
         self.assertNotIn(str(outer.cget("highlightcolor")).lower(), ("#000000", "black"))
 
+    def test_empty_message_lines_take_almost_no_space(self):
+        frame = self.make_frame()
+        message = gw.MessageLabel(frame, self.style)
+        message.pack(fill=tk.X)
+        self.root.update()
+        empty_height = message.winfo_reqheight()
+        self.assertLessEqual(empty_height, 4)
+        message.configure(text="Something to say", fg=self.style.theme.error)
+        self.root.update()
+        self.assertGreater(message.winfo_reqheight(), 12)
+        self.assertEqual((message.cget("text"), str(message.cget("fg"))), ("Something to say", self.style.theme.error))
+        message.config(text="")
+        self.root.update()
+        self.assertEqual(message.winfo_reqheight(), empty_height)
+
     def test_chips_are_pills(self):
         frame = self.make_frame()
         chip = gw.chip(frame, self.style, "In CISA KEV", "raise")

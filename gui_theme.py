@@ -113,14 +113,22 @@ def apply_ttk_styles(root, style):
     style.family = choose_family(root)
     s.theme_use("clam")
     s.configure("Treeview", background=t.card, fieldbackground=t.card, foreground=t.text, borderwidth=0,
-                rowheight=round(28 * style.scale), font=style.font(10))
+                rowheight=round(28 * style.scale), font=style.font(10), bordercolor=t.card, lightcolor=t.card,
+                darkcolor=t.card)
     s.configure("Treeview.Heading", background=t.border, foreground=t.text, relief="flat", padding=6,
-                font=style.font(9, "bold"))
+                font=style.font(9, "bold"), bordercolor=t.border, lightcolor=t.border, darkcolor=t.border)
     s.map("Treeview", background=[("selected", t.accent)], foreground=[("selected", t.on_accent)])
     s.map("Treeview.Heading", background=[("active", t.border)])
     s.configure("Vertical.TScrollbar", background=t.border, troughcolor=t.card, bordercolor=t.card,
                 arrowcolor=t.text, lightcolor=t.border, darkcolor=t.border)
+    s.map("Vertical.TScrollbar", background=[("disabled", t.card), ("pressed", t.muted), ("active", t.muted)],
+          lightcolor=[("disabled", t.card), ("pressed", t.muted), ("active", t.muted)],
+          darkcolor=[("disabled", t.card), ("pressed", t.muted), ("active", t.muted)],
+          arrowcolor=[("disabled", t.border)])
     s.configure("Score.Horizontal.TProgressbar", troughcolor=t.field, background=t.accent, bordercolor=t.border,
                 lightcolor=t.accent, darkcolor=t.accent, thickness=10)
+    for name in ("Score.Horizontal.TProgressbar", "Busy.Horizontal.TProgressbar"):
+        s.map(name, background=[("disabled", t.border)], lightcolor=[("disabled", t.border)],
+              darkcolor=[("disabled", t.border)])
     s.configure("Busy.Horizontal.TProgressbar", troughcolor=t.field, background=t.accent, bordercolor=t.border,
                 lightcolor=t.accent, darkcolor=t.accent, thickness=6)

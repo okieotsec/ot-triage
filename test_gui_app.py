@@ -164,6 +164,22 @@ class ShellTests(AppTestCase):
         self.assertGreaterEqual(accent[0].winfo_width(), app.header.winfo_width() - 2)
         self.assertEqual(str(accent[0].cget("bg")), app.style.theme.accent)
 
+    def test_the_narrow_tab_strip_hides_shortcut_hints_and_fits_the_minimum_width_at_every_text_size(self):
+        for percent in (90, 100, 115, 130):
+            with self.subTest(text_percent=percent):
+                uiprefs.save(UiPrefs(text_percent=percent), self.prefs_path)
+                app = self.make()
+                app._layout(True)
+                self.root.update_idletasks()
+                self.assertTrue(all(not h.winfo_manager() for h in app.nav_hints.values()))
+                total = sum(i.winfo_reqwidth() + 4 for i in app.nav_items.values())
+                self.assertLessEqual(total, 700, f"{total}px of tabs at {percent}% text")
+                app._layout(False)
+                self.assertTrue(all(h.winfo_manager() for h in app.nav_hints.values()))
+                for child in self.root.winfo_children():
+                    child.destroy()
+                gc.collect()
+
     def test_header_has_the_title_and_the_exposure_definition_lives_in_assess(self):
         app = self.make()
         self.assertIn("Vulnerability Prioritizer", self.labels(app.header))
@@ -316,6 +332,86 @@ class HostileConfigTests(AppTestCase):
         self.pump(0.2)
         self.assertEqual(app.views["assess"].badge.cget("text"), "NEVER")
         self.assertIn("No threat data is loaded", app.views["assess"].cve_message.cget("text"))
+
+
+class KeyboardReachabilityTests(AppTestCase):
+    """Every interactive control, in every view, must be on the Tab path (the keyboard-only checklist item)."""
+
+    def interactive(self, root_widget):
+        found, stack = [], [root_widget]
+        while stack:
+            widget = stack.pop()
+            stack.extend(widget.winfo_children())
+            if not widget.winfo_ismapped():
+                continue
+            kind = type(widget).__name__
+            takes_focus = str(widget.cget("takefocus")) if "takefocus" in widget.keys() else "0"
+            if (isinstance(widget, (tk.Entry, tk.Checkbutton)) or kind in ("Treeview", "Segmented")
+                    or (isinstance(widget, tk.Button) and str(widget.cget("state")) == "normal")
+                    or (isinstance(widget, (tk.Frame, tk.Label)) and takes_focus == "1")):
+                found.append(widget)
+        return found
+
+    def tab_path(self, start):
+        path, widget = [], start
+        for _ in range(600):
+            path.append(widget)
+            widget = widget.tk_focusNext()
+            if widget is None or widget is start:
+                break
+        return path
+
+    def prepare(self):
+        (self.work / "k.json").write_bytes(kev_bytes())
+        (self.work / "e.gz").write_bytes(epss_bytes())
+        td.import_from_files(self.work / "k.json", self.work / "e.gz", self.data_dir)
+        app = self.make()
+        self.root.wm_attributes("-type", "dialog")
+        self.root.geometry("1200x900+20+20")
+        self.root.deiconify()
+        self.pump(0.3)
+        state = app.ctx.assess_state
+        state.cvss.set("8.0")
+        return app
+
+    def test_every_control_in_every_view_is_reachable_with_the_tab_key(self):
+        app = self.prepare()
+        for name in ("assess", "batch", "threat", "settings", "about"):
+            with self.subTest(view=name):
+                app.show_view(name)
+                self.pump(0.2)
+                path = self.tab_path(app.nav_buttons["assess"])
+                controls = self.interactive(app.views[name].frame)
+                if name != "about":
+                    self.assertGreaterEqual(len(controls), 1, name)
+                else:
+                    self.assertEqual(controls, [], "the About view is read-only text")
+                missing = [str(c) for c in controls if c not in path]
+                self.assertEqual(missing, [], f"{name}: not reachable with Tab")
+        self.assertIn(app.nav_buttons["about"], self.tab_path(app.nav_buttons["assess"]))
+        status_buttons = [w for w in app.status_bar.winfo_children() if isinstance(w, tk.Button)]
+        self.assertTrue(all(b in self.tab_path(app.nav_buttons["assess"]) for b in status_buttons))
+
+    def test_the_assess_view_exposes_every_input_to_the_keyboard(self):
+        app = self.prepare()
+        app.show_view("assess")
+        self.pump(0.2)
+        controls = self.interactive(app.views["assess"].frame)
+        kinds = [type(c).__name__ for c in controls]
+        self.assertEqual(kinds.count("Segmented"), 5)
+        self.assertGreaterEqual(kinds.count("Entry"), 3)
+        self.assertGreaterEqual(kinds.count("Button"), 3)
+
+    def test_nothing_that_is_not_interactive_steals_focus(self):
+        app = self.prepare()
+        app.show_view("assess")
+        self.pump(0.2)
+        for widget in self.tab_path(app.nav_buttons["assess"]):
+            self.assertTrue(isinstance(widget, (tk.Entry, tk.Button, tk.Checkbutton, tk.Frame, tk.Label, tk.Text,
+                                                tk.Canvas)) or type(widget).__name__ in ("Segmented", "Treeview",
+                                                                                          "Scrollbar", "TScrollbar"),
+                            type(widget).__name__)
+            self.assertNotIsInstance(widget, tk.Toplevel)
 
 
 class StatusBarTests(AppTestCase):

@@ -118,7 +118,7 @@ class BatchView:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         for priority in ("NOW", "NEXT", "NEVER", "ERROR"):
             self.tree.tag_configure(priority, foreground=s.priority_text_color(priority))
-        round_corners(wrap, 10, t.border, t.bg, fill={"tl": t.border, "tr": t.border, "bl": t.card, "br": t.card})
+        round_corners(wrap, 10, t.border, t.bg, fill={"tl": t.border, "tr": t.card, "bl": t.card, "br": t.card})
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
     def _build_details(self):
@@ -280,8 +280,8 @@ class BatchView:
 
     def _clear_details(self):
         self.detail_title.configure(text="Select a row to see why." if self.state.items else
-                                    "Open a CSV file to score it. Required columns: cvss, asset, exposure, and "
-                                    "threat (or cve).")
+                                    "Open a CSV file to score it. Required columns: cvss (or cvss_vector), asset, "
+                                    "exposure, and threat (or cve).")
         self.detail_chips.set_items([])
         self.detail_text.configure(text="")
 

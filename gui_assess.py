@@ -5,8 +5,8 @@ from tkinter import ttk
 import cvss
 import explain
 from explain import SHORT_LABELS, AssessInputs
-from gui_widgets import (Expander, FlowFrame, ScrollFrame, Segmented, ask_text, button, card, chip, field_label,
-                         priority_badge, rounded_entry, set_enabled)
+from gui_widgets import (Expander, FlowFrame, MessageLabel, ScrollFrame, Segmented, ask_text, button, card, chip,
+                         field_label, priority_badge, rounded_entry, set_enabled)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -135,8 +135,8 @@ class AssessView:
         self.cve_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=5)
         self.cve_entry.bind("<Return>", lambda _e: self.lookup())
         button(row, s, "Look up", self.lookup, "secondary").pack(side=tk.LEFT, padx=(8, 0))
-        self.cve_message = tk.Label(vuln, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
-        self.cve_message.pack(fill=tk.X, pady=(4, 0))
+        self.cve_message = MessageLabel(vuln, s)
+        self.cve_message.pack(fill=tk.X)
         self.cve_chips = FlowFrame(vuln, t.card)
         self.cve_chips.pack(fill=tk.X, pady=(4, 0))
 
@@ -145,9 +145,8 @@ class AssessView:
         self.vector_entry.pack(fill=tk.X, ipady=5)
         self.vector_entry.bind("<Return>", lambda _e: self.apply_vector())
         self.vector_entry.bind("<FocusOut>", lambda _e: self.apply_vector(), add="+")
-        self.vector_message = tk.Label(vuln, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w",
-                                       justify="left")
-        self.vector_message.pack(fill=tk.X, pady=(4, 0))
+        self.vector_message = MessageLabel(vuln, s)
+        self.vector_message.pack(fill=tk.X)
         self.vector_message.bind("<Configure>",
                                  lambda e: self.vector_message.configure(wraplength=max(e.width - 4, 100)))
 

@@ -20,6 +20,32 @@ class ThemeContrastTests(unittest.TestCase):
             with self.subTest(theme=theme.name):
                 self.assertGreaterEqual(contrast(theme.muted, theme.border), 3.0)
 
+    def test_no_default_theme_colours_leak_through_in_any_state(self):
+        import tkinter as tk
+        from tkinter import ttk
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("no display available")
+        self.addCleanup(root.destroy)
+        root.withdraw()
+        for theme in THEMES.values():
+            gui_theme.apply_ttk_styles(root, gui_theme.Style(theme))
+            style = ttk.Style(root)
+            leaks = {"#9e9a91", "#eeebe7", "#dcdad5", "#bab5ab", "#cfcdc8"}
+            applicable = {"Treeview": ("background", "bordercolor", "lightcolor", "darkcolor"),
+                          "Treeview.Heading": ("background", "bordercolor", "lightcolor", "darkcolor"),
+                          "Vertical.TScrollbar": ("background", "bordercolor", "lightcolor", "darkcolor",
+                                                  "troughcolor"),
+                          "Score.Horizontal.TProgressbar": ("background", "bordercolor", "lightcolor", "darkcolor",
+                                                            "troughcolor")}
+            applicable["Busy.Horizontal.TProgressbar"] = applicable["Score.Horizontal.TProgressbar"]
+            for widget, options in applicable.items():
+                for option in options:
+                    for states in ([], ["disabled"], ["active"], ["pressed"], ["selected"]):
+                        value = str(style.lookup(widget, option, states) or "").lower()
+                        self.assertNotIn(value, leaks, f"{theme.name}: {widget} {option} {states} is {value}")
+
     def test_contrast_helper_matches_known_values(self):
         self.assertAlmostEqual(contrast("#000000", "#ffffff"), 21.0, places=2)
         self.assertAlmostEqual(contrast("#ffffff", "#ffffff"), 1.0, places=2)

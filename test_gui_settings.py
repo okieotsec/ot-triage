@@ -9,6 +9,7 @@ import gui_about
 import gui_settings
 import settings as scoring
 import uiprefs
+import version
 from gui_context import Context
 from gui_testing import DisplayTestCase
 from gui_theme import Style
@@ -246,7 +247,7 @@ class AboutViewTests(DisplayTestCase):
             if isinstance(node, tk.Label):
                 texts.append(node.cget("text"))
         joined = "\n".join(texts)
-        self.assertIn("0.3.0", joined)
+        self.assertIn(version.__version__, joined)
         self.assertIn("no routable path from IT or the internet", joined)
         self.assertIn("its definitions are not Dragos'", joined)
         self.assertIn("fully offline", joined)
