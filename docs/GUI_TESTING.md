@@ -8,6 +8,7 @@ Run everything with `python3 -m unittest` (about 80 seconds, mostly the tests th
 | --- | --- | --- |
 | Colours and contrast | `test_gui_theme.py` | Every text and background pair meets a 4.5:1 contrast ratio in both themes, disabled text stays readable, every status has a symbol as well as a colour |
 | Logic behind the screens | `test_explain.py`, `test_uiprefs.py` | The "what would change" list agrees with the real rules, summaries include inputs, settings and data versions, malformed preference files fall back safely |
+| Rounded shapes | `test_gui_round.py` | The generated anti-aliased corners and pills are correct pixel by pixel, are placed exactly on the corners of frames, entries and canvases, and the PNG encoding is valid |
 | Widgets | `test_gui_widgets.py` | Segmented controls by mouse and keyboard, chips that wrap, tooltips, expanders, the scrolling area, the background worker and the reason dialog |
 | Assess | `test_gui_assess.py` | Results match the rules, CVE lookup and the threat sources, flags can only raise the level, overrides need a reason, tab order, text size |
 | Batch | `test_gui_batch.py` | Loading, filters, search, sorting, export, hostile files, a 20,000-row file, a load that finishes after the window was rebuilt |

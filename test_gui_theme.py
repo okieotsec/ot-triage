@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 import gui_theme
 from gui_theme import DARK, LIGHT, THEMES, contrast
@@ -33,13 +34,26 @@ class ThemeContrastTests(unittest.TestCase):
 
     def test_style_helpers(self):
         style = gui_theme.Style(DARK, 1.15)
-        self.assertEqual(style.font(10)[1], 12)
+        self.assertEqual(style.font(10)[1], round(10 * gui_theme.FONT_BOOST * 1.15))
         self.assertEqual(style.font(10, "bold")[2], "bold")
         self.assertEqual(style.bucket("NOW"), (DARK.now, DARK.on_now))
         self.assertEqual(style.bucket("ERROR")[1], DARK.error)
         self.assertEqual(style.direction("lower"), DARK.lower)
         self.assertEqual(style.direction("unknown"), DARK.neutral)
         self.assertEqual(gui_theme.Style(DARK, 0.5).font(8)[1], 7)
+
+    def test_font_choice_prefers_the_first_installed_modern_family(self):
+        with mock.patch("gui_theme.tkfont.families", return_value=("Liberation Sans", "Noto Sans", "Adwaita Sans")):
+            self.assertEqual(gui_theme.choose_family(object()), "Adwaita Sans")
+        with mock.patch("gui_theme.tkfont.families", return_value=("Liberation Sans", "Inter", "Adwaita Sans")):
+            self.assertEqual(gui_theme.choose_family(object()), "Inter")
+
+    def test_font_choice_falls_back_to_the_system_default(self):
+        fake = mock.Mock()
+        fake.actual.return_value = "Liberation Sans"
+        with (mock.patch("gui_theme.tkfont.families", return_value=("Liberation Sans",)),
+              mock.patch("gui_theme.tkfont.nametofont", return_value=fake)):
+            self.assertEqual(gui_theme.choose_family(object()), "Liberation Sans")
 
     def test_every_status_has_a_symbol_as_well_as_a_colour(self):
         for key in ("raise", "lower", "neutral", "ok", "warn", "error"):

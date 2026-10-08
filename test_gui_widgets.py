@@ -21,14 +21,15 @@ class WidgetTests(DisplayTestCase):
         clicked = []
         for kind in ("primary", "secondary"):
             b = gw.button(frame, self.style, "Save", lambda: clicked.append(1), kind)
-            enabled_look = (str(b.cget("bg")), str(b.cget("fg")))
+            enabled_look = (b.fill, str(b.cget("fg")), str(b.cget("image")))
             gw.set_enabled(b, False)
             self.assertEqual(str(b.cget("state")), "disabled")
-            self.assertEqual((str(b.cget("bg")), str(b.cget("fg"))), (self.style.theme.border, self.style.theme.muted))
-            self.assertNotEqual((str(b.cget("bg")), str(b.cget("fg"))), enabled_look)
+            self.assertEqual((b.fill, str(b.cget("fg"))), (self.style.theme.border, self.style.theme.muted))
+            self.assertNotEqual((b.fill, str(b.cget("fg")), str(b.cget("image"))), enabled_look)
             b.invoke()
             gw.set_enabled(b, True)
-            self.assertEqual((str(b.cget("bg")), str(b.cget("fg")), str(b.cget("state"))), (*enabled_look, "normal"))
+            self.assertEqual((b.fill, str(b.cget("fg")), str(b.cget("image"))), enabled_look)
+            self.assertEqual(str(b.cget("state")), "normal")
             b.invoke()
         self.assertEqual(len(clicked), 2)
 
@@ -140,7 +141,9 @@ class WidgetTests(DisplayTestCase):
         for priority in ("NOW", "NEXT", "NEVER"):
             badge = gw.priority_badge(frame, self.style, priority)
             self.assertEqual(badge.cget("text"), priority)
-            self.assertEqual((str(badge.cget("bg")), str(badge.cget("fg"))), self.style.bucket(priority))
+            self.assertEqual((badge.fill, str(badge.cget("fg"))), self.style.bucket(priority))
+            self.assertEqual(str(badge.cget("bg")), self.style.theme.card)
+            self.assertEqual((badge.image.width(), badge.image.height()), badge.size)
 
     def test_field_label_adds_a_help_mark_only_when_asked(self):
         frame = self.make_frame()
@@ -148,6 +151,136 @@ class WidgetTests(DisplayTestCase):
         helped = gw.field_label(frame, self.style, "Exposure", "Explained")
         self.assertEqual(len(plain.winfo_children()), 1)
         self.assertEqual(len(helped.winfo_children()), 2)
+
+
+class RoundedLookTests(DisplayTestCase):
+    def test_cards_hide_their_square_corners_with_the_card_colour_inside(self):
+        frame = self.make_frame()
+        inner = gw.card(frame, self.style, "Vulnerability")
+        outer = inner.master
+        self.root.update()
+        self.assertEqual(len(outer.corner_labels), 4)
+        t = self.style.theme
+        top_left = outer.corner_labels[0].image
+        self.assertEqual(top_left.get(0, 0), tuple(int(frame.cget("bg")[i:i + 2], 16) for i in (1, 3, 5)))
+        radius = top_left.width()
+        inside = top_left.get(radius - 1, radius - 1)
+        self.assertEqual(inside, tuple(int(t.card[i:i + 2], 16) for i in (1, 3, 5)))
+        self.assertEqual(top_left.get(radius - 1, 0), tuple(int(t.border[i:i + 2], 16) for i in (1, 3, 5)))
+
+    def test_a_card_never_draws_a_black_focus_border_when_a_child_has_focus(self):
+        frame = self.make_frame()
+        inner = gw.card(frame, self.style, "Vulnerability")
+        outer = inner.master
+        self.assertEqual(str(outer.cget("highlightcolor")), self.style.theme.border)
+        self.assertEqual(str(outer.cget("highlightbackground")), self.style.theme.border)
+        self.assertNotIn(str(outer.cget("highlightcolor")).lower(), ("#000000", "black"))
+
+    def test_chips_are_pills(self):
+        frame = self.make_frame()
+        chip = gw.chip(frame, self.style, "In CISA KEV", "raise")
+        self.assertEqual(chip.shape["radius"], chip.image.height() // 2)
+        self.assertEqual(chip.shape["fill"], None)
+        self.assertEqual(chip.shape["ring"], self.style.theme.raise_)
+
+    def test_segmented_corners_follow_the_selected_segments_and_the_focus_ring(self):
+        frame = self.make_frame()
+        var = tk.StringVar(value="a")
+        seg = gw.Segmented(frame, self.style, [("a", "Alpha"), ("b", "Beta"), ("c", "Gamma")], var)
+        seg.pack()
+        self.root.update()
+        t = self.style.theme
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
+        tl, tr = seg.corner_labels[0].image, seg.corner_labels[1].image
+        radius = tl.width()
+        self.assertEqual(tl.get(radius - 1, radius - 1), rgb(t.accent))
+        self.assertEqual(tr.get(0, radius - 1), rgb(t.field))
+        var.set("c")
+        self.root.update()
+        self.assertEqual(seg.corner_labels[0].image.get(radius - 1, radius - 1), rgb(t.field))
+        self.assertEqual(seg.corner_labels[1].image.get(0, radius - 1), rgb(t.accent))
+        seg._ring(t.accent)
+        self.assertEqual(seg.corner_labels[0].image.get(radius - 1, 0), rgb(t.accent))
+        seg._ring(t.border)
+        self.assertEqual(seg.corner_labels[0].image.get(radius - 1, 0), rgb(t.border))
+
+    def test_rounded_inputs_recolour_their_corners_for_focus_and_errors(self):
+        frame = self.make_frame()
+        entry = gw.rounded_entry(frame, self.style, width=10)
+        entry.pack(ipady=4)
+        self.root.update()
+        t = self.style.theme
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
+        radius = entry.corner_labels[0].image.width()
+        self.assertEqual(len(entry.corner_labels), 4)
+        self.assertEqual(entry.corner_labels[0].image.get(radius - 1, 0), rgb(t.border))
+        entry.focused = True
+        entry.repaint()
+        self.assertEqual(entry.corner_labels[0].image.get(radius - 1, 0), rgb(t.accent))
+        entry.configure(highlightbackground=t.error, highlightcolor=t.error)
+        entry.repaint()
+        self.assertEqual(entry.corner_labels[0].image.get(radius - 1, 0), rgb(t.error))
+        entry.focused = False
+        entry.configure(highlightbackground=t.border, highlightcolor=t.accent)
+        entry.repaint()
+        self.assertEqual(entry.corner_labels[0].image.get(radius - 1, 0), rgb(t.border))
+
+    def test_rounded_inputs_follow_real_keyboard_focus(self):
+        frame = self.make_frame()
+        entry = gw.rounded_entry(frame, self.style, width=10)
+        entry.pack()
+        self.root.update()
+        entry.focus_force()
+        self.pump(0.1)
+        if not entry.focused:
+            self.skipTest("the window manager did not give the test window keyboard focus")
+        self.assertEqual(entry.corner_labels[0].image.get(entry.corner_labels[0].image.width() - 1, 0),
+                         tuple(int(self.style.theme.accent[i:i + 2], 16) for i in (1, 3, 5)))
+
+    def test_buttons_show_a_pressed_state_while_the_mouse_is_down(self):
+        frame = self.make_frame()
+        b = gw.button(frame, self.style, "Save", lambda: None)
+        b.pack()
+        self.root.update()
+        normal = str(b.cget("image"))
+        b.event_generate("<ButtonPress-1>")
+        self.assertNotEqual(str(b.cget("image")), normal)
+        b.event_generate("<ButtonRelease-1>")
+        self.assertEqual(str(b.cget("image")), normal)
+
+    def test_a_disabled_button_does_not_show_the_pressed_state(self):
+        frame = self.make_frame()
+        b = gw.button(frame, self.style, "Save", lambda: None)
+        b.pack()
+        gw.set_enabled(b, False)
+        shown = str(b.cget("image"))
+        b.event_generate("<ButtonPress-1>")
+        self.assertEqual(str(b.cget("image")), shown)
+
+    def test_bordered_frames_in_every_view_use_their_border_colour_for_focus(self):
+        import tempfile
+        from pathlib import Path
+
+        import gui_batch
+        import gui_threat
+        from gui_context import Context
+        from settings import DEFAULT_SETTINGS
+        from uiprefs import DEFAULT_PREFS
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx = Context(self.root, self.style, DEFAULT_SETTINGS, DEFAULT_PREFS)
+            ctx.data_dir = Path(tmp) / "data"
+            holder = tk.Toplevel(self.root)
+            self.addCleanup(holder.destroy)
+            checked = 0
+            for view in (gui_batch.BatchView(ctx, holder), gui_threat.ThreatView(ctx, holder)):
+                stack = [view.frame]
+                while stack:
+                    node = stack.pop()
+                    stack.extend(node.winfo_children())
+                    if type(node) is tk.Frame and int(node.cget("highlightthickness")) == 1:
+                        checked += 1
+                        self.assertEqual(str(node.cget("highlightcolor")), str(node.cget("highlightbackground")))
+            self.assertGreaterEqual(checked, 3)
 
 
 class ScrollFrameTests(DisplayTestCase):

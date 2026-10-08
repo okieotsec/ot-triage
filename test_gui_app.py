@@ -82,7 +82,9 @@ class ShellTests(AppTestCase):
     def test_builds_with_five_views_and_creates_them_lazily(self):
         app = self.make()
         self.assertEqual(list(app.nav_buttons), ["assess", "batch", "threat", "settings", "about"])
-        self.assertEqual([b.cget("text") for b in app.nav_buttons.values()][:2], ["Assess   Ctrl+1", "Batch   Ctrl+2"])
+        self.assertEqual([b.cget("text") for b in app.nav_buttons.values()], ["Assess", "Batch", "Threat data",
+                                                                                "Settings", "About"])
+        self.assertEqual([h.cget("text") for h in app.nav_hints.values()], [f"Ctrl+{i}" for i in range(1, 6)])
         self.assertEqual(list(app.views), ["assess"])
         self.assertEqual(app.current, "assess")
 
@@ -94,8 +96,12 @@ class ShellTests(AppTestCase):
             visible = [n for n, v in app.views.items() if v.frame.winfo_manager()]
             self.assertEqual(visible, [name])
             self.assertEqual(str(app.nav_buttons[name].cget("bg")), app.style.theme.card)
-            others = [b for n, b in app.nav_buttons.items() if n != name]
-            self.assertTrue(all(str(b.cget("bg")) == app.style.theme.header for b in others))
+            self.assertEqual(str(app.nav_bars[name].cget("bg")), app.style.theme.accent)
+            others = [n for n in app.nav_buttons if n != name]
+            self.assertTrue(all(str(app.nav_buttons[n].cget("bg")) == app.style.theme.header for n in others))
+            self.assertTrue(all(str(app.nav_bars[n].cget("bg")) == app.style.theme.header for n in others))
+            self.assertTrue(all(str(b.cget("highlightbackground")) == str(b.cget("bg"))
+                                for b in app.nav_buttons.values()))
         self.assertEqual(len(app.views), 5)
 
     def test_nav_buttons_navigate(self):
@@ -142,11 +148,11 @@ class ShellTests(AppTestCase):
         self.assertEqual((app.nav.grid_info()["row"], app.nav.grid_info()["column"]), (1, 0))
         self.assertEqual(int(app.nav.grid_info()["columnspan"]), 2)
         self.assertEqual(int(app.status_bar.grid_info()["row"]), 3)
-        self.assertTrue(all(b.pack_info()["side"] == "left" for b in app.nav_buttons.values()))
+        self.assertTrue(all(i.pack_info()["side"] == "left" for i in app.nav_items.values()))
         app._layout(False)
         self.assertEqual((int(app.nav.grid_info()["row"]), int(app.nav.grid_info()["column"])), (1, 0))
         self.assertEqual(int(app.content.grid_info()["column"]), 1)
-        self.assertTrue(all(b.pack_info()["fill"] == "x" for b in app.nav_buttons.values()))
+        self.assertTrue(all(i.pack_info()["fill"] == "x" for i in app.nav_items.values()))
 
     def test_the_header_accent_line_spans_the_whole_width(self):
         app = self.make()
@@ -332,6 +338,10 @@ class StatusBarTests(AppTestCase):
         self.app.refresh_status()
         chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
         self.assertTrue(any(c.startswith("⚠ KEV") and c.endswith("(stale)") for c in chips), chips)
+
+    def test_the_status_bar_never_draws_a_black_focus_border(self):
+        app = self.make()
+        self.assertEqual(str(app.status_bar.cget("highlightcolor")), str(app.status_bar.cget("highlightbackground")))
 
     def test_clicking_a_chip_opens_the_threat_data_view(self):
         app = self.make()

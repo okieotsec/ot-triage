@@ -3,7 +3,7 @@ import tkinter as tk
 
 import settings as scoring
 import uiprefs
-from gui_widgets import ScrollFrame, Segmented, button, card, set_enabled
+from gui_widgets import ScrollFrame, Segmented, button, card, rounded_entry, set_enabled
 from settings import SPEC, Settings
 
 TITLES = {"cvss_high": "CVSS High line", "cvss_critical": "CVSS Critical line",
@@ -64,7 +64,7 @@ class SettingsView:
         self.frame = tk.Frame(parent, bg=t.bg)
         self.scroll = ScrollFrame(self.frame, t.bg)
         self.scroll.pack(fill=tk.BOTH, expand=True)
-        self.scroll.body.configure(padx=20, pady=20)
+        self.scroll.body.configure(padx=28, pady=24)
         self.entries, self.messages, self._traces = {}, {}, []
         self._build_scoring(self.scroll.body)
         self._build_appearance(self.scroll.body)
@@ -101,9 +101,7 @@ class SettingsView:
                             font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
             hint.pack(fill=tk.X)
             hint.bind("<Configure>", lambda e, w=hint: w.configure(wraplength=max(e.width - 4, 100)))
-            entry = tk.Entry(row, textvariable=self.state.vars[name], width=9, justify="center", font=s.font(11),
-                             bg=t.field, fg=t.text, insertbackground=t.text, relief="flat", highlightthickness=2,
-                             highlightbackground=t.border, highlightcolor=t.accent)
+            entry = rounded_entry(row, s, self.state.vars[name], width=9, justify="center", outside=t.card)
             entry.grid(row=0, column=1, ipady=5)
             message = tk.Label(row, text="", font=s.font(9), bg=t.card, fg=t.error, anchor="w", justify="left")
             message.grid(row=1, column=0, columnspan=2, sticky="ew")
@@ -159,6 +157,7 @@ class SettingsView:
         for name, entry in self.entries.items():
             entry.configure(highlightbackground=t.error if name in errors else t.border,
                             highlightcolor=t.error if name in errors else t.accent)
+            entry.repaint()
             self.messages[name].configure(text=f"✖ {errors[name]}" if name in errors else "")
         self.parsed = parsed
         if parsed is None:

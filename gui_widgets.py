@@ -4,50 +4,99 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 
-from gui_theme import PRIORITY_SYMBOLS, SYMBOLS
+from gui_round import photo, recolor_corners, round_corners, shape_label, text_size
+from gui_theme import SYMBOLS
+
+CARD_RADIUS, BUTTON_RADIUS, SEGMENT_RADIUS, BADGE_RADIUS, ENTRY_RADIUS = 12, 9, 9, 14, 9
 
 
-def card(parent, style, title, expand=False, pady=(0, 14)):
-    """Create a titled card and return the frame to put its content in."""
+def card(parent, style, title, expand=False, pady=(0, 16)):
+    """Create a titled, rounded card and return the frame to put its content in."""
     t = style.theme
-    outer = tk.Frame(parent, bg=t.card, highlightthickness=1, highlightbackground=t.border)
+    outer = tk.Frame(parent, bg=t.card, highlightthickness=1, highlightbackground=t.border, highlightcolor=t.border)
     outer.pack(fill=tk.BOTH if expand else tk.X, expand=expand, pady=pady)
     if title:
         tk.Label(outer, text=title.upper(), font=style.font(9, "bold"), bg=t.card, fg=t.accent).pack(
-            anchor="w", padx=16, pady=(12, 4))
+            anchor="w", padx=20, pady=(14, 4))
     inner = tk.Frame(outer, bg=t.card)
-    inner.pack(fill=tk.BOTH, expand=expand, padx=16, pady=(0 if title else 12, 14))
+    inner.pack(fill=tk.BOTH, expand=expand, padx=20, pady=(0 if title else 14, 16))
+    round_corners(outer, CARD_RADIUS, t.border, parent.cget("bg"), fill=t.card)
     return inner
+
+
+def rounded_entry(parent, style, variable=None, width=20, size=11, bold=False, justify="left", outside=None):
+    """Create a text input with rounded corners; call .repaint() after changing its highlight colours."""
+    t = style.theme
+    outside = outside or parent.cget("bg")
+    entry = tk.Entry(parent, textvariable=variable, width=width, font=style.font(size, "bold" if bold else "normal"),
+                     bg=t.field, fg=t.text, insertbackground=t.text, relief="flat", justify=justify,
+                     highlightthickness=2, highlightbackground=t.border, highlightcolor=t.accent,
+                     selectbackground=t.accent, selectforeground=t.on_accent)
+    round_corners(entry, ENTRY_RADIUS, t.border, outside, ring_width=2, fill=t.field)
+    entry.focused = False
+
+    def repaint():
+        ring = entry.cget("highlightcolor") if entry.focused else entry.cget("highlightbackground")
+        recolor_corners(entry, ENTRY_RADIUS, str(ring), outside, ring_width=2, fill=t.field)
+
+    def focus(state):
+        entry.focused = state
+        repaint()
+
+    entry.repaint = repaint
+    entry.bind("<FocusIn>", lambda _e: focus(True), add="+")
+    entry.bind("<FocusOut>", lambda _e: focus(False), add="+")
+    return entry
 
 
 def field_label(parent, style, text, help_text=None, bg=None):
     """Create a small caption above an input, with an optional help mark."""
     bg = bg or style.theme.card
     row = tk.Frame(parent, bg=bg)
-    row.pack(fill=tk.X, pady=(10, 3))
+    row.pack(fill=tk.X, pady=(11, 4))
     tk.Label(row, text=text, font=style.font(9), bg=bg, fg=style.theme.muted).pack(side=tk.LEFT)
     if help_text:
         help_mark(row, style, help_text, bg).pack(side=tk.LEFT, padx=(6, 0))
     return row
 
 
+def _shade(color, toward, amount):
+    """Blend a #rrggbb colour towards another by a fraction."""
+    mixed = [round(int(color[i:i + 2], 16) * (1 - amount) + int(toward[i:i + 2], 16) * amount) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(mixed)
+
+
 def button(parent, style, text, command, kind="primary", **options):
-    """Create a flat button; kind is primary or secondary. Use set_enabled to enable or disable it."""
+    """Create a rounded button; kind is primary or secondary. Use set_enabled to enable or disable it."""
     t = style.theme
-    bg, fg = (t.accent, t.on_accent) if kind == "primary" else (t.field, t.text)
-    weight = "bold" if kind == "primary" else "normal"
-    widget = tk.Button(parent, text=text, command=command, font=style.font(10, weight), bg=bg, fg=fg,
-                       activebackground=t.text, activeforeground=t.bg, relief="flat", bd=0, padx=14, pady=7,
-                       cursor="hand2", highlightthickness=2, highlightbackground=bg, highlightcolor=t.accent,
-                       disabledforeground=t.muted, **options)
-    widget.look = {"normal": (bg, fg, "hand2"), "disabled": (t.border, t.muted, "arrow")}
+    outside = parent.cget("bg")
+    fill, fg = (t.accent, t.on_accent) if kind == "primary" else (t.field, t.text)
+    ring = None if kind == "primary" else t.border
+    font = style.font(10, "bold" if kind == "primary" else "normal")
+    text_w, text_h = text_size(parent, font, text)
+    width, height = text_w + 40, text_h + 20
+    images = {"normal": photo(parent, width, height, BUTTON_RADIUS, fill, ring),
+              "pressed": photo(parent, width, height, BUTTON_RADIUS, _shade(fill, t.text, 0.18), ring),
+              "disabled": photo(parent, width, height, BUTTON_RADIUS, t.border)}
+    widget = tk.Button(parent, text=text, command=command, font=font, image=images["normal"], compound="center",
+                       fg=fg, bg=outside, activebackground=outside, activeforeground=fg, relief="flat", bd=0,
+                       padx=0, pady=0, cursor="hand2", highlightthickness=2, highlightbackground=outside,
+                       highlightcolor=t.accent, disabledforeground=t.muted, **options)
+    widget.images, widget.fill = images, fill
+    widget.look = {"normal": (fill, fg, "hand2", images["normal"]), "disabled": (t.border, t.muted, "arrow",
+                                                                                  images["disabled"])}
+    widget.bind("<ButtonPress-1>", lambda _e: widget.cget("state") == "normal" and widget.configure(
+        image=images["pressed"]), add="+")
+    widget.bind("<ButtonRelease-1>", lambda _e: widget.cget("state") == "normal" and widget.configure(
+        image=images["normal"]), add="+")
     return widget
 
 
 def set_enabled(widget, enabled):
     """Enable or disable a button made by button(), with a clearly different look when disabled."""
-    bg, fg, cursor = widget.look["normal" if enabled else "disabled"]
-    widget.configure(state="normal" if enabled else "disabled", bg=bg, fg=fg, cursor=cursor, highlightbackground=bg)
+    fill, fg, cursor, image = widget.look["normal" if enabled else "disabled"]
+    widget.fill = fill
+    widget.configure(state="normal" if enabled else "disabled", fg=fg, cursor=cursor, image=image)
 
 
 class ScrollFrame(tk.Frame):
@@ -150,11 +199,11 @@ def help_mark(parent, style, text, bg=None):
 
 
 def chip(parent, style, text, direction="neutral", bg=None):
-    """Create a rounded-look status chip with a symbol and a word."""
+    """Create a pill-shaped status chip with a symbol and a word."""
     color = style.direction(direction)
     symbol = SYMBOLS.get(direction, "")
-    return tk.Label(parent, text=f"{symbol} {text}".strip(), font=style.font(9), fg=color, bg=bg or style.theme.card,
-                    highlightthickness=1, highlightbackground=color, padx=8, pady=2)
+    return shape_label(parent, f"{symbol} {text}".strip(), style.font(9), color, ring=color,
+                       outside=bg or style.theme.card, padx=11, pady=3)
 
 
 class FlowFrame(tk.Frame):
@@ -196,13 +245,18 @@ class Segmented(tk.Frame):
         super().__init__(parent, bg=t.border, highlightthickness=2, highlightbackground=t.border,
                          highlightcolor=t.accent, takefocus=1, bd=0)
         self.style, self.options, self.variable, self.command = style, list(options), variable, command
+        self.outside = bg or parent.cget("bg")
+        self.ring_color = t.border
         self.buttons, self.enabled = {}, True
         for index, (value, text) in enumerate(self.options):
-            label = tk.Label(self, text=text, font=style.font(10), padx=6, pady=7, cursor="hand2")
+            label = tk.Label(self, text=text, font=style.font(10), padx=6, pady=8, cursor="hand2")
             label.grid(row=0, column=index, sticky="nsew", padx=(0 if index == 0 else 1, 0))
             label.bind("<Button-1>", lambda _e, v=value: self._choose(v, focus=True))
             self.buttons[value] = label
             self.columnconfigure(index, weight=1, uniform="seg")
+        round_corners(self, SEGMENT_RADIUS, self.ring_color, self.outside, ring_width=2, fill=t.field)
+        self.bind("<FocusIn>", lambda _e: self._ring(t.accent), add="+")
+        self.bind("<FocusOut>", lambda _e: self._ring(t.border), add="+")
         for key, step in (("<Left>", -1), ("<Up>", -1), ("<Right>", 1), ("<Down>", 1)):
             self.bind(key, lambda _e, s=step: self._step(s))
         self.bind("<Home>", lambda _e: self._choose(self.options[0][0]))
@@ -210,6 +264,16 @@ class Segmented(tk.Frame):
         self._trace = variable.trace_add("write", lambda *_a: self.refresh())
         self.bind("<Destroy>", self._on_destroy)
         self.refresh()
+
+    def _ring(self, color):
+        self.ring_color = color
+        self._paint_corners()
+
+    def _paint_corners(self):
+        first, last = self.buttons[self.options[0][0]], self.buttons[self.options[-1][0]]
+        left, right = str(first.cget("bg")), str(last.cget("bg"))
+        recolor_corners(self, SEGMENT_RADIUS, self.ring_color, self.outside, ring_width=2,
+                        fill={"tl": left, "bl": left, "tr": right, "br": right})
 
     def _on_destroy(self, event):
         if event.widget is self:
@@ -247,6 +311,7 @@ class Segmented(tk.Frame):
             fg = (t.on_accent if on else t.muted) if self.enabled else t.muted
             label.configure(bg=t.accent if on and self.enabled else (t.border if on else t.field), fg=fg,
                             font=self.style.font(10, "bold" if on else "normal"))
+        self._paint_corners()
 
 
 class Expander(tk.Frame):
@@ -278,12 +343,30 @@ class Expander(tk.Frame):
             self.body.pack_forget()
 
 
-def priority_badge(parent, style, priority, size=30, width=7):
-    """Create the large NOW, NEXT or NEVER badge, showing the word and a symbol."""
+class PriorityBadge(tk.Label):
+    """The large rounded NOW, NEXT or NEVER badge; call show() to change what it displays."""
+
+    def __init__(self, parent, style):
+        font = style.font(30, "bold")
+        text_w, text_h = text_size(parent, font, "NEVER")
+        self.size = (text_w + 64, text_h + 28)
+        super().__init__(parent, font=font, bg=parent.cget("bg"), compound="center", bd=0, highlightthickness=0,
+                         padx=0, pady=0)
+        self.fill = parent.cget("bg")
+
+    def show(self, text, fill, fg, ring=None):
+        """Display text on a rounded background of the given colour."""
+        self.fill = fill
+        self.image = photo(self, *self.size, BADGE_RADIUS, fill, ring)
+        self.configure(text=text, fg=fg, image=self.image)
+
+
+def priority_badge(parent, style, priority):
+    """Create the large NOW, NEXT or NEVER badge, showing the word."""
+    badge = PriorityBadge(parent, style)
     bg, fg = style.bucket(priority)
-    label = tk.Label(parent, text=priority, font=style.font(size, "bold"), bg=bg, fg=fg, width=width)
-    label.symbol = PRIORITY_SYMBOLS.get(priority, "")
-    return label
+    badge.show(priority, bg, fg)
+    return badge
 
 
 class Worker:
@@ -352,8 +435,7 @@ def ask_text(parent, style, title, prompt, ok_text="OK"):
     result = {"value": None}
     tk.Label(dialog, text=prompt, font=style.font(10), bg=t.card, fg=t.text, wraplength=int(380 * style.scale),
              justify="left").pack(padx=18, pady=(16, 8))
-    entry = tk.Entry(dialog, font=style.font(11), bg=t.field, fg=t.text, insertbackground=t.text, relief="flat",
-                     highlightthickness=1, highlightbackground=t.border, highlightcolor=t.accent, width=44)
+    entry = rounded_entry(dialog, style, width=44, outside=t.card)
     entry.pack(padx=18, ipady=5)
     entry.focus_set()
     error = tk.Label(dialog, text="", font=style.font(9), bg=t.card, fg=t.error)
