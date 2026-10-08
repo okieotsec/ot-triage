@@ -15,7 +15,10 @@ class Context:
         self.assess_state = None
         self.batch_state = None
         self.updater = None
+        self.settings_state = None
         self.data_dir = None
+        self.settings_path = None
+        self.prefs_path = None
 
     # ---- threat data ----
     def get_threat_data(self):
