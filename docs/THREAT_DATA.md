@@ -63,6 +63,25 @@ Stored files are checked again every time they are loaded, so a file changed on 
 - Size limits are enforced while downloading, not only at the end.
 - The app's own proxy settings follow your system settings (`HTTPS_PROXY` and similar).
 
+## Troubleshooting: "unable to get local issuer certificate" on Windows
+
+On a fresh Windows install the EPSS download can fail with this message while the KEV download works. The EPSS server's certificate chain ends at Amazon's root certificate, cross-signed by *Starfield Services Root Certificate Authority - G2*. Windows installs some trusted roots only when first needed, and Python can only use roots that are actually in the machine's trusted store. Opening the address in a browser does **not** fix it, and certificate checking is never turned off.
+
+This was reproduced and fixed on a new Windows 11 virtual machine. In an **Administrator** PowerShell:
+
+```
+Invoke-WebRequest https://www.amazontrust.com/repository/SFSRootCAG2.cer -OutFile $env:TEMP\SFSRootCAG2.cer
+(Get-FileHash $env:TEMP\SFSRootCAG2.cer -Algorithm SHA256).Hash
+```
+
+The hash must be exactly `568D6905A2C88708A4B3025190EDCFEDB1974A606A13C6E5290FCB2AE63EDAB5`. If it is not, do not install the file. If it matches:
+
+```
+Import-Certificate -FilePath $env:TEMP\SFSRootCAG2.cer -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+Then restart the app and update again. If it still fails, repeat with `AmazonRootCA1.cer` (SHA-256 `8ECDE6884F3D87B1125BA31AC3FCB13D7016DE7F57CC904FE1CB97C6AE98196E`). Both certificates are Amazon Trust's published root certificates (https://www.amazontrust.com/repository/). Importing them needs administrator rights; an ordinary Windows PC that has been used and updated normally usually already has them.
+
 ## Where the data is stored
 
 | System | Location |
