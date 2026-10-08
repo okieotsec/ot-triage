@@ -2,6 +2,8 @@
 
 ## 0.4.0 (release candidate)
 
+- **Text size shortcuts:** Ctrl+plus, Ctrl+minus and Ctrl+0 make the whole interface larger or smaller (90% to 130%) or reset it, and the choice is remembered. This helps on window managers where resizing the window is awkward.
+- **Fixed:** in the Batch view the loading progress bar could be squeezed out of sight by the results table in short windows; it now sits directly under the toolbar.
 - **Fixed:** the headline in the Priority card (for example "Schedule remediation") was cut off in medium-width windows; it now wraps onto a second line.
 - **Fixed:** changing the threat level in the Assess view could show an extra "unexpected error (TclError)" box after the override reason prompt, because the dialog tried to take the keyboard grab before the window manager had shown it. The grab is now retried until the window is visible and can never raise.
 - **CVSS vectors:** paste a CVSS 3.0, 3.1 or 4.0 vector in the Assess view to fill in the base score, or add a `cvss_vector` column to batch files. Scores match FIRST's official calculators for every possible base vector. See [docs/CVSS.md](docs/CVSS.md).

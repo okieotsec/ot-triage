@@ -1,4 +1,5 @@
 """Tkinter GUI for the Now / Next / Never vulnerability prioritizer: window shell, navigation and status bar."""
+import dataclasses
 import gc
 import sys
 import tkinter as tk
@@ -192,6 +193,29 @@ class App:
             self.root.bind_all(sequence, self._focus_cve)
         for sequence in ("<Control-Shift-C>", "<Control-Shift-c>"):
             self.root.bind_all(sequence, self._copy_summary)
+        for sequence in ("<Control-plus>", "<Control-equal>", "<Control-KP_Add>"):
+            self.root.bind_all(sequence, lambda _e: self.zoom(+1))
+        for sequence in ("<Control-minus>", "<Control-KP_Subtract>"):
+            self.root.bind_all(sequence, lambda _e: self.zoom(-1))
+        for sequence in ("<Control-Key-0>", "<Control-KP_0>"):
+            self.root.bind_all(sequence, lambda _e: self.zoom(0))
+
+    def zoom(self, direction):
+        """Make the text one step larger or smaller (0 resets it), remember the choice and rebuild the window."""
+        steps = uiprefs.TEXT_PERCENTS
+        current = steps.index(self.ctx.prefs.text_percent)
+        target = steps.index(uiprefs.DEFAULT_PREFS.text_percent) if direction == 0 else current + direction
+        if not 0 <= target < len(steps) or target == current:
+            return "break"
+        new = dataclasses.replace(self.ctx.prefs, text_percent=steps[target])
+        try:
+            uiprefs.save(new, self.ctx.prefs_path)
+        except OSError as error:
+            self.ctx.error("Preferences not saved", f"The preferences file could not be written: "
+                                                    f"{error.strerror or error}")
+            return "break"
+        self.ctx.prefs_changed(new)
+        return "break"
 
     def _focus_cve(self, _event=None):
         self.show_view("assess")

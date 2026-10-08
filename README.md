@@ -31,6 +31,7 @@ scoring settings differ from the defaults.
 | Ctrl+1 to Ctrl+5 | Switch views |
 | Ctrl+L | Go to the CVE field |
 | Ctrl+Shift+C | Copy the summary of the current result |
+| Ctrl+plus / Ctrl+minus / Ctrl+0 | Make the text larger or smaller, or reset it (also in Settings) |
 | Arrow keys | Change the choice in a focused segmented control |
 
 See [docs/GUI_TESTING.md](docs/GUI_TESTING.md) for how the GUI is tested.

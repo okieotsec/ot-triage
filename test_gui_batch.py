@@ -169,6 +169,23 @@ class BatchLoadTests(BatchViewTestCase):
             self.pump(5, until=lambda: bool(view.state.items))
         self.assertTrue(view.state.items)
 
+    def test_the_progress_row_sits_right_under_the_toolbar_so_a_tall_table_cannot_squeeze_it_out(self):
+        view = self.build()
+        release = threading.Event()
+        real = batch.process_file
+
+        def slow(*args, **kwargs):
+            release.wait(5)
+            return real(*args, **kwargs)
+
+        with mock.patch("gui_batch.batch.process_file", side_effect=slow):
+            view.load(SAMPLE)
+            self.pump()
+            order = view.body.pack_slaves()
+            self.assertEqual(order.index(view.progress_row), order.index(view.toolbar) + 1)
+            release.set()
+            self.pump(5, until=lambda: bool(view.state.items))
+
     def test_a_load_that_finishes_after_a_rebuild_still_lands_in_the_state(self):
         view = self.build()
         release = threading.Event()

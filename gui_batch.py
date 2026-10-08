@@ -59,7 +59,7 @@ class BatchView:
     # ---- building ----
     def _build_toolbar(self):
         s, t = self.style, self.style.theme
-        bar = tk.Frame(self.body, bg=t.bg)
+        bar = self.toolbar = tk.Frame(self.body, bg=t.bg)
         bar.pack(fill=tk.X)
         self.open_button = button(bar, s, "Open CSV…", self.open_file)
         self.open_button.pack(side=tk.LEFT)
@@ -159,7 +159,7 @@ class BatchView:
             ctx.info("Batch import", "Another task is still running. Wait for it to finish or cancel it.")
             return
         set_enabled(self.open_button, False)
-        self.progress_row.pack(fill=tk.X, pady=(8, 0))
+        self.progress_row.pack(fill=tk.X, pady=(8, 0), after=self.toolbar)
         self.progress_bar.start(12)
 
     def _progress(self, message):
