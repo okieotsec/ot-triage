@@ -363,7 +363,12 @@ def fetch(url, max_bytes, allowed_hosts, context=None, timeout=FETCH_TIMEOUT_SEC
 
 def _tls_error(error):
     detail = getattr(error, "verify_message", None) or error.reason or str(error)
-    return FetchError(f"the secure connection could not be verified ({detail})")
+    message = f"the secure connection could not be verified ({detail})"
+    if sys.platform == "win32" and "issuer" in str(detail):
+        message += (". Windows installs some trusted certificates only when first needed: open the download address "
+                    "in Microsoft Edge once, or run Windows Update, then try again. Certificate checking is never "
+                    "turned off")
+    return FetchError(message)
 
 
 # ---- storage ---------------------------------------------------------------
