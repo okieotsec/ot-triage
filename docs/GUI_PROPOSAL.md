@@ -155,3 +155,7 @@ The first build was functional but flatter than the mockup. A second pass, check
 - **A refined sidebar:** an accent bar marks the current view and the keyboard shortcut is shown at the right of each item, instead of a boxed outline.
 - **Roomier, more consistent spacing** between cards and fields.
 - **A bug fix found along the way:** in Tk, a frame that contains the focused widget draws its focus colour (black by default) as its border. Cards containing the focused field had a black outline; every bordered frame now uses its own border colour for focus too.
+
+## CVSS vector input
+
+A **CVSS vector (optional)** field in the Assess view works out the base score from a pasted CVSS 3.0, 3.1 or 4.0 vector, and the Batch import accepts a `cvss_vector` column. See [CVSS.md](CVSS.md).

@@ -40,6 +40,18 @@ def build(directory):
     add("extra_columns", HEADER.rstrip() + b",extra1,extra2\n" + GOOD_ROW.rstrip() + b",a,b\n")
     add("duplicate_column", b"cvss,cvss,threat,asset,exposure\n1.0,9.8,active,crown,high\n")
     add("reordered_columns", b"exposure,asset,threat,cvss\nhigh,crown,active,9.8\n")
+    tail = b",active,crown,high\n"
+    v31 = b"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    add("vector_only", b"cvss_vector,threat,asset,exposure\n" + v31 + tail)
+    add("vector_invalid", b"cvss_vector,threat,asset,exposure\nCVSS:3.1/AV:N/AC:L" + tail)
+    add("vector_mismatch", b"cvss,cvss_vector,threat,asset,exposure\n3.0," + v31 + tail)
+    add("vector_v2", b"cvss_vector,threat,asset,exposure\nAV:N/AC:L/Au:N/C:P/I:P/A:P" + tail)
+    add("vector_formula", b'cvss_vector,threat,asset,exposure\n"=HYPERLINK(""http://example.invalid"")"' + tail)
+    add("vector_huge", b"cvss_vector,threat,asset,exposure\nCVSS:3.1/" + b"A" * 3_000_000 + tail)
+    add("vector_duplicate_header", b"cvss_vector,vector,threat,asset,exposure\n" + v31 + b"," + v31 + tail)
+    add("vector_unicode", "cvss_vector,threat,asset,exposure\nCVSS:3.1/\u0410V:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        .encode() + tail)
+    add("vector_null_byte", b"cvss_vector,threat,asset,exposure\nCVSS:3.1/AV:N\x00/AC:L" + tail)
     for label, value in (("nan", "nan"), ("inf", "inf"), ("negative", "-1"), ("over_ten", "10.1"),
                          ("huge", "1e308"), ("blank", ""), ("text", "high")):
         add("cvss_" + label, HEADER + f"X-1,Example,{value},active,crown,high,available,none\n".encode())

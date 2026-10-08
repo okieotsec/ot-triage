@@ -71,6 +71,40 @@ class MaliciousFileTests(unittest.TestCase):
         self.assertEqual([i.priority for i in self.load("reordered_columns")[0]], ["NOW"])
         self.assertEqual(self.load("bom_utf8")[0][0].priority, "NOW")
 
+    def test_hostile_cvss_vectors_become_error_rows_and_never_a_score(self):
+        for name in ("vector_invalid", "vector_mismatch", "vector_v2", "vector_formula", "vector_unicode",
+                     "vector_null_byte"):
+            with self.subTest(case=name):
+                items, error = self.load(name)
+                self.assertIsNone(error, name)
+                self.assertEqual([i.priority for i in items], ["ERROR"], name)
+                self.assertIn("cvss", items[0].error)
+                self.assertLess(len(items[0].error), 300)
+                self.assertLessEqual(len(items[0].cvss_vector), batch.MAX_ERROR_VECTOR_CHARS)
+        items, error = self.load("vector_only")
+        self.assertEqual((error, [i.priority for i in items], items[0].cvss), (None, ["NOW"], 9.8))
+        items, error = self.load("vector_duplicate_header")
+        self.assertIsNone(items)
+        self.assertIn("Duplicate column", str(error))
+
+    def test_a_giant_vector_cell_is_refused_by_the_csv_layer_before_any_parsing(self):
+        items, error = self.load("vector_huge")
+        self.assertIsNone(items)
+        self.assertIn("field larger than field limit", str(error))
+        long_cell = batch.score_row(2, {"cvss_vector": "CVSS:3.1/" + "A" * 100_000, "threat": "none",
+                                        "asset": "standard", "exposure": "low"})
+        self.assertEqual(long_cell.priority, "ERROR")
+        self.assertIn("longer than 400", long_cell.error)
+
+    def test_a_hostile_vector_cell_does_not_survive_into_an_unsafe_export(self):
+        items, _ = self.load("vector_formula")
+        out = os.path.join(self.dir.name, "vectors.csv")
+        batch.write_results(out, items)
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            row = next(csv.DictReader(fh))
+        self.assertTrue(row["cvss_vector"].startswith("'="))
+        self.assertFalse(row["error"].startswith(tuple("=+-@\t\r")))
+
     def test_row_and_size_caps(self):
         path = os.path.join(self.dir.name, "cap.csv")
         with open(path, "wb") as fh:

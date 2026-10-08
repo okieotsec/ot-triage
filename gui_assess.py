@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 
+import cvss
 import explain
 from explain import SHORT_LABELS, AssessInputs
 from gui_widgets import (Expander, FlowFrame, ScrollFrame, Segmented, ask_text, button, card, chip, field_label,
@@ -10,6 +11,11 @@ from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
 STACK_BELOW = 900
+SCORE_HINT = "Enter a base score from 0.0 to 10.0, or paste a vector above"
+VECTOR_HELP = ("Paste a CVSS 3.0, 3.1 or 4.0 vector such as CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H. The "
+               "base score is worked out for you and filled in below. Temporal, threat and environmental metrics are "
+               "accepted but do not change the base score. CVSS 2 vectors are not supported.")
+VECTOR_DELAY_MS = 400
 EXPOSURE_HELP = ("Low means no routable path from IT or the internet, verified by testing, not assumed from a "
                  "firewall's existence. If you are unsure, choose Medium.")
 THREAT_HELP = ("Filled in from local KEV and EPSS data when a CVE is looked up. Data can only raise the level; "
@@ -29,6 +35,8 @@ class AssessState:
     def __init__(self, root):
         self.cve = tk.StringVar(root)
         self.cvss = tk.StringVar(root)
+        self.vector = tk.StringVar(root)
+        self.vector_info = None
         self.threat = tk.StringVar(root, Threat.NONE.name)
         self.asset = tk.StringVar(root, Asset.STANDARD.name)
         self.exposure = tk.StringVar(root, Exposure.LOW.name)
@@ -77,17 +85,22 @@ class AssessView:
                     self.state.analyst, self.state.public):
             self._traces.append((var, var.trace_add("write", self.update)))
         self._traces.append((self.state.cve, self.state.cve.trace_add("write", self._cve_edited)))
+        self._traces.append((self.state.vector, self.state.vector.trace_add("write", self._vector_typed)))
+        self._traces.append((self.state.cvss, self.state.cvss.trace_add("write", self._cvss_typed)))
+        self._showing_vector = self._setting_cvss = False
+        self._vector_job = None
         self.frame.bind("<Destroy>", self._on_destroy)
         self.scroll.canvas.bind("<Configure>", self._on_resize, add="+")
         self._layout(wide=True)
+        self.apply_vector()
         self.refresh()
 
     def _on_destroy(self, event):
         if event.widget is self.frame:
-            for job in (self._flash_job, self._pending):
+            for job in (self._flash_job, self._pending, self._vector_job):
                 if job:
                     self.frame.after_cancel(job)
-            self._flash_job = self._pending = None
+            self._flash_job = self._pending = self._vector_job = None
             for var, trace in self._traces:
                 try:
                     var.trace_remove("write", trace)
@@ -127,6 +140,17 @@ class AssessView:
         self.cve_chips = FlowFrame(vuln, t.card)
         self.cve_chips.pack(fill=tk.X, pady=(4, 0))
 
+        field_label(vuln, s, "CVSS vector (optional)", VECTOR_HELP)
+        self.vector_entry = self._entry(vuln, state.vector, width=22, size=10)
+        self.vector_entry.pack(fill=tk.X, ipady=5)
+        self.vector_entry.bind("<Return>", lambda _e: self.apply_vector())
+        self.vector_entry.bind("<FocusOut>", lambda _e: self.apply_vector(), add="+")
+        self.vector_message = tk.Label(vuln, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w",
+                                       justify="left")
+        self.vector_message.pack(fill=tk.X, pady=(4, 0))
+        self.vector_message.bind("<Configure>",
+                                 lambda e: self.vector_message.configure(wraplength=max(e.width - 4, 100)))
+
         field_label(vuln, s, "CVSS base score")
         row = tk.Frame(vuln, bg=t.card)
         row.pack(fill=tk.X)
@@ -135,7 +159,7 @@ class AssessView:
         self.cvss_entry.pack(side=tk.LEFT, ipady=6)
         self.cvss_band = tk.Label(row, text="", font=s.font(10, "bold"), bg=t.card, fg=t.muted)
         self.cvss_band.pack(side=tk.LEFT, padx=12)
-        self.cvss_hint = tk.Label(vuln, text="Enter a base score from 0.0 to 10.0", font=s.font(9), bg=t.card,
+        self.cvss_hint = tk.Label(vuln, text=SCORE_HINT, font=s.font(9), bg=t.card,
                                   fg=t.muted, anchor="w")
         self.cvss_hint.pack(fill=tk.X, pady=(4, 0))
 
@@ -334,7 +358,7 @@ class AssessView:
             return
         self.cvss_entry.configure(highlightbackground=t.border, highlightcolor=t.accent)
         self.cvss_entry.repaint()
-        self.cvss_hint.configure(text="Enter a base score from 0.0 to 10.0", fg=t.muted)
+        self.cvss_hint.configure(text=SCORE_HINT, fg=t.muted)
         decision = self._decision() if self.auto_threat else None
         threat = decision.level if decision else Threat[state.threat.get()]
         inputs = AssessInputs(cvss, threat, Asset[state.asset.get()], Exposure[state.exposure.get()],
@@ -401,7 +425,9 @@ class AssessView:
             self.cvss_band.configure(text="")
             return
         label, direction = explain.cvss_band(value)
-        self.cvss_band.configure(text=label, fg=self.style.direction(direction))
+        info = self.state.vector_info
+        self.cvss_band.configure(text=f"{label}  \u00b7  {info.label}" if info else label,
+                                 fg=self.style.direction(direction))
 
     def _idle(self, headline, sub, error=False):
         t = self.style.theme
@@ -432,7 +458,8 @@ class AssessView:
         self.action_label.configure(text=result.action)
         self.chips.set_items([chip(self.chips, s, f.label, f.direction)
                               for f in explain.sorted_factors(result.factors)])
-        lines = [f"• {r}" for r in result.reasons] + ["", *result.inputs, f"Scoring settings: {result.profile}"]
+        lines = [f"• {r}" for r in result.reasons] + ["", *result.inputs, *self.vector_lines(),
+                                                        f"Scoring settings: {result.profile}"]
         if self.versions:
             lines.append(f"Threat data: {self.versions}")
         self.reasoning_text.configure(text="\n".join(lines))
@@ -466,17 +493,83 @@ class AssessView:
             label.pack(side=tk.LEFT, fill=tk.X, expand=True)
             label.bind("<Configure>", lambda e, w=label: w.configure(wraplength=max(e.width - 4, 100)))
 
+    # ---- CVSS vector ----
+    def vector_lines(self):
+        """Return summary lines naming the CVSS vector the score came from, if any."""
+        info = self.state.vector_info
+        if info is None:
+            return []
+        return [f"CVSS vector: {info.normalized}", f"CVSS version: {info.version} (base score {info.score:.1f})"]
+
+    def _vector_typed(self, *_args):
+        """Wait for typing to pause before checking the vector, so half-typed text is not flagged."""
+        if self._showing_vector:
+            return
+        if self._vector_job:
+            self.frame.after_cancel(self._vector_job)
+        self._vector_job = self.frame.after(VECTOR_DELAY_MS, self.apply_vector)
+
+    def apply_vector(self):
+        """Check the vector now; if it is valid, fill in the base score from it."""
+        if self._vector_job:
+            self.frame.after_cancel(self._vector_job)
+            self._vector_job = None
+        state, t = self.state, self.style.theme
+        text = state.vector.get().strip()
+        if not text:
+            state.vector_info = None
+            self.vector_message.configure(text="", fg=t.muted)
+            self.update()
+            return
+        try:
+            info = cvss.parse_vector(text)
+        except ValueError as error:
+            previous, state.vector_info = state.vector_info, None
+            if previous is not None:
+                note = f" The score below still comes from the previous vector ({previous.label})."
+            elif state.cvss.get().strip():
+                note = " The score typed below is used instead."
+            else:
+                note = ""
+            self.vector_message.configure(text=f"\u2716 {error}.{note}", fg=t.error)
+            self.update()
+            return
+        state.vector_info = info
+        self._setting_cvss = True
+        try:
+            state.cvss.set(f"{info.score:.1f}")
+        finally:
+            self._setting_cvss = False
+        band = explain.cvss_band(info.score)
+        self.vector_message.configure(text=f"\u2713 {info.label} vector: base score {info.score:.1f} ({band[0]}), "
+                                           "filled in below.", fg=t.ok)
+        self.update()
+
+    def _cvss_typed(self, *_args):
+        """If the score is typed by hand while a vector is active, the vector no longer describes it."""
+        info = self.state.vector_info
+        if self._setting_cvss or info is None or self.state.cvss.get().strip() == f"{info.score:.1f}":
+            return
+        self.state.vector_info = None
+        self._showing_vector = True
+        try:
+            self.state.vector.set("")
+        finally:
+            self._showing_vector = False
+        self.vector_message.configure(text="The score was changed by hand, so the vector was cleared.",
+                                      fg=self.style.theme.muted)
+
     # ---- copying ----
     def copy_summary(self):
         """Copy the plain-text summary."""
         if self.result:
-            self.ctx.copy(explain.summary_text(self.result, self.versions))
+            self.ctx.copy(explain.summary_text(self.result, self.versions, self.vector_lines()))
             self._flash("Summary copied")
 
     def copy_markdown(self):
         """Copy the Markdown summary."""
         if self.result:
-            self.ctx.copy(explain.markdown_summary(self.result, self.versions))
+            self.ctx.copy(explain.markdown_summary(self.result, self.versions, self.vector_lines()))
             self._flash("Markdown copied")
 
     def _flash(self, text):

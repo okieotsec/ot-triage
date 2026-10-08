@@ -296,10 +296,14 @@ class BatchView:
             self.detail_chips.set_items([chip(self.detail_chips, self.style, f.label, f.direction)
                                          for f in explain.sorted_factors(item.result.factors)])
             lines = [f"Action: {item.result.action}", ""] + [f"• {r}" for r in item.result.reasons]
+            if item.cvss_version:
+                lines += ["", f"CVSS vector: {item.cvss_vector} (CVSS {item.cvss_version}, base score {item.cvss:.1f})"]
             lines += ["", f"Scoring settings: {item.result.profile}"]
         else:
             self.detail_chips.set_items([chip(self.detail_chips, self.style, "Not scored", "error")])
             lines = [f"• {part}" for part in item.error.split("; ")]
+            if item.cvss_vector:
+                lines += ["", f"CVSS vector as given: {item.cvss_vector}"]
         self.detail_text.configure(text="\n".join(lines))
 
     # ---- export ----

@@ -93,16 +93,16 @@ class ParserTests(unittest.TestCase):
                 cvss.parse_vector(bad)
 
     def test_unsafe_characters_are_rejected_before_any_parsing(self):
-        for char in (" ", "\t", "\n", "\r", "\x00", "%", ";", "'", '"', "=", "$", "`", "\\", "А", "／", "​",
-                     "‮", "<", ">", "&", "|"):
+        for char in (" ", "\t", "\n", "\r", "\x00", "%", ";", "'", '"', "=", "$", "`", "\\", "\u0410", "\uff0f",
+                     "\u200b", "\u202e", "<", ">", "&", "|"):
             with self.subTest(char=repr(char)), self.assertRaisesRegex(ValueError, "only letters, digits"):
                 cvss.parse_vector(V31.replace("AV:N", "AV:N" + char))
 
     def test_unicode_lookalikes_do_not_pass_as_ascii_letters(self):
         with self.assertRaises(ValueError):
-            cvss.parse_vector(V31.replace("CVSS", "CѵSS"))
+            cvss.parse_vector(V31.replace("CVSS", "C\u0475SS"))
         with self.assertRaises(ValueError):
-            cvss.parse_vector(V31.replace("AV:N", "АV:N"))
+            cvss.parse_vector(V31.replace("AV:N", "\u0410V:N"))
 
     def test_long_input_is_rejected_quickly_and_messages_stay_short(self):
         start = time.monotonic()
@@ -200,6 +200,39 @@ class OfficialReferenceTests(unittest.TestCase):
         self.assertEqual(FIXTURE["counts"], {"3.0": 2592, "3.1": 2592, "4.0": 104976})
         for digest in FIXTURE["digests"].values():
             self.assertRegex(digest, r"^[0-9a-f]{64}$")
+
+
+class VerificationToolTests(unittest.TestCase):
+    """The developer tool downloads reference code, so its pins must stay complete and well-formed (offline check)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        path = Path(__file__).resolve().parent / "tools" / "verify_cvss_against_reference.py"
+        spec = importlib.util.spec_from_file_location("verify_cvss_tool", path)
+        cls.tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.tool)
+
+    def test_every_download_is_https_and_pinned_by_hash(self):
+        self.tool.check_pins()
+        self.assertEqual(set(self.tool.PINNED_SHA256), set(self.tool.SOURCES))
+        for name, url in self.tool.SOURCES.items():
+            self.assertTrue(url.startswith("https://"), name)
+            self.assertRegex(self.tool.PINNED_SHA256[name], r"^[0-9a-f]{64}$")
+
+    def test_the_pin_check_notices_drift(self):
+        original = dict(self.tool.PINNED_SHA256)
+        try:
+            self.tool.PINNED_SHA256["extra.js"] = "0" * 64
+            with self.assertRaises(SystemExit):
+                self.tool.check_pins()
+        finally:
+            self.tool.PINNED_SHA256.clear()
+            self.tool.PINNED_SHA256.update(original)
+
+    def test_the_tool_enumerates_the_same_vectors_as_the_tests(self):
+        for version in cvss.SUPPORTED_VERSIONS:
+            self.assertEqual(list(self.tool.all_vectors(version)), list(all_vectors(version)))
 
 
 class TableTests(unittest.TestCase):

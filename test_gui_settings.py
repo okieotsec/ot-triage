@@ -55,7 +55,7 @@ class ParseFieldsTests(unittest.TestCase):
         self.assertEqual(set(errors), {"cvss_high", "stale_days", "epss_percentile_cutoff"})
 
     def test_huge_and_odd_text_never_raises(self):
-        for bad in ("9" * 5000, "1e999", "0x10", "٣", " \t ", "7.0\x00"):
+        for bad in ("9" * 5000, "1e999", "0x10", "\u0663", " \t ", "7.0\x00"):
             for field in self.GOOD:
                 settings, errors = self.parse(**{field: bad})
                 self.assertTrue(settings is None or isinstance(settings, Settings), (field, bad))

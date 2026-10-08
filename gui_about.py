@@ -10,6 +10,7 @@ ATTRIBUTION = ("The Now / Next / Never categories come from Dragos' annual ICS/O
                "use similar framing, such as Foxguard's \"Patch Now, Next, or Never.\" This tool adapts the idea "
                "with its own scoring rules; its definitions are not Dragos' and are documented in docs/POLICY.md.")
 DOCUMENTS = [("README.md", "How to run the tool, the rules as implemented, and the batch CSV format"),
+             ("docs/CVSS.md", "Pasting CVSS vectors, supported versions and how the scores were verified"),
              ("docs/POLICY.md", "The prioritization decisions and why they were made"),
              ("docs/THREAT_DATA.md", "KEV and EPSS data, offline updates and the safety checks"),
              ("docs/SETTINGS.md", "The adjustable scoring settings, their defaults and limits"),
