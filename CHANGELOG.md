@@ -3,7 +3,7 @@
 ## 0.4.0 (release candidate)
 
 - **Text size shortcuts:** Ctrl+plus, Ctrl+minus and Ctrl+0 make the whole interface larger or smaller (90% to 130%) or reset it, and the choice is remembered. This helps on window managers where resizing the window is awkward.
-- **Clearer Windows certificate error:** on a fresh Windows install the EPSS download can fail with "unable to get local issuer certificate" because Windows has not installed a trusted root yet. The message now says how to fix it (open the address in Edge once, or run Windows Update). Certificate checking stays on.
+- **Clearer Windows certificate error:** on a fresh Windows install the EPSS download can fail with "unable to get local issuer certificate" because Windows has not installed a trusted root yet. The message now points to a verified fix in [docs/THREAT_DATA.md](docs/THREAT_DATA.md) (install Amazon Trust's published root, checked against its SHA-256). Certificate checking stays on.
 - **Fixed:** in the Batch view the loading progress bar could be squeezed out of sight by the results table in short windows; it now sits directly under the toolbar.
 - **Fixed:** the headline in the Priority card (for example "Schedule remediation") was cut off in medium-width windows; it now wraps onto a second line.
 - **Fixed:** changing the threat level in the Assess view could show an extra "unexpected error (TclError)" box after the override reason prompt, because the dialog tried to take the keyboard grab before the window manager had shown it. The grab is now retried until the window is visible and can never raise.
