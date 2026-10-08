@@ -16,12 +16,12 @@ Tool results
 - Risky-call grep: no eval, exec, pickle, subprocess, os.system, yaml.load, shell=True or unverified TLS contexts in application code (subprocess appears only in the test that creates a throwaway certificate).
 
 Dynamic testing (CP3 focus: settings file handling, new UI inputs, background work)
-- The plan's malicious CSV set (all 24 files, including 1M rows, a 50 MB line, UTF-16, Latin-1, formula payloads and bad CVSS values) was pushed through the Batch view itself: each ends in a short message or a table, within the time limit, and the view stays usable.
+- The plan's malicious CSV set (all 22 files, including 1M rows, a 50 MB line, UTF-16, Latin-1, formula payloads and bad CVSS values) was pushed through the Batch view itself: each ends in a short message or a table, within the time limit, and the view stays usable.
 - The 14 hostile settings files run at application start: each leaves the app on defaults with exactly one warning and no Custom scoring badge. Six hostile preference files behave the same.
 - Hostile stored threat data (corrupt KEV and EPSS files) shows "problem" chips in the status bar, and a CVE lookup says no data is loaded instead of reporting the CVE as safe.
 - Formula payloads appear as plain text in the table and are neutralized in the export (id, name, cve, action, rationale, threat_source).
 - Background work: a load that finishes after the window was rebuilt still lands in the saved state; an update can be cancelled mid-download; a second job while one runs is refused politely; a job finishing after its view is gone does not crash.
-- Settings entry: 14 families of bad text (non-numbers, comma decimals, huge numbers, NaN, infinity, out-of-range, too-close lines) are rejected field by field and cannot be saved. Save, restore defaults and failed writes are covered. Mutation checks of the key controls all fail the tests.
+- Settings entry: bad text (non-numbers, empty text, comma decimals, huge numbers, NaN, infinity, out-of-range values, lines too close together) is rejected field by field and cannot be saved. Save, restore defaults and failed writes are covered. Mutation checks of the key controls all fail the tests.
 - Real-app visual review: screenshots of the running application were reviewed for Assess (dark, light, 130% text, forced narrow layout), Batch, Threat data, Settings (light, custom scoring) and About (dark and light).
 
 Threat model update (section 3)
