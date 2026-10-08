@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import gui_testing
 import settings as scoring
 import threatdata as td
 import uiprefs
@@ -76,6 +77,27 @@ class AppTestCase(unittest.TestCase):
 
     def status_texts(self):
         return [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
+
+
+class SandboxTests(unittest.TestCase):
+    def test_default_paths_point_into_the_private_test_home(self):
+        for path in (scoring.default_path(), uiprefs.default_path(), td.default_data_dir()):
+            self.assertTrue(str(path).startswith(gui_testing.SANDBOX), path)
+        self.assertTrue(str(Path.home()).startswith(gui_testing.SANDBOX))
+
+    def test_an_app_started_without_explicit_paths_writes_only_into_the_sandbox(self):
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("no display available")
+        self.addCleanup(root.destroy)
+        root.withdraw()
+        with mock.patch("gui_context.messagebox.showwarning"):
+            app = app_module.App(root)
+            app.ctx.prefs_changed(UiPrefs(theme="light"))
+            uiprefs.save(UiPrefs(theme="light"))
+        self.assertTrue(uiprefs.default_path().is_file())
+        self.assertTrue(str(uiprefs.default_path()).startswith(gui_testing.SANDBOX))
 
 
 class ShellTests(AppTestCase):

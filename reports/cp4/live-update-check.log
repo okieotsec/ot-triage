@@ -1,0 +1,7 @@
+update took 1.5s [('kev', True), ('epss', True)]
+KEV: version 2026.10.08, date 2026-10-08, count 1,739, problem: none
+EPSS: version v2026.06.15, date 2026-10-08, count 384,534, problem: none
+loaded: KEV 2026.10.08 (2026-10-08); EPSS v2026.06.15 (2026-10-08) | warnings: []
+lookup of a CVE from the live KEV file: ISC
+file modes: {'epss.csv.gz': '0o600', 'kev.json': '0o600', 'meta.json': '0o600'} | folder: 0o700
+checked at 2026-10-08T20:35:06Z
