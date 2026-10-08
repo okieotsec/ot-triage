@@ -1,6 +1,6 @@
 {
   "errors": [],
-  "generated_at": "2026-10-08T03:28:07Z",
+  "generated_at": "2026-10-08T03:32:08Z",
   "metrics": {
     "./batch.py": {
       "CONFIDENCE.HIGH": 0,
@@ -37,7 +37,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 47,
+      "loc": 48,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -271,7 +271,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 223,
+      "loc": 238,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -453,7 +453,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 6878,
+      "loc": 6894,
       "nosec": 0,
       "skipped_tests": 3
     }
