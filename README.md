@@ -57,6 +57,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
 - [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV and EPSS threat data, offline updates and safety checks
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
+- [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned work, order and design decisions
 
 ## Security testing
