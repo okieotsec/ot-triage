@@ -137,6 +137,8 @@ class App:
             self.status_bar.grid(row=3, column=0, columnspan=2, sticky="ew")
             for item in self.nav_items.values():
                 item.pack(side=tk.LEFT, padx=2, pady=4)
+            for hint in self.nav_hints.values():
+                hint.pack_forget()
         else:
             self.shell.rowconfigure(2, weight=0)
             self.shell.rowconfigure(1, weight=1)
@@ -146,6 +148,8 @@ class App:
             self.nav.configure(width=int(210 * self.style.scale))
             for item in self.nav_items.values():
                 item.pack(fill=tk.X, padx=8, pady=3)
+            for hint in self.nav_hints.values():
+                hint.pack(side=tk.RIGHT, padx=(0, 12))
         self._mark_current()
 
     def _on_resize(self, event):

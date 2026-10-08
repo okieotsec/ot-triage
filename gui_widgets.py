@@ -24,6 +24,26 @@ def card(parent, style, title, expand=False, pady=(0, 16)):
     return inner
 
 
+class MessageLabel(tk.Label):
+    """A one-line message that takes almost no space while it is empty."""
+
+    def __init__(self, parent, style, **options):
+        self._normal, self._tiny = style.font(9), (style.family, 1)
+        options.setdefault("bg", style.theme.card)
+        options.setdefault("fg", style.theme.muted)
+        super().__init__(parent, text="", font=self._tiny, anchor="w", justify="left", pady=0, bd=0,
+                         highlightthickness=0, **options)
+
+    def configure(self, cnf=None, **options):
+        """Configure the label; setting text also switches between the normal and the collapsed size."""
+        if "text" in options:
+            options["font"] = self._normal if options["text"] else self._tiny
+            options["pady"] = 2 if options["text"] else 0
+        return super().configure(cnf, **options)
+
+    config = configure
+
+
 def rounded_entry(parent, style, variable=None, width=20, size=11, bold=False, justify="left", outside=None):
     """Create a text input with rounded corners; call .repaint() after changing its highlight colours."""
     t = style.theme

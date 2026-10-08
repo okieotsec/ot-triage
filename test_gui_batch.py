@@ -86,6 +86,23 @@ class BatchLoadTests(BatchViewTestCase):
         self.assertEqual(str(view.open_button.cget("state")), "normal")
         self.assertFalse(view.progress_row.winfo_ismapped())
 
+    def test_the_table_corners_match_what_is_underneath_them(self):
+        view = self.build()
+        t = self.style.theme
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
+        wrap = view.tree.master
+        tl, tr, bl, br = (label.image for label in wrap.corner_labels)
+        radius = tl.width()
+        # the pixel of each corner image that lies deepest inside the table
+        self.assertEqual(tl.get(radius - 1, radius - 1), rgb(t.border))
+        self.assertEqual(tr.get(0, radius - 1), rgb(t.card))
+        self.assertEqual(bl.get(radius - 1, 0), rgb(t.card))
+        self.assertEqual(br.get(0, 0), rgb(t.card))
+
+    def test_the_empty_hint_names_every_accepted_score_column(self):
+        view = self.build()
+        self.assertIn("cvss (or cvss_vector)", view.detail_title.cget("text"))
+
     def test_first_row_is_selected_and_explained(self):
         view = self.load()
         self.assertEqual(len(view.tree.selection()), 1)
