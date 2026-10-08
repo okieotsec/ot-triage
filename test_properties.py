@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 import batch
+import cvss
 import settings
 import threatdata
 import uiprefs
@@ -166,6 +167,43 @@ class PropertyTests(unittest.TestCase):
                 self.assertGreaterEqual(order[raised], order[base])
             missing = threatdata.derive_threat(None, settings.DEFAULT_SETTINGS, analyst, public).level
             self.assertGreaterEqual(order[base], order[missing])
+
+        @hyp_settings(max_examples=500, deadline=None)
+        @given(st.text(max_size=600))
+        def test_cvss_parser_only_raises_value_error(self, text):
+            try:
+                vector = cvss.parse_vector(text)
+            except ValueError:
+                return
+            self.assertTrue(0.0 <= vector.score <= 10.0)
+
+        @hyp_settings(max_examples=500, deadline=None)
+        @given(st.sampled_from(["3.0", "3.1", "4.0"]), st.integers(min_value=0, max_value=500),
+               st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/. ", max_size=6))
+        def test_cvss_parser_survives_mutated_valid_vectors(self, version, position, replacement):
+            seeds = {"3.0": "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                     "3.1": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                     "4.0": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"}
+            seed = seeds[version]
+            position %= len(seed) + 1
+            text = seed[:position] + replacement + seed[position + 1:]
+            try:
+                vector = cvss.parse_vector(text)
+            except ValueError:
+                return
+            self.assertEqual(cvss.parse_vector(vector.normalized).normalized, vector.normalized)
+            self.assertEqual(cvss.parse_vector(vector.normalized).score, vector.score)
+
+        @hyp_settings(max_examples=400, deadline=None)
+        @given(st.data())
+        def test_optional_metrics_never_change_a_cvss_base_score(self, data):
+            version = data.draw(st.sampled_from(["3.0", "3.1", "4.0"]))
+            base, optional = cvss._allowed(version)
+            metrics = {name: data.draw(st.sampled_from(sorted(values))) for name, values in base.items()}
+            plain = f"CVSS:{version}/" + "/".join(f"{n}:{v}" for n, v in metrics.items())
+            chosen = data.draw(st.lists(st.sampled_from(sorted(optional)), unique=True, max_size=len(optional)))
+            extras = "".join(f"/{name}:{data.draw(st.sampled_from(sorted(optional[name])))}" for name in chosen)
+            self.assertEqual(cvss.parse_vector(plain + extras).score, cvss.parse_vector(plain).score)
 
         @hyp_settings(max_examples=300, deadline=None)
         @given(st.binary(max_size=2048))

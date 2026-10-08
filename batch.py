@@ -3,6 +3,7 @@ import csv
 import os
 from dataclasses import dataclass, field
 
+import cvss
 from prioritizer import (Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Result, Threat,
                          parse_cvss, prioritize)
 from settings import DEFAULT_SETTINGS
@@ -10,12 +11,15 @@ from threatdata import apply_threat_context, derive_threat, normalize_cve
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_ROWS = 50_000
-REQUIRED = ["cvss", "asset", "exposure"]
+REQUIRED = ["asset", "exposure"]
+MAX_ERROR_VECTOR_CHARS = 200
+SCORE_TOLERANCE = 0.001
 DEFAULTS = {"patch": Patch.AVAILABLE, "controls": Controls.NONE}
 FIELD_ENUMS = {"threat": Threat, "asset": Asset, "exposure": Exposure, "patch": Patch, "controls": Controls}
 
 _HEADER_ALIASES = {
     "cvss_score": "cvss", "cvss_base_score": "cvss", "base_score": "cvss",
+    "vector": "cvss_vector", "cvss_vector_string": "cvss_vector",
     "threat_status": "threat", "threat_intel": "threat",
     "asset_criticality": "asset", "criticality": "asset",
     "network_exposure": "exposure",
@@ -73,6 +77,8 @@ class BatchItem:
     id: str = ""
     name: str = ""
     cve: str = ""
+    cvss_vector: str = ""
+    cvss_version: str = ""
     threat_sources: str = ""
     cvss_raw: str = ""
     inputs: dict = field(default_factory=dict)   # field -> enum member, for successfully parsed cells
@@ -104,9 +110,12 @@ def read_rows(path):
         duplicates = sorted({c for c in columns if c and columns.count(c) > 1})
         if duplicates:
             raise ValueError(f"Duplicate column(s): {', '.join(duplicates)}")
-        missing = [c for c in REQUIRED if c not in columns]
+        missing = []
+        if "cvss" not in columns and "cvss_vector" not in columns:
+            missing.append("cvss (or cvss_vector)")
         if "threat" not in columns and "cve" not in columns:
-            missing.insert(1, "threat (or cve)")
+            missing.append("threat (or cve)")
+        missing += [c for c in REQUIRED if c not in columns]
         if missing:
             raise ValueError(f"Missing required column(s): {', '.join(missing)}. "
                              f"Found: {', '.join(h.strip() for h in header)}")
@@ -128,6 +137,36 @@ def has_cve_column(path):
     return "cve" in [_norm_header(h) for h in header]
 
 
+def _read_cvss(item, vector_text, errors):
+    """Set the item's CVSS score from the cvss column, the cvss_vector column, or both (which must agree)."""
+    vector_text = vector_text.strip()
+    if not vector_text:
+        try:
+            item.cvss = parse_cvss(item.cvss_raw)
+        except ValueError as e:
+            errors.append(f"cvss: {e}")
+        return
+    try:
+        parsed = cvss.parse_vector(vector_text)
+    except ValueError as e:
+        item.cvss_vector = vector_text[:MAX_ERROR_VECTOR_CHARS]
+        errors.append(f"cvss_vector: {e}")
+        return
+    item.cvss_vector, item.cvss_version, score = parsed.normalized, parsed.version, parsed.score
+    if item.cvss_raw.strip():
+        try:
+            typed = parse_cvss(item.cvss_raw)
+        except ValueError as e:
+            errors.append(f"cvss: {e}")
+            return
+        if abs(typed - score) > SCORE_TOLERANCE:
+            errors.append(f"cvss ({item.cvss_raw.strip()[:12]}) does not match the base score of cvss_vector "
+                          f"({score:.1f})")
+            return
+    item.cvss_raw = f"{score:.1f}"
+    item.cvss = score
+
+
 def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None):
     """Parse one normalized row and score it, recording any errors on the item."""
     item = BatchItem(line=line, id=row.get("id", ""), name=row.get("name", ""), cvss_raw=row.get("cvss", ""))
@@ -142,10 +181,7 @@ def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None):
             errors.append(f"cve: {e}")
     if info is not None and not (info.kev_loaded or info.epss_loaded):
         info = None
-    try:
-        item.cvss = parse_cvss(item.cvss_raw)
-    except ValueError as e:
-        errors.append(f"cvss: {e}")
+    _read_cvss(item, row.get("cvss_vector", ""), errors)
     manual = None
     if row.get("threat", "").strip():
         try:
@@ -212,7 +248,8 @@ def _safe(text):
     return "'" + text if text and text[0] in "=+-@\t\r" else text
 
 
-OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cvss", "threat", "asset",
+OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cvss", "cvss_version", "cvss_vector",
+                  "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line"]
 
@@ -226,7 +263,8 @@ def write_results(path, items, threatdata=None):
         rank = 0
         for item in items:
             row = {"id": _safe(item.id), "cve": _safe(item.cve), "name": _safe(item.name),
-                   "priority": item.priority, "source_line": item.line}
+                   "priority": item.priority, "source_line": item.line, "cvss_version": item.cvss_version,
+                   "cvss_vector": _safe(item.cvss_vector)}
             if item.result:
                 rank += 1
                 row.update(

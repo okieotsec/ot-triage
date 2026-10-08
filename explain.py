@@ -115,11 +115,11 @@ def sorted_factors(factors):
     return sorted(factors, key=lambda f: order.get(f.direction, 3))
 
 
-def summary_text(result, data_versions=""):
+def summary_text(result, data_versions="", extra=()):
     """Return a plain-text summary of a result, with inputs and settings so it can be reproduced."""
     headline = HEADLINES[result.priority][0]
     lines = [f"Priority: {result.priority} ({headline})", f"Ordering score: {result.score:.2f}/10",
-             f"Action: {result.action}", "", "Inputs:", *[f"- {i}" for i in result.inputs],
+             f"Action: {result.action}", "", "Inputs:", *[f"- {i}" for i in result.inputs], *[f"- {e}" for e in extra],
              f"- Scoring settings: {result.profile}"]
     if data_versions:
         lines.append(f"- Threat data: {data_versions}")
@@ -127,12 +127,12 @@ def summary_text(result, data_versions=""):
     return "\n".join(lines)
 
 
-def markdown_summary(result, data_versions=""):
+def markdown_summary(result, data_versions="", extra=()):
     """Return a Markdown summary of a result, suitable for pasting into a ticket."""
     headline = HEADLINES[result.priority][0]
     lines = [f"**Priority: {result.priority}** ({headline})", "", f"- Ordering score: {result.score:.2f} / 10",
              f"- Action: {result.action}", "", "**Inputs**", "", *[f"- {i}" for i in result.inputs],
-             f"- Scoring settings: {result.profile}"]
+             *[f"- {e}" for e in extra], f"- Scoring settings: {result.profile}"]
     if data_versions:
         lines.append(f"- Threat data: {data_versions}")
     lines += ["", "**Rationale**", "", *[f"- {r}" for r in result.reasons]]

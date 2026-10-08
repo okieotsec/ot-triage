@@ -1,4 +1,5 @@
 import tempfile
+import time
 import tkinter as tk
 import tkinter.font as tkfont
 import unittest
@@ -303,6 +304,175 @@ class AssessOptionTests(unittest.TestCase):
             for value, label in options:
                 self.assertTrue(label)
                 self.assertIn(value, enum.__members__)
+
+
+V31 = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+V40_87 = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:L/SI:L/SA:L"
+
+
+class AssessVectorTests(AssessTestCase):
+    def paste(self, text):
+        self.ctx.assess_state.vector.set(text)
+        self.view.apply_vector()
+        self.pump()
+
+    def setup_inputs(self):
+        self.build()
+        self.fill("", Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH)
+
+    def test_a_valid_v31_vector_fills_in_the_score_and_drives_the_result(self):
+        self.setup_inputs()
+        self.paste(V31)
+        state = self.ctx.assess_state
+        self.assertEqual(state.cvss.get(), "9.8")
+        expected = prioritize(9.8, Threat.PUBLIC, Asset.STANDARD, Exposure.HIGH).priority
+        self.assertEqual(self.view.badge.cget("text"), expected)
+        self.assertIn("CVSS 3.1 vector: base score 9.8 (CRITICAL)", self.view.vector_message.cget("text"))
+        self.assertEqual(str(self.view.vector_message.cget("fg")), self.style.theme.ok)
+        self.assertEqual(self.view.cvss_band.cget("text"), "CRITICAL  \u00b7  CVSS 3.1")
+
+    def test_a_v40_vector_is_scored_with_the_v40_algorithm(self):
+        self.setup_inputs()
+        self.paste(V40_87)
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "8.7")
+        self.assertIn("CVSS 4.0", self.view.vector_message.cget("text"))
+        self.assertEqual(self.view.cvss_band.cget("text"), "HIGH  \u00b7  CVSS 4.0")
+
+    def test_the_same_inputs_give_different_scores_in_different_versions(self):
+        self.setup_inputs()
+        self.paste("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")
+        v3 = self.ctx.assess_state.cvss.get()
+        self.paste("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N")
+        self.assertNotEqual(self.ctx.assess_state.cvss.get(), v3)
+
+    def test_the_vector_appears_in_summaries_and_the_reasoning_panel(self):
+        self.setup_inputs()
+        self.paste(V40_87)
+        self.view.copy_summary()
+        text = self.ctx.copy.call_args[0][0]
+        self.assertIn(f"- CVSS vector: {V40_87}", text)
+        self.assertIn("- CVSS version: 4.0 (base score 8.7)", text)
+        self.view.copy_markdown()
+        self.assertIn(f"- CVSS vector: {V40_87}", self.ctx.copy.call_args[0][0])
+        self.view.reasoning.toggle()
+        self.assertIn(f"CVSS vector: {V40_87}", self.view.reasoning_text.cget("text"))
+
+    def test_no_vector_means_no_vector_lines(self):
+        self.setup_inputs()
+        self.fill("8.0")
+        self.view.copy_summary()
+        self.assertNotIn("CVSS vector", self.ctx.copy.call_args[0][0])
+        self.assertEqual(self.view.vector_lines(), [])
+
+    def test_optional_metrics_and_odd_order_are_accepted(self):
+        self.setup_inputs()
+        self.paste("  CVSS:3.1/A:H/I:H/C:H/S:U/UI:N/PR:N/AC:L/AV:N/E:P/RL:O/RC:C\n")
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "9.8")
+
+    def test_an_invalid_vector_is_explained_and_never_used(self):
+        self.setup_inputs()
+        self.fill("5.0", Threat.NONE, Asset.STANDARD, Exposure.LOW)
+        for bad, fragment in (("notavector", "must start with CVSS"), ("not a vector", "only letters, digits"),
+                              ("CVSS:3.1/AV:N", "missing required metric"),
+                              ("AV:N/AC:L/Au:N/C:P/I:P/A:P", "version 2 vectors are not supported"),
+                              ("CVSS:9.9/AV:N", "not supported"), (V31 + "/AV:L", "appears more than once")):
+            self.paste(bad)
+            message = self.view.vector_message.cget("text")
+            self.assertIn(fragment, message, bad)
+            self.assertTrue(message.startswith("\u2716"))
+            self.assertIn("The score typed below is used instead", message)
+            self.assertEqual(self.ctx.assess_state.cvss.get(), "5.0")
+            self.assertIsNone(self.ctx.assess_state.vector_info)
+            self.assertEqual(str(self.view.vector_message.cget("fg")), self.style.theme.error)
+
+    def test_breaking_a_valid_vector_says_the_score_is_still_from_the_previous_one(self):
+        self.setup_inputs()
+        self.paste(V31)
+        self.paste(V31 + "/ZZ:N")
+        message = self.view.vector_message.cget("text")
+        self.assertIn("still comes from the previous vector (CVSS 3.1)", message)
+        self.assertNotIn("typed below", message)
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "9.8")
+
+    def test_typing_a_score_by_hand_clears_the_vector(self):
+        self.setup_inputs()
+        self.paste(V31)
+        self.ctx.assess_state.cvss.set("7.5")
+        self.pump()
+        self.assertEqual(self.ctx.assess_state.vector.get(), "")
+        self.assertIsNone(self.ctx.assess_state.vector_info)
+        self.assertIn("changed by hand", self.view.vector_message.cget("text"))
+        self.assertEqual(self.view.cvss_band.cget("text"), "HIGH")
+        self.assertEqual(self.view.vector_lines(), [])
+
+    def test_retyping_the_same_score_keeps_the_vector(self):
+        self.setup_inputs()
+        self.paste(V31)
+        self.ctx.assess_state.cvss.set("9.8")
+        self.pump()
+        self.assertEqual(self.ctx.assess_state.vector.get(), V31)
+        self.assertIsNotNone(self.ctx.assess_state.vector_info)
+
+    def test_clearing_the_vector_keeps_the_score_as_a_manual_value(self):
+        self.setup_inputs()
+        self.paste(V31)
+        self.paste("")
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "9.8")
+        self.assertEqual(self.view.vector_message.cget("text"), "")
+        self.assertEqual(self.view.vector_lines(), [])
+
+    def test_typing_waits_for_a_pause_before_checking(self):
+        self.setup_inputs()
+        self.ctx.assess_state.vector.set("CVSS:3.1/AV:N/AC")
+        self.assertEqual(self.view.vector_message.cget("text"), "")
+        self.assertIsNotNone(self.view._vector_job)
+        self.pump(0.7)
+        self.assertIn("\u2716", self.view.vector_message.cget("text"))
+
+    def test_enter_checks_the_vector_immediately(self):
+        self.setup_inputs()
+        self.ctx.assess_state.vector.set(V31)
+        self.view.vector_entry.focus_force()
+        self.pump(0.1)
+        if self.root.focus_get() is not self.view.vector_entry:
+            self.skipTest("the window manager did not give the test window keyboard focus")
+        self.view.vector_entry.event_generate("<Return>")
+        self.pump()
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "9.8")
+
+    def test_a_huge_paste_is_rejected_quickly(self):
+        self.setup_inputs()
+        start = time.monotonic()
+        self.paste("CVSS:3.1/" + "A" * 2_000_000)
+        self.assertLess(time.monotonic() - start, 2.0)
+        self.assertIn("longer than 400", self.view.vector_message.cget("text"))
+        self.assertLess(len(self.view.vector_message.cget("text")), 200)
+
+    def test_the_vector_survives_a_rebuild_with_its_message(self):
+        self.setup_inputs()
+        self.paste(V40_87)
+        self.view.frame.destroy()
+        rebuilt = self.build()
+        self.assertEqual(self.ctx.assess_state.vector.get(), V40_87)
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "8.7")
+        self.assertIn("CVSS 4.0", rebuilt.vector_message.cget("text"))
+        self.assertEqual(rebuilt.badge.cget("text"), self.view.badge.cget("text"))
+
+    def test_the_vector_field_sits_between_the_cve_and_the_score_in_the_tab_order(self):
+        view = self.build()
+        order, widget = [], view.cve_entry
+        for _ in range(40):
+            order.append(widget)
+            widget = widget.tk_focusNext()
+            if widget is None or widget is view.cve_entry:
+                break
+        self.assertLess(order.index(view.cve_entry), order.index(view.vector_entry))
+        self.assertLess(order.index(view.vector_entry), order.index(view.cvss_entry))
+
+    def test_the_hint_mentions_the_vector_option_and_the_field_has_help(self):
+        view = self.build()
+        self.assertIn("paste a vector", view.cvss_hint.cget("text"))
+        self.assertIn("CVSS 2 vectors are not supported", gui_assess.VECTOR_HELP)
 
 
 class AssessLayoutTests(AssessTestCase):

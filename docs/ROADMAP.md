@@ -39,6 +39,10 @@ The rule structure, the 4.0 low-severity line, the ordering weights, and the par
 - Updating is always started by the user (an optional check at startup stays off by default). An import-from-file option covers offline networks.
 - Downloads use HTTPS only. The standard library follows redirects, including from HTTPS to plain HTTP, so a custom redirect handler is required. Decompressed size of the EPSS file is capped.
 
+## CVSS vectors
+
+The "accept a full CVSS vector string" item from the original review notes is done: see [CVSS.md](CVSS.md).
+
 ## GUI direction
 
 **Framework: stay on ttk** (the standard Tkinter widgets, with the existing custom dark theme), and add a light theme through the same colour tokens. CustomTkinter was considered and rejected: it is a new dependency that appears to have had no release in a long time, which this project's own security plan flags, and the current look is already close to modern.

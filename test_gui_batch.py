@@ -396,6 +396,51 @@ class BatchThreatDataTests(BatchViewTestCase):
         self.assertEqual(self.rows(view)[0][4], "▬ NEXT")
 
 
+class BatchVectorTests(BatchViewTestCase):
+    V31 = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    V40 = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:L/SI:L/SA:L"
+
+    def csv_text(self):
+        return ("id,cvss_vector,cvss,threat,asset,exposure\n"
+                f"A,{self.V31},,active,crown,high\n"
+                f"B,{self.V40},8.7,public,standard,high\n"
+                f"C,{self.V31},5.0,none,standard,low\n"
+                "D,CVSS:3.1/AV:N,,none,standard,low\n")
+
+    def test_scores_come_from_vectors_and_the_details_name_the_vector(self):
+        view = self.load(self.write_csv("vectors.csv", self.csv_text()))
+        by_id = {r[1]: r for r in self.rows()}
+        self.assertEqual(by_id["A"][6], "9.8")
+        self.assertEqual(by_id["B"][6], "8.7")
+        self.assertTrue(by_id["C"][4].startswith("! ERROR"))
+        self.assertIn("cvss (5.0) does not match", by_id["C"][7])
+        self.assertIn("cvss_vector:", by_id["D"][7])
+        view.tree.selection_set(view.tree.get_children()[0])
+        self.pump()
+        text = view.detail_text.cget("text")
+        first = next(i for i in view.state.items if i.id == view.tree.item(view.tree.selection()[0], "values")[1])
+        self.assertIn(f"CVSS vector: {first.cvss_vector} (CVSS {first.cvss_version}", text)
+
+    def test_an_error_row_shows_the_vector_as_given(self):
+        view = self.load(self.write_csv("vectors.csv", self.csv_text()))
+        view.set_filter("ERROR")
+        self.pump()
+        view.tree.selection_set(view.tree.get_children()[0])
+        self.pump()
+        self.assertIn("CVSS vector as given: ", view.detail_text.cget("text"))
+
+    def test_the_export_carries_the_version_and_vector(self):
+        view = self.load(self.write_csv("vectors.csv", self.csv_text()))
+        out = self.work / "out.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(out))
+        view.export()
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["A"]["cvss"], rows["A"]["cvss_version"], rows["A"]["cvss_vector"]),
+                         ("9.8", "3.1", self.V31))
+        self.assertEqual(rows["B"]["cvss_version"], "4.0")
+
+
 class BatchRebuildTests(BatchViewTestCase):
     def test_a_rebuild_keeps_the_loaded_file_filter_and_sort(self):
         view = self.load()

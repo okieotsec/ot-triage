@@ -1,6 +1,7 @@
 import csv
 import os
 import tempfile
+import time
 import unittest
 
 import batch
@@ -75,7 +76,7 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(item.inputs["controls"], Controls.NONE)
 
     def test_header_aliases_and_bom(self):
-        path = write_csv("﻿CVSS Score,Threat Status,Asset Criticality,Network Exposure\n9.8,active,crown,high\n")
+        path = write_csv("\ufeffCVSS Score,Threat Status,Asset Criticality,Network Exposure\n9.8,active,crown,high\n")
         self.addCleanup(os.remove, path)
         items = batch.process_file(path)
         self.assertEqual([i.priority for i in items], ["NOW"])
@@ -179,6 +180,116 @@ def make_threatdata(kev=None, epss=None, kev_loaded=True, epss_loaded=True):
                for c, action, ransomware in (kev or [])}
     return td.ThreatData(td.KevData("2026.10.04", "2026-10-04", entries) if kev_loaded else None,
                          td.EpssData("v2026.06.15", "2026-10-07", dict(epss or {})) if epss_loaded else None)
+
+
+V31 = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+V40_87 = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:L/SI:L/SA:L"
+
+
+class CvssVectorColumnTests(unittest.TestCase):
+    BASE = {"threat": "active", "asset": "crown", "exposure": "high"}
+
+    def row(self, **changes):
+        return {**self.BASE, **changes}
+
+    def test_a_vector_alone_supplies_the_score_and_records_its_version(self):
+        for vector, score, version in ((V31, 9.8, "3.1"), (V40_87, 8.7, "4.0")):
+            item = batch.score_row(2, self.row(cvss_vector=vector))
+            self.assertEqual((item.cvss, item.cvss_version, item.cvss_vector, item.error), (score, version, vector, ""))
+            self.assertEqual(item.cvss_raw, f"{score:.1f}")
+            self.assertEqual(item.priority, "NOW")
+
+    def test_the_vector_is_normalized_and_may_carry_optional_metrics(self):
+        item = batch.score_row(2, self.row(cvss_vector="CVSS:3.1/A:H/I:H/C:H/S:U/UI:N/PR:N/AC:L/AV:N/E:P"))
+        self.assertEqual((item.cvss, item.cvss_vector), (9.8, V31 + "/E:P"))
+
+    def test_a_matching_score_column_is_accepted_in_any_format(self):
+        for typed in ("9.8", " 9.8 ", "9.80", "9.800"):
+            item = batch.score_row(2, self.row(cvss=typed, cvss_vector=V31))
+            self.assertEqual((item.error, item.cvss), ("", 9.8), typed)
+
+    def test_a_conflicting_score_column_makes_an_error_row_not_a_silent_choice(self):
+        item = batch.score_row(2, self.row(cvss="7.0", cvss_vector=V31))
+        self.assertEqual(item.priority, "ERROR")
+        self.assertIn("cvss (7.0) does not match the base score of cvss_vector (9.8)", item.error)
+        self.assertIsNone(item.cvss)
+        for typed in ("9.7", "9.79", "9.81", "9.75", "9.85", "10"):
+            self.assertEqual(batch.score_row(2, self.row(cvss=typed, cvss_vector=V31)).priority, "ERROR", typed)
+
+    def test_an_invalid_vector_is_never_rescued_by_a_valid_score_column(self):
+        for bad, fragment in (("nonsense", "must start with CVSS"), ("AV:N/AC:L/Au:N/C:P/I:P/A:P", "version 2"),
+                              ("CVSS:3.1/AV:N", "missing required"), ("=HYPERLINK(1)", "only letters, digits"),
+                              ("notcvss/AV:N", "must start with CVSS")):
+            item = batch.score_row(2, self.row(cvss="9.8", cvss_vector=bad))
+            self.assertEqual(item.priority, "ERROR", bad)
+            self.assertIn("cvss_vector:", item.error)
+            self.assertIn(fragment, item.error)
+            self.assertEqual(item.cvss_version, "")
+
+    def test_an_unreadable_score_next_to_a_valid_vector_is_reported(self):
+        item = batch.score_row(2, self.row(cvss="abc", cvss_vector=V31))
+        self.assertEqual(item.priority, "ERROR")
+        self.assertIn("cvss:", item.error)
+
+    def test_neither_column_gives_the_old_message(self):
+        item = batch.score_row(2, self.row())
+        self.assertEqual(item.priority, "ERROR")
+        self.assertIn("cvss: CVSS score must be a number", item.error)
+        self.assertEqual(batch.score_row(2, self.row(cvss_vector="  ", cvss="8")).cvss, 8.0)
+
+    def test_a_giant_vector_cell_is_rejected_quickly_and_kept_short(self):
+        start = time.monotonic()
+        item = batch.score_row(2, self.row(cvss_vector="CVSS:3.1/" + "A" * 5_000_000))
+        self.assertLess(time.monotonic() - start, 1.0)
+        self.assertEqual(item.priority, "ERROR")
+        self.assertLessEqual(len(item.cvss_vector), batch.MAX_ERROR_VECTOR_CHARS)
+        self.assertLess(len(item.error), 200)
+
+    def test_header_aliases_and_missing_column_messages(self):
+        path = write_csv(f"vector,threat,asset,exposure\n{V31},active,crown,high\n")
+        self.addCleanup(os.remove, path)
+        self.assertEqual(batch.process_file(path)[0].cvss, 9.8)
+        path2 = write_csv(f"cvss vector string,threat,asset,exposure\n{V31},active,crown,high\n")
+        self.addCleanup(os.remove, path2)
+        self.assertEqual(batch.process_file(path2)[0].cvss_version, "3.1")
+        bad = write_csv("threat,asset,exposure\nactive,crown,high\n")
+        self.addCleanup(os.remove, bad)
+        with self.assertRaisesRegex(ValueError, r"cvss \(or cvss_vector\)"):
+            batch.process_file(bad)
+        both = write_csv("cvss,asset\n9,crown\n")
+        self.addCleanup(os.remove, both)
+        with self.assertRaises(ValueError) as caught:
+            batch.process_file(both)
+        message = str(caught.exception)
+        self.assertLess(message.index("threat (or cve)"), message.index("exposure"))
+
+    def test_both_vector_header_spellings_together_are_a_duplicate(self):
+        path = write_csv(f"cvss_vector,vector,threat,asset,exposure\n{V31},{V31},active,crown,high\n")
+        self.addCleanup(os.remove, path)
+        with self.assertRaisesRegex(ValueError, "Duplicate column"):
+            batch.process_file(path)
+
+    def test_export_has_version_and_vector_columns_and_neutralizes_them(self):
+        good = batch.score_row(2, self.row(id="A", cvss_vector=V40_87))
+        bad = batch.score_row(3, self.row(id="B", cvss_vector="=HYPERLINK(\"http://example.invalid\")"))
+        plain = batch.score_row(4, self.row(id="C", cvss="8.0"))
+        fd, out = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        self.addCleanup(os.remove, out)
+        batch.write_results(out, batch.sort_items([good, bad, plain]))
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["A"]["cvss"], rows["A"]["cvss_version"], rows["A"]["cvss_vector"]),
+                         ("8.7", "4.0", V40_87))
+        self.assertEqual((rows["C"]["cvss_version"], rows["C"]["cvss_vector"]), ("", ""))
+        self.assertTrue(rows["B"]["cvss_vector"].startswith("'="))
+        self.assertIn("cvss_vector:", rows["B"]["error"])
+        for row in rows.values():
+            self.assertFalse(row["cvss_vector"].startswith(tuple("=+-@\t\r")))
+
+    def test_the_sample_file_and_old_files_without_vectors_are_unchanged(self):
+        items = batch.process_file(SAMPLE)
+        self.assertTrue(all(i.cvss_version == "" and i.cvss_vector == "" for i in items))
 
 
 class CveColumnTests(unittest.TestCase):

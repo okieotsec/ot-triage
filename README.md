@@ -39,7 +39,7 @@ See [docs/GUI_TESTING.md](docs/GUI_TESTING.md) for how the GUI is tested.
 
 | Input | Values |
 | --- | --- |
-| CVSS base score | 0.0 to 10.0 |
+| CVSS base score | 0.0 to 10.0, typed or worked out from a pasted CVSS 3.0, 3.1 or 4.0 vector (see [docs/CVSS.md](docs/CVSS.md)) |
 | Threat | Active exploitation in the wild, public exploit available, no known exploitation |
 | Asset | Crown jewel, important, standard |
 | Exposure | High (internet connected), medium, low |
@@ -70,7 +70,7 @@ Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [
 
 ## Batch CSV
 
-Required columns: `cvss`, `asset`, `exposure`, and `threat` (or `cve`).
+Required columns: `cvss` (or `cvss_vector`), `asset`, `exposure`, and `threat` (or `cve`). A `cvss_vector` column (CVSS 3.0, 3.1 or 4.0) supplies the score; see [docs/CVSS.md](docs/CVSS.md).
 Optional columns: `id`, `name`, `patch` (default available), `controls` (default none).
 An optional `cve` column looks the CVE up in local KEV and EPSS data (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)); with it, `threat` can be left blank.
 Other columns are ignored. Header names accept common aliases, and enum cells accept short aliases or the full dropdown labels.
@@ -80,6 +80,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 ## Documentation
 
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
+- [docs/CVSS.md](docs/CVSS.md): pasting CVSS vectors, supported versions and how the scores were verified
 - [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV and EPSS threat data, offline updates and safety checks
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
