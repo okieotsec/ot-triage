@@ -170,7 +170,7 @@ class StorageTests(unittest.TestCase):
         self.now = datetime.datetime(2026, 10, 7, 12, 0, tzinfo=datetime.timezone.utc)
 
     def fetcher(self, kev=None, epss=None):
-        def fetch(url, max_bytes, allowed_hosts):
+        def fetch(url, max_bytes, allowed_hosts, **_kwargs):
             result = kev if url == td.KEV_URL else epss
             if isinstance(result, Exception):
                 raise result
@@ -332,6 +332,42 @@ class StorageTests(unittest.TestCase):
         self.assertIn("unknown", unknown[0].text)
         empty = td.ThreatData().freshness(7, self.now)
         self.assertTrue(all(f.stale and f.missing for f in empty))
+
+    def test_status_is_read_without_parsing_every_epss_row(self):
+        self.update()
+        with mock.patch("threatdata.parse_epss", side_effect=AssertionError("full parse")):
+            kev, epss = td.read_status(self.dir)
+        self.assertEqual((kev.loaded, kev.version, kev.date, kev.count), (True, "2026.10.04", "2026-10-04", 1))
+        self.assertEqual((epss.loaded, epss.version, epss.date, epss.count), (True, "v2026.06.15", "2026-10-07", 2))
+        self.assertEqual(kev.retrieved_at, "2026-10-07T12:00:00Z")
+        self.assertEqual(kev.version_text, "2026.10.04, released 2026-10-04")
+        self.assertEqual(epss.version_text, "v2026.06.15, scored 2026-10-07")
+
+    def test_status_freshness_matches_the_loaded_data_freshness(self):
+        self.update()
+        later = self.now + datetime.timedelta(days=3)
+        from_status = [s.freshness(7, later) for s in td.read_status(self.dir)]
+        self.assertEqual(from_status, td.ThreatData.load(self.dir).freshness(7, later))
+        stale = [s.freshness(2, later) for s in td.read_status(self.dir)]
+        self.assertTrue(all(f.stale for f in stale))
+
+    def test_status_when_nothing_is_stored_or_files_are_damaged(self):
+        kev, epss = td.read_status(self.dir)
+        self.assertEqual((kev.loaded, epss.loaded), (False, False))
+        self.assertTrue(kev.freshness(7).missing)
+        self.update()
+        (self.dir / td.KEV_FILE).write_bytes(b"corrupt")
+        (self.dir / td.EPSS_FILE).write_bytes(b"\x1f\x8bnot really gzip")
+        kev, epss = td.read_status(self.dir)
+        for status in (kev, epss):
+            self.assertFalse(status.loaded)
+            self.assertIn("could not be used", status.problem)
+            self.assertTrue(status.freshness(7).stale and not status.freshness(7).missing)
+        (self.dir / td.EPSS_FILE).write_bytes(gzip.compress(b"no header line\n"))
+        self.assertIn("no valid header", td.read_status(self.dir)[1].problem)
+        (self.dir / td.EPSS_FILE).unlink()
+        (self.dir / td.EPSS_FILE).mkdir()
+        self.assertTrue(td.read_status(self.dir)[1].problem)
 
     def test_default_data_dir_uses_an_absolute_xdg_folder_only(self):
         if sys.platform in ("win32", "darwin"):

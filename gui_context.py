@@ -14,6 +14,7 @@ class Context:
         self.threat_data = None
         self.assess_state = None
         self.batch_state = None
+        self.updater = None
         self.data_dir = None
 
     # ---- threat data ----
@@ -29,6 +30,10 @@ class Context:
         """Forget the loaded data so the next use reads the files again, and refresh the status bar."""
         self.threat_data = None
         self.status_changed()
+
+    def status(self):
+        """Return the cheaply read status of each stored threat data source."""
+        return threatdata.read_status(self.data_dir)
 
     def versions(self):
         """Return the loaded KEV and EPSS versions, or an empty string if no data has been loaded."""

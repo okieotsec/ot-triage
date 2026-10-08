@@ -2,6 +2,7 @@
 import csv
 import dataclasses
 import datetime
+import functools
 import gzip
 import hashlib
 import http.client
@@ -425,7 +426,7 @@ def _read_meta(data_dir):
     for name in ("kev", "epss"):
         entry = meta.get(name) if isinstance(meta, dict) else None
         if isinstance(entry, dict):
-            clean[name] = {k: _label(entry.get(k, "")) for k in ("source", "retrieved_at", "sha256")}
+            clean[name] = {k: _label(entry.get(k, "")) for k in ("source", "retrieved_at", "sha256", "count")}
     return clean
 
 
@@ -433,15 +434,15 @@ def _install(name, raw, source, data_dir, now):
     """Validate raw bytes and, only if valid, replace the stored copy and its metadata."""
     data_dir = Path(data_dir)
     if name == "kev":
-        parse_kev(raw)
+        count = len(parse_kev(raw).entries)
         stored, filename = raw, KEV_FILE
     else:
-        parse_epss(raw)
+        count = len(parse_epss(raw).scores)
         stored, filename = (raw if raw[:2] == b"\x1f\x8b" else gzip.compress(raw)), EPSS_FILE
     _write_atomic(data_dir / filename, stored)
     meta = _read_meta(data_dir)
     meta[name] = {"source": _label(source), "retrieved_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                  "sha256": hashlib.sha256(stored).hexdigest()}
+                  "sha256": hashlib.sha256(stored).hexdigest(), "count": str(count)}
     _write_atomic(data_dir / META_FILE, json.dumps({"version": 1, **meta}, indent=2).encode("utf-8"))
 
 
@@ -470,7 +471,8 @@ def update_from_network(data_dir=None, fetcher=fetch, now=None, cancel=None, pro
             continue
         if progress:
             progress(f"Downloading {label}...")
-        results.append(_run(name, lambda u=url, c=cap, h=hosts: fetcher(u, c, h), url, data_dir, now))
+        get = fetcher if cancel is None else functools.partial(fetcher, cancel=cancel)
+        results.append(_run(name, lambda u=url, c=cap, h=hosts, g=get: g(u, c, h), url, data_dir, now))
     return results
 
 
@@ -534,16 +536,88 @@ class ThreatData:
                 continue
             version = (f"{data.catalog_version}, released {data.date_released}" if name == "kev"
                        else f"{data.model_version}, scored {data.score_date}")
-            retrieved = self.meta.get(name, {}).get("retrieved_at", "")
-            try:
-                when = datetime.datetime.strptime(retrieved, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
-                days = max(0, (now - when).days)
-            except ValueError:
-                report.append(Freshness(label, f"{label} {version}: retrieval date unknown", True, False))
-                continue
-            report.append(Freshness(label, f"{label} {version}: retrieved {days} day{'s' if days != 1 else ''} ago",
-                                    days > stale_days, False))
+            report.append(_freshness(label, version, self.meta.get(name, {}).get("retrieved_at", ""), stale_days, now))
         return report
+
+
+def _freshness(label, version, retrieved, stale_days, now):
+    try:
+        when = datetime.datetime.strptime(retrieved, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+        days = max(0, (now - when).days)
+    except ValueError:
+        return Freshness(label, f"{label} {version}: retrieval date unknown", True, False)
+    return Freshness(label, f"{label} {version}: retrieved {days} day{'s' if days != 1 else ''} ago",
+                     days > stale_days, False)
+
+
+@dataclass(frozen=True)
+class SourceStatus:
+    """What is stored for one source, read cheaply from its file header and metadata."""
+
+    name: str
+    label: str
+    loaded: bool = False
+    version: str = ""
+    date: str = ""
+    count: int = None
+    retrieved_at: str = ""
+    problem: str = ""
+
+    @property
+    def version_text(self):
+        """Return the version and date as one phrase."""
+        word = "released" if self.name == "kev" else "scored"
+        return f"{self.version}, {word} {self.date}"
+
+    def freshness(self, stale_days, now=None):
+        """Return the age and stale status of this source."""
+        if self.problem:
+            return Freshness(self.label, f"{self.label}: {self.problem}", True, False)
+        if not self.loaded:
+            return Freshness(self.label, f"{self.label}: not loaded", True, True)
+        return _freshness(self.label, self.version_text, self.retrieved_at, stale_days, now or _now())
+
+
+def _epss_header(path):
+    """Read the model version and score date from the first line of a stored EPSS file."""
+    if not path.is_file():
+        raise ThreatDataError("stored EPSS file is not a regular file")
+    with open(path, "rb") as raw:
+        gzipped = raw.read(2) == b"\x1f\x8b"
+    opener = gzip.open if gzipped else open
+    try:
+        with opener(path, "rb") as stream:
+            first = stream.read(300).split(b"\n", 1)[0].decode("utf-8").rstrip("\r")
+    except (OSError, EOFError, zlib.error, UnicodeDecodeError):
+        raise ThreatDataError("stored EPSS data is unreadable") from None
+    match = EPSS_HEADER_RE.match(first)
+    if not match or not _valid_date(match.group(2)):
+        raise ThreatDataError("stored EPSS data has no valid header line")
+    return match.group(1), match.group(2)
+
+
+def read_status(data_dir=None):
+    """Return the stored status of KEV and EPSS without parsing the full EPSS file."""
+    data_dir = Path(data_dir or default_data_dir())
+    meta, report = _read_meta(data_dir), []
+    for name, label, filename in (("kev", "KEV", KEV_FILE), ("epss", "EPSS", EPSS_FILE)):
+        path = data_dir / filename
+        if not path.exists():
+            report.append(SourceStatus(name, label))
+            continue
+        saved = meta.get(name, {})
+        count = int(saved["count"]) if saved.get("count", "").isdigit() else None
+        try:
+            if name == "kev":
+                kev = parse_kev(_read_capped(path, KEV_MAX_BYTES))
+                version, date, count = kev.catalog_version, kev.date_released, len(kev.entries)
+            else:
+                version, date = _epss_header(path)
+        except (OSError, ThreatDataError) as error:
+            report.append(SourceStatus(name, label, problem=f"stored data could not be used ({error})"[:200]))
+            continue
+        report.append(SourceStatus(name, label, True, version, date, count, saved.get("retrieved_at", "")))
+    return report
 
 
 # ---- threat derivation -----------------------------------------------------
