@@ -206,7 +206,7 @@ class RoundedLookTests(DisplayTestCase):
         seg.pack()
         self.root.update()
         t = self.style.theme
-        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
         tl, tr = seg.corner_labels[0].image, seg.corner_labels[1].image
         radius = tl.width()
         self.assertEqual(tl.get(radius - 1, radius - 1), rgb(t.accent))
@@ -226,7 +226,7 @@ class RoundedLookTests(DisplayTestCase):
         entry.pack(ipady=4)
         self.root.update()
         t = self.style.theme
-        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
+        rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
         radius = entry.corner_labels[0].image.width()
         self.assertEqual(len(entry.corner_labels), 4)
         self.assertEqual(entry.corner_labels[0].image.get(radius - 1, 0), rgb(t.border))
