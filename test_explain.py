@@ -87,6 +87,15 @@ class WhatWouldChangeTests(unittest.TestCase):
                     between = round(between + step, 1)
 
 
+class CvssBandTests(unittest.TestCase):
+    def test_bands_follow_the_cvss_standard(self):
+        for value, label in ((0.0, "NONE"), (0.1, "LOW"), (3.9, "LOW"), (4.0, "MEDIUM"), (6.9, "MEDIUM"),
+                             (7.0, "HIGH"), (8.9, "HIGH"), (9.0, "CRITICAL"), (10.0, "CRITICAL")):
+            self.assertEqual(explain.cvss_band(value)[0], label, value)
+        self.assertEqual(explain.cvss_band(9.5)[1], "raise")
+        self.assertEqual(explain.cvss_band(5.0)[1], "warn")
+
+
 class SummaryTests(unittest.TestCase):
     def setUp(self):
         self.result = prioritize(8.8, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH, settings=CUSTOM)

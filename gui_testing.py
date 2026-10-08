@@ -28,7 +28,12 @@ class DisplayTestCase(unittest.TestCase):
 
     def pump(self, seconds=0.0, until=None):
         """Process Tk events, optionally until a condition holds or time runs out."""
-        end = time.monotonic() + max(seconds, 0.05 if until is None else seconds)
+        if until is None and seconds <= 0:
+            for _ in range(3):
+                self.root.update()
+                time.sleep(0.005)
+            return True
+        end = time.monotonic() + seconds
         while time.monotonic() < end:
             self.root.update()
             if until is not None and until():

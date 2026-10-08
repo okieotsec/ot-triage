@@ -23,6 +23,16 @@ FIELD_PHRASES = {"threat": "the threat", "asset": "the asset", "exposure": "the 
 FIELD_ENUMS = {"threat": Threat, "asset": Asset, "exposure": Exposure, "patch": Patch, "controls": Controls}
 
 
+CVSS_BANDS = [(9.0, "CRITICAL", "raise"), (7.0, "HIGH", "raise"), (4.0, "MEDIUM", "warn"), (0.1, "LOW", "ok"),
+              (0.0, "NONE", "neutral")]
+
+
+def cvss_band(value):
+    """Return the CVSS standard's severity label and a status direction for a base score."""
+    _minimum, label, direction = next(band for band in CVSS_BANDS if value >= band[0])
+    return label, direction
+
+
 @dataclass(frozen=True)
 class AssessInputs:
     """The six inputs to one prioritization."""
