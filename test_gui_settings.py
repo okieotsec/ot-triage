@@ -11,6 +11,7 @@ import settings as scoring
 import uiprefs
 from gui_context import Context
 from gui_testing import DisplayTestCase
+from gui_theme import Style
 from settings import DEFAULT_SETTINGS, Settings
 from uiprefs import DEFAULT_PREFS, UiPrefs
 
@@ -249,6 +250,21 @@ class AboutViewTests(DisplayTestCase):
         self.assertIn("no routable path from IT or the internet", joined)
         self.assertIn("its definitions are not Dragos'", joined)
         self.assertIn("fully offline", joined)
+
+    def test_document_names_are_never_cut_off_at_any_text_size(self):
+        for scale in (0.9, 1.0, 1.3):
+            with self.subTest(scale=scale):
+                style = Style(self.theme, scale)
+                ctx = Context(self.root, style, DEFAULT_SETTINGS, DEFAULT_PREFS)
+                holder = tk.Toplevel(self.root)
+                self.addCleanup(holder.destroy)
+                holder.geometry("1000x700+0+0")
+                view = gui_about.AboutView(ctx, holder)
+                view.frame.pack(fill=tk.BOTH, expand=True)
+                self.pump(0.1)
+                self.assertEqual(len(view.doc_names), len(gui_about.DOCUMENTS))
+                for label in view.doc_names:
+                    self.assertGreaterEqual(label.winfo_width(), label.winfo_reqwidth(), label.cget("text"))
 
     def test_every_document_it_points_to_exists(self):
         for name, _description in gui_about.DOCUMENTS:

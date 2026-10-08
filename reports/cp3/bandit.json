@@ -1,6 +1,6 @@
 {
   "errors": [],
-  "generated_at": "2026-10-08T03:26:53Z",
+  "generated_at": "2026-10-08T03:28:07Z",
   "metrics": {
     "./batch.py": {
       "CONFIDENCE.HIGH": 0,
@@ -433,12 +433,12 @@
     },
     "./vuln_prioritizer_gui.py": {
       "CONFIDENCE.HIGH": 0,
-      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
       "SEVERITY.LOW": 0,
-      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
       "loc": 230,
       "nosec": 0,
@@ -446,38 +446,17 @@
     },
     "_totals": {
       "CONFIDENCE.HIGH": 0,
-      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
       "SEVERITY.LOW": 0,
-      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
       "loc": 6878,
       "nosec": 0,
       "skipped_tests": 3
     }
   },
-  "results": [
-    {
-      "code": "42         apply_ttk_styles(root, self.style)\n43         self.ctx = Context(root, self.style, loaded.settings, prefs_loaded.prefs, shell=self)\n44         self.ctx.settings_path, self.ctx.prefs_path, self.ctx.data_dir = settings_path, prefs_path, data_dir\n",
-      "col_offset": 19,
-      "end_col_offset": 93,
-      "filename": "./vuln_prioritizer_gui.py",
-      "issue_confidence": "LOW",
-      "issue_cwe": {
-        "id": 78,
-        "link": "https://cwe.mitre.org/data/definitions/78.html"
-      },
-      "issue_severity": "MEDIUM",
-      "issue_text": "Function call with shell=True parameter identified, possible security issue.",
-      "line_number": 43,
-      "line_range": [
-        43
-      ],
-      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b604_any_other_function_with_shell_equals_true.html",
-      "test_id": "B604",
-      "test_name": "any_other_function_with_shell_equals_true"
-    }
-  ]
+  "results": []
 }

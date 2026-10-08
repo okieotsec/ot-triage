@@ -35,15 +35,16 @@ class AboutView:
             ("Low exposure: " + EXPOSURE_HELP, False)])
         self._paragraphs(card(scroll.body, self.style, "Where the categories come from"), [(ATTRIBUTION, False)])
         docs = card(scroll.body, self.style, "Documentation")
-        for name, description in DOCUMENTS:
-            row = tk.Frame(docs, bg=t.card)
-            row.pack(fill=tk.X, pady=2)
-            tk.Label(row, text=name, font=self.style.font(10, "bold"), bg=t.card, fg=t.text, width=22,
-                     anchor="w").pack(side=tk.LEFT)
-            label = tk.Label(row, text=description, font=self.style.font(10), bg=t.card, fg=t.muted, anchor="w",
-                             justify="left")
-            label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            label.bind("<Configure>", lambda e, w=label: w.configure(wraplength=max(e.width - 4, 100)))
+        docs.columnconfigure(1, weight=1)
+        self.doc_names = []
+        for row, (name, description) in enumerate(DOCUMENTS):
+            label = tk.Label(docs, text=name, font=self.style.font(10, "bold"), bg=t.card, fg=t.text, anchor="w")
+            label.grid(row=row, column=0, sticky="w", padx=(0, 18), pady=2)
+            self.doc_names.append(label)
+            text = tk.Label(docs, text=description, font=self.style.font(10), bg=t.card, fg=t.muted, anchor="w",
+                            justify="left")
+            text.grid(row=row, column=1, sticky="ew", pady=2)
+            text.bind("<Configure>", lambda e, w=text: w.configure(wraplength=max(e.width - 4, 100)))
 
     def _paragraphs(self, box, paragraphs):
         t = self.style.theme
