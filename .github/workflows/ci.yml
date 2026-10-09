@@ -37,7 +37,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Run the tests (Linux, with a virtual display)
         if: runner.os == 'Linux'
-        run: xvfb-run -a python -u -X dev -W error::ResourceWarning -m unittest discover -v -f
+        run: xvfb-run -a python -u -X dev -W error::ResourceWarning -c "import faulthandler, unittest; faulthandler.dump_traceback_later(90, exit=True); unittest.main(module=None, argv=['unittest', 'discover', '-v', '-f'])"
       - name: Run the tests (Windows)
         if: runner.os == 'Windows'
         run: python -u -X dev -W error::ResourceWarning -m unittest discover -v -f

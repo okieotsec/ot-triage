@@ -431,7 +431,8 @@ class KeyboardReachabilityTests(AppTestCase):
         (self.work / "e.gz").write_bytes(epss_bytes())
         td.import_from_files(self.work / "k.json", self.work / "e.gz", self.data_dir)
         app = self.make()
-        self.root.wm_attributes("-type", "dialog")
+        if self.root.tk.call("tk", "windowingsystem") == "x11":
+            self.root.wm_attributes("-type", "dialog")  # a real floating window on tiling window managers
         self.root.geometry("1200x900+20+20")
         self.root.deiconify()
         self.pump(0.3)
