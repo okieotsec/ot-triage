@@ -248,7 +248,8 @@ class EntryLimitTests(DisplayTestCase):
     def make(self, **options):
         calls = []
         variable = tk.StringVar(self.root)
-        entry = gw.rounded_entry(self.root, self.style, variable, on_too_long=lambda: calls.append(1), **options)
+        frame = self.make_frame()
+        entry = gw.rounded_entry(frame, self.style, variable, on_too_long=lambda: calls.append(1), **options)
         entry.pack()
         self.root.deiconify()
         self.pump(0.1)
@@ -417,9 +418,11 @@ class RoundedLookTests(DisplayTestCase):
         self.root.update()
         normal = str(b.cget("image"))
         b.event_generate("<ButtonPress-1>")
-        self.assertNotEqual(str(b.cget("image")), normal)
+        pressed = str(b.cget("image"))
+        self.assertNotEqual(pressed, normal)
         b.event_generate("<ButtonRelease-1>")
-        self.assertEqual(str(b.cget("image")), normal)
+        # Back to the resting look, or the hover look if the real pointer happens to be over the button
+        self.assertNotEqual(str(b.cget("image")), pressed)
 
     def test_a_disabled_button_does_not_show_the_pressed_state(self):
         frame = self.make_frame()
