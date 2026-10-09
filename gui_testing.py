@@ -13,7 +13,7 @@ from gui_theme import DARK, Style, apply_ttk_styles
 # GUI tests run with a private home folder, so an accidental write to a default settings, preferences or data path can
 # never touch the real user's files.
 SANDBOX = tempfile.mkdtemp(prefix="vp-test-home-")
-os.environ.update({"HOME": SANDBOX, "XDG_CONFIG_HOME": os.path.join(SANDBOX, "config"),
+os.environ.update({"HOME": SANDBOX, "USERPROFILE": SANDBOX, "XDG_CONFIG_HOME": os.path.join(SANDBOX, "config"),
                    "XDG_DATA_HOME": os.path.join(SANDBOX, "data"), "APPDATA": os.path.join(SANDBOX, "appdata"),
                    "LOCALAPPDATA": os.path.join(SANDBOX, "localappdata")})
 atexit.register(shutil.rmtree, SANDBOX, ignore_errors=True)
