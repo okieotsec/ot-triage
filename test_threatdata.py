@@ -267,6 +267,7 @@ class StorageTests(unittest.TestCase):
         with mock.patch.object(td, "KEV_MAX_BYTES", 100):
             self.assertFalse(td.import_from_files(big, None, self.dir, self.now)[0].ok)
 
+    @unittest.skipIf(os.name == "nt", "Windows does not allow control characters in file names")
     def test_import_source_labels_are_sanitized(self):
         src = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, src)

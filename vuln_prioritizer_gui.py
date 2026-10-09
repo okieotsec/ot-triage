@@ -22,6 +22,7 @@ from version import __version__
 VIEWS = [("assess", "Assess", AssessView), ("batch", "Batch", BatchView), ("threat", "Threat data", ThreatView),
          ("settings", "Settings", SettingsView), ("about", "About", AboutView)]
 NARROW_BELOW = 900
+NARROW_MARGIN = 40  # the layout only changes when the width is clearly past the threshold, never right on it
 SUBTITLE = "Now / Next / Never triage from CVSS, threat intel, asset value, exposure and mitigations"
 
 
@@ -155,7 +156,8 @@ class App:
 
     def _on_resize(self, event):
         if event.widget is self.root:
-            self._layout(event.width < NARROW_BELOW)
+            limit = NARROW_BELOW + NARROW_MARGIN if self.narrow else NARROW_BELOW - NARROW_MARGIN
+            self._layout(event.width < limit)
 
     # ---- navigation ----
     def show_view(self, name):

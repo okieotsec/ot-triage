@@ -13,7 +13,7 @@ from gui_theme import DARK, Style, apply_ttk_styles
 # GUI tests run with a private home folder, so an accidental write to a default settings, preferences or data path can
 # never touch the real user's files.
 SANDBOX = tempfile.mkdtemp(prefix="vp-test-home-")
-os.environ.update({"HOME": SANDBOX, "XDG_CONFIG_HOME": os.path.join(SANDBOX, "config"),
+os.environ.update({"HOME": SANDBOX, "USERPROFILE": SANDBOX, "XDG_CONFIG_HOME": os.path.join(SANDBOX, "config"),
                    "XDG_DATA_HOME": os.path.join(SANDBOX, "data"), "APPDATA": os.path.join(SANDBOX, "appdata"),
                    "LOCALAPPDATA": os.path.join(SANDBOX, "localappdata")})
 atexit.register(shutil.rmtree, SANDBOX, ignore_errors=True)
@@ -66,6 +66,8 @@ class DisplayTestCase(unittest.TestCase):
     def make_frame(self, width=400, height=300):
         """Create a sized frame inside a visible-enough toplevel for geometry tests."""
         top = tk.Toplevel(self.root)
+        if top.tk.call("tk", "windowingsystem") == "x11":
+            top.wm_attributes("-type", "dialog")  # tiling window managers keep the exact size of floating windows
         top.geometry(f"{width}x{height}+0+0")
         frame = tk.Frame(top, bg=self.style.theme.card)
         frame.pack(fill=tk.BOTH, expand=True)

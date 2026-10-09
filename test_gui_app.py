@@ -219,6 +219,19 @@ class ShellTests(AppTestCase):
         self.assertEqual(app.ctx.prefs.text_percent, 100)
         self.assertTrue(self.mocks["showerror"].called)
 
+    def test_the_navigation_layout_needs_a_clearly_different_width_to_switch(self):
+        app = self.make()
+        app._layout(False)
+
+        def resize(*widths):
+            for width in widths:
+                app._on_resize(mock.Mock(widget=app.root, width=width))
+            return app.narrow
+        self.assertFalse(resize(1100, 906, 880, 861))
+        self.assertTrue(resize(859))
+        self.assertTrue(resize(880, 906, 939))
+        self.assertFalse(resize(941, 906, 880))
+
     def test_the_header_accent_line_spans_the_whole_width(self):
         app = self.make()
         self.root.deiconify()
@@ -431,7 +444,8 @@ class KeyboardReachabilityTests(AppTestCase):
         (self.work / "e.gz").write_bytes(epss_bytes())
         td.import_from_files(self.work / "k.json", self.work / "e.gz", self.data_dir)
         app = self.make()
-        self.root.wm_attributes("-type", "dialog")
+        if self.root.tk.call("tk", "windowingsystem") == "x11":
+            self.root.wm_attributes("-type", "dialog")  # a real floating window on tiling window managers
         self.root.geometry("1200x900+20+20")
         self.root.deiconify()
         self.pump(0.3)

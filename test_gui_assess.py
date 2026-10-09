@@ -444,12 +444,24 @@ class AssessVectorTests(AssessTestCase):
         self.pump()
         self.assertEqual(self.ctx.assess_state.cvss.get(), "9.8")
 
-    def test_a_huge_paste_is_rejected_quickly(self):
+    def test_a_long_vector_is_reported_in_one_short_line(self):
         self.setup_inputs()
         start = time.monotonic()
-        self.paste("CVSS:3.1/" + "A" * 2_000_000)
+        self.paste("CVSS:3.1/" + "A" * 1500)
         self.assertLess(time.monotonic() - start, 2.0)
         self.assertIn("longer than 400", self.view.vector_message.cget("text"))
+        self.assertLess(len(self.view.vector_message.cget("text")), 200)
+
+    def test_a_huge_paste_into_the_box_is_refused_at_once_and_never_reaches_the_widget(self):
+        self.setup_inputs()
+        entry = self.view.vector_entry
+        entry.insert(0, V31)
+        start = time.monotonic()
+        entry.insert("end", "A" * 5_000_000)  # what pasting a huge text does
+        self.pump()
+        self.assertLess(time.monotonic() - start, 2.0)
+        self.assertEqual(entry.get(), V31)
+        self.assertIn("too long", self.view.vector_message.cget("text"))
         self.assertLess(len(self.view.vector_message.cget("text")), 200)
 
     def test_the_vector_survives_a_rebuild_with_its_message(self):
@@ -494,6 +506,17 @@ class AssessLayoutTests(AssessTestCase):
             view.verdict.configure(text=headline)
             self.pump(0.1)
             self.assertLessEqual(view.verdict.winfo_reqwidth(), view.verdict.winfo_width() + 1, headline)
+
+    def test_the_layout_needs_a_clearly_different_width_to_switch_so_it_cannot_flip_flop(self):
+        view = self.build()
+        view._layout(wide=True)
+        sizes = lambda *widths: [view._on_resize(mock.Mock(width=w)) or view.wide for w in widths]  # noqa: E731
+        # Wide stays wide until the width is clearly below the line, even when a scrollbar takes ~20 px
+        self.assertEqual(sizes(906, 889, 870, 861), [True, True, True, True])
+        self.assertEqual(sizes(859), [False])
+        # Stacked stays stacked until the width is clearly above the line
+        self.assertEqual(sizes(889, 906, 930, 939), [False, False, False, False])
+        self.assertEqual(sizes(940, 906, 889), [True, True, True])
 
     def test_a_rebuild_keeps_the_inputs_and_the_result(self):
         view = self.build()
