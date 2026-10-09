@@ -1,4 +1,5 @@
 import threading
+import time
 import tkinter as tk
 import unittest
 from unittest import mock
@@ -241,6 +242,46 @@ class ScrollAreaTests(DisplayTestCase):
         outside = mock.Mock(x_root=-50, y_root=-50)
         area._unbind_wheel(outside)
         self.assertFalse(area.bind_all("<MouseWheel>"))
+
+
+class EntryLimitTests(DisplayTestCase):
+    def make(self, **options):
+        calls = []
+        variable = tk.StringVar(self.root)
+        entry = gw.rounded_entry(self.root, self.style, variable, on_too_long=lambda: calls.append(1), **options)
+        entry.pack()
+        self.root.deiconify()
+        self.pump(0.1)
+        return entry, variable, calls
+
+    def test_text_within_the_limit_is_accepted_and_text_beyond_it_is_refused_with_a_callback(self):
+        entry, _variable, calls = self.make(max_chars=10)
+        entry.insert(0, "abcde")
+        entry.insert("end", "fghij")
+        self.assertEqual((entry.get(), calls), ("abcdefghij", []))
+        entry.insert("end", "k")
+        entry.insert(0, "X")
+        self.assertEqual((entry.get(), len(calls)), ("abcdefghij", 2))
+
+    def test_a_huge_paste_is_refused_without_touching_the_widget(self):
+        entry, _variable, calls = self.make()
+        start = time.monotonic()
+        entry.insert(0, "A" * 5_000_000)
+        self.assertLess(time.monotonic() - start, 2.0)
+        self.assertEqual((entry.get(), len(calls)), ("", 1))
+
+    def test_the_default_limit_is_generous_for_real_use(self):
+        entry, _variable, calls = self.make()
+        entry.insert(0, "x" * gw.MAX_ENTRY_CHARS)
+        self.assertEqual((len(entry.get()), calls), (gw.MAX_ENTRY_CHARS, []))
+
+    def test_the_program_setting_the_variable_is_not_blocked_by_the_limit(self):
+        entry, variable, calls = self.make(max_chars=10)
+        variable.set("a longer text than ten characters")
+        self.pump(0.1)
+        self.assertEqual((entry.get(), calls), ("a longer text than ten characters", []))
+        entry.insert("end", "!")  # typing more on top of it is refused
+        self.assertEqual(len(calls), 1)
 
 
 class LinkLabelTests(DisplayTestCase):

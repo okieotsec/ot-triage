@@ -9,6 +9,7 @@ from gui_round import photo, recolor_corners, round_corners, shape_label, text_s
 from gui_theme import SYMBOLS
 
 BAR_FLIP_WINDOW, BAR_FLIP_LIMIT = 2.0, 6  # seconds, and how many bar changes in that time are accepted
+MAX_ENTRY_CHARS = 2000  # no text box here needs more; Tk gets extremely slow showing megabytes in one line
 CARD_RADIUS, BUTTON_RADIUS, SEGMENT_RADIUS, BADGE_RADIUS, ENTRY_RADIUS = 12, 9, 9, 14, 9
 
 
@@ -46,8 +47,13 @@ class MessageLabel(tk.Label):
     config = configure
 
 
-def rounded_entry(parent, style, variable=None, width=20, size=11, bold=False, justify="left", outside=None):
-    """Create a text input with rounded corners; call .repaint() after changing its highlight colours."""
+def rounded_entry(parent, style, variable=None, width=20, size=11, bold=False, justify="left", outside=None,
+                  max_chars=MAX_ENTRY_CHARS, on_too_long=None):
+    """Create a text input with rounded corners; call .repaint() after changing its highlight colours.
+
+    Typing or pasting that would make the text longer than max_chars is refused (and on_too_long is called), so a
+    huge paste can never reach the widget. Changes made through the variable are not affected.
+    """
     t = style.theme
     outside = outside or parent.cget("bg")
     entry = tk.Entry(parent, textvariable=variable, width=width, font=style.font(size, "bold" if bold else "normal"),
@@ -56,6 +62,15 @@ def rounded_entry(parent, style, variable=None, width=20, size=11, bold=False, j
                      selectbackground=t.accent, selectforeground=t.on_accent)
     round_corners(entry, ENTRY_RADIUS, t.border, outside, ring_width=2, fill=t.field)
     entry.focused = False
+
+    def allow(proposed, how):
+        if how != "key" or len(proposed) <= max_chars:
+            return True
+        if on_too_long is not None:
+            on_too_long()
+        return False
+
+    entry.configure(validate="key", validatecommand=(entry.register(allow), "%P", "%V"))
 
     def repaint():
         ring = entry.cget("highlightcolor") if entry.focused else entry.cget("highlightbackground")

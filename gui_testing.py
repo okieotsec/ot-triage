@@ -66,6 +66,8 @@ class DisplayTestCase(unittest.TestCase):
     def make_frame(self, width=400, height=300):
         """Create a sized frame inside a visible-enough toplevel for geometry tests."""
         top = tk.Toplevel(self.root)
+        if top.tk.call("tk", "windowingsystem") == "x11":
+            top.wm_attributes("-type", "dialog")  # tiling window managers keep the exact size of floating windows
         top.geometry(f"{width}x{height}+0+0")
         frame = tk.Frame(top, bg=self.style.theme.card)
         frame.pack(fill=tk.BOTH, expand=True)

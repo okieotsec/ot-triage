@@ -5,8 +5,8 @@ from tkinter import ttk
 import cvss
 import explain
 from explain import SHORT_LABELS, AssessInputs
-from gui_widgets import (Expander, FlowFrame, MessageLabel, ReferenceList, ScrollFrame, Segmented, ask_text, button,
-                         card, chip, field_label, priority_badge, rounded_entry, set_enabled)
+from gui_widgets import (MAX_ENTRY_CHARS, Expander, FlowFrame, MessageLabel, ReferenceList, ScrollFrame, Segmented,
+                         ask_text, button, card, chip, field_label, priority_badge, rounded_entry, set_enabled)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -145,7 +145,7 @@ class AssessView:
         self.cve_chips.pack(fill=tk.X, pady=(4, 0))
 
         field_label(vuln, s, "CVSS vector (optional)", VECTOR_HELP)
-        self.vector_entry = self._entry(vuln, state.vector, width=22, size=10)
+        self.vector_entry = self._entry(vuln, state.vector, width=22, size=10, on_too_long=self._vector_too_long)
         self.vector_entry.pack(fill=tk.X, ipady=5)
         self.vector_entry.bind("<Return>", lambda _e: self.apply_vector())
         self.vector_entry.bind("<FocusOut>", lambda _e: self.apply_vector(), add="+")
@@ -187,8 +187,8 @@ class AssessView:
         field_label(rem, s, "Compensating controls", CONTROLS_HELP)
         Segmented(rem, s, _options(Controls), state.controls).pack(fill=tk.X)
 
-    def _entry(self, parent, variable, width, size=11, bold=False):
-        return rounded_entry(parent, self.style, variable, width, size, bold)
+    def _entry(self, parent, variable, width, size=11, bold=False, on_too_long=None):
+        return rounded_entry(parent, self.style, variable, width, size, bold, on_too_long=on_too_long)
 
     def _check(self, parent, text, variable):
         t = self.style.theme
@@ -526,6 +526,12 @@ class AssessView:
         if info is None:
             return []
         return [f"CVSS vector: {info.normalized}", f"CVSS version: {info.version} (base score {info.score:.1f})"]
+
+    def _vector_too_long(self):
+        """Explain that a paste was refused because it is far longer than any CVSS vector."""
+        self.vector_message.configure(text=f"\u2716 That text is too long to be a CVSS vector (the limit for this "
+                                           f"box is {MAX_ENTRY_CHARS} characters), so it was not pasted.",
+                                      fg=self.style.theme.error)
 
     def _vector_typed(self, *_args):
         """Wait for typing to pause before checking the vector, so half-typed text is not flagged."""
