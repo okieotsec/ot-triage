@@ -363,6 +363,30 @@ class Expander(tk.Frame):
             self.body.pack_forget()
 
 
+class LinkLabel(tk.Label):
+    """Text that acts as a link: it opens on click, or on Enter or Space when focused, and shows its focus."""
+
+    def __init__(self, parent, style, text, command):
+        t = style.theme
+        self._font = style.font(10)
+        self._underlined = (*self._font[:2], "underline")
+        super().__init__(parent, text=text, font=self._font, fg=t.accent, bg=t.card, cursor="hand2", anchor="w",
+                         justify="left", takefocus=True, highlightthickness=1, highlightbackground=t.card,
+                         highlightcolor=t.accent, bd=0, padx=0, pady=0)
+        self.command = command
+        for sequence in ("<Button-1>", "<Return>", "<space>", "<KP_Enter>"):
+            self.bind(sequence, self._activate)
+        for sequence in ("<Enter>", "<FocusIn>"):
+            self.bind(sequence, lambda _e: self.configure(font=self._underlined))
+        for sequence in ("<Leave>", "<FocusOut>"):
+            self.bind(sequence, lambda _e: self.configure(font=self._font))
+
+    def _activate(self, _event=None):
+        self.focus_set()
+        self.command()
+        return "break"
+
+
 class PriorityBadge(tk.Label):
     """The large rounded NOW, NEXT or NEVER badge; call show() to change what it displays."""
 

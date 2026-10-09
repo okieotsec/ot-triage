@@ -29,6 +29,7 @@ The application works **fully offline**. It connects to the internet only when y
 - HTTPS only, with certificate and host name verification that cannot be turned off from the interface or the settings.
 - No account, no telemetry, no analytics, no usage data, and no data about your vulnerabilities, assets or settings is ever sent. Only the two download requests above are made.
 - System proxy settings (`HTTPS_PROXY`) are honoured.
+- **Links from CISA's notes:** the Assess view lists the reference links CISA includes with a KEV entry. The application never fetches them. A link opens in your own web browser only when you click it (or press Enter on it), and the domain is always shown next to it. Because the notes come from a downloaded file they are treated as untrusted: only plain `https` links to an ordinary host name are clickable (no `http`, `javascript:`, `file:`, addresses with a user name or unusual port, IP addresses or look-alike characters). Anything else is shown as plain text and is never opened.
 - Downloads are limited in size and time, validated completely before use, and replace the stored copy only on success. A failed update keeps the previous data.
 - For networks with no internet access, download the two files elsewhere and use **Import from files**; they get the same checks.
 

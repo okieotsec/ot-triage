@@ -21,6 +21,7 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
+import references
 from prioritizer import Factor, Threat
 
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
@@ -73,6 +74,12 @@ class KevEntry:
     required_action: str
     due_date: str
     ransomware: bool
+    notes: str = ""
+
+    @property
+    def references(self):
+        """Return the entry's notes as a tuple of references (safe links and plain text)."""
+        return references.parse_references(self.notes)
 
 
 @dataclass(frozen=True)
@@ -216,9 +223,15 @@ def parse_kev(data):
         ransomware = item.get("knownRansomwareCampaignUse")
         if ransomware not in ("Known", "Unknown"):
             raise ThreatDataError(f"{where}: invalid knownRansomwareCampaignUse")
+        notes = item.get("notes", "")
+        if not isinstance(notes, str):
+            raise ThreatDataError(f"{where}: 'notes' must be text")
+        if len(notes) > MAX_FIELD_CHARS:
+            raise ThreatDataError(f"{where}: 'notes' is longer than {MAX_FIELD_CHARS} characters")
         entries[cve] = KevEntry(cve, _text(item, "vendorProject", where), _text(item, "product", where),
                                 _text(item, "vulnerabilityName", where), added,
-                                _text(item, "requiredAction", where), due, ransomware == "Known")
+                                _text(item, "requiredAction", where), due, ransomware == "Known",
+                                references.clean(notes))
     return KevData(version, released[:10], entries)
 
 

@@ -26,7 +26,7 @@ Run this before a release, with `python3 vuln_prioritizer_gui.py`.
 **Keyboard only (no mouse)**
 - [ ] Tab reaches every field, button and choice in a sensible order; the focused control has a visible outline.
 - [ ] Left and Right arrows change a focused choice (for example Threat or Exposure).
-- [ ] Ctrl+1 to Ctrl+5 switch views; Ctrl+L focuses the CVE field; Ctrl+Shift+C copies the summary; Ctrl+plus, Ctrl+minus and Ctrl+0 change the text size, keep what you typed, and the size is still there after a restart.
+- [ ] Ctrl+1 to Ctrl+5 switch views; Ctrl+L focuses the CVE field; Ctrl+Shift+C copies the summary; after looking up a KEV CVE the References card lists links that open in your browser when clicked (and from the keyboard with Enter); Ctrl+plus, Ctrl+minus and Ctrl+0 change the text size, keep what you typed, and the size is still there after a restart.
 - [ ] Enter in the CVE field looks the CVE up; Space or Enter opens "Show reasoning".
 
 **Both themes and every text size**
