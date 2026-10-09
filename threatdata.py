@@ -75,6 +75,7 @@ class KevEntry:
     due_date: str
     ransomware: bool
     notes: str = ""
+    forensic_triage: bool = False
 
     @property
     def references(self):
@@ -231,7 +232,7 @@ def parse_kev(data):
         entries[cve] = KevEntry(cve, _text(item, "vendorProject", where), _text(item, "product", where),
                                 _text(item, "vulnerabilityName", where), added,
                                 _text(item, "requiredAction", where), due, ransomware == "Known",
-                                references.clean(notes))
+                                references.clean(notes), item.get("forensicTriage") == "Yes")
     return KevData(version, released[:10], entries)
 
 
@@ -682,6 +683,9 @@ def apply_threat_context(result, decision, info):
         reasons.append(f"CISA KEV: added {entry.date_added}{due} (context only; does not change the bucket)")
         if entry.required_action:
             action = f"{action}. CISA required action: {entry.required_action}"
+        if entry.forensic_triage:
+            reasons.append("CISA asks for forensic triage on this entry (BOD 26-04): look for signs of compromise, "
+                           "not only patch (context only; does not change the bucket)")
         if entry.ransomware:
             score = min(10.0, round(score + RANSOMWARE_SCORE_BONUS, 2))
             reasons.append("Known ransomware campaign use: ranked higher within the bucket; the bucket is unchanged")
@@ -694,6 +698,8 @@ def apply_threat_context(result, decision, info):
         factors[position:position] = threat_factors
     if info is not None and info.kev is not None and info.kev.ransomware:
         factors.insert(position + len(threat_factors) if threat_factors else 1, Factor("Ransomware use", "raise"))
+    if info is not None and info.kev is not None and info.kev.forensic_triage:
+        factors.append(Factor("Forensic triage advised", "neutral"))
     return dataclasses.replace(result, reasons=reasons, action=action, score=score, factors=factors)
 
 

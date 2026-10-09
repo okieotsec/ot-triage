@@ -398,5 +398,72 @@ class CveColumnTests(unittest.TestCase):
         self.assertEqual((row["action"], row["rationale"], row["threat_source"]), ("'=1+1", "'=2+2", "'+cmd"))
 
 
+class KevReferenceTests(unittest.TestCase):
+    NOTES = "https://vendor.example.com/a ; =Click me: https://www.cisa.gov/bod ; http://insecure.example.com/x"
+    ROW = {"cvss": "8.0", "asset": "standard", "exposure": "high", "cve": "CVE-2024-0001"}
+
+    def data(self, triage=False):
+        entry = td.KevEntry("CVE-2024-0001", "Acme", "Widget", "Flaw", "2024-01-02", "Apply.", "2024-01-23", False,
+                            self.NOTES, triage)
+        return td.ThreatData(td.KevData("2026.10.04", "2026-10-04", {entry.cve: entry}),
+                             td.EpssData("v2026.06.15", "2026-10-07", {}))
+
+    def test_a_kev_row_carries_its_references_and_the_triage_flag(self):
+        item = batch.score_row(2, self.ROW, threatdata=self.data(triage=True))
+        self.assertEqual([r.host for r in item.references if r.is_link], ["vendor.example.com", "www.cisa.gov"])
+        self.assertEqual(len(item.references), 3)
+        self.assertTrue(item.forensic_triage)
+
+    def test_rows_without_a_kev_entry_have_none(self):
+        manual = batch.score_row(2, {**self.ROW, "cve": "", "threat": "none"}, threatdata=self.data())
+        other = batch.score_row(3, {**self.ROW, "cve": "CVE-2030-0001"}, threatdata=self.data())
+        for item in (manual, other):
+            self.assertEqual((item.references, item.forensic_triage), ((), False))
+
+    def test_the_triage_flag_never_changes_the_bucket_or_the_score(self):
+        plain = batch.score_row(2, self.ROW, threatdata=self.data(triage=False))
+        flagged = batch.score_row(2, self.ROW, threatdata=self.data(triage=True))
+        self.assertEqual((plain.priority, plain.result.score), (flagged.priority, flagged.result.score))
+
+    def test_the_triage_flag_adds_a_context_note_and_a_neutral_chip_only_when_set(self):
+        flagged = batch.score_row(2, self.ROW, threatdata=self.data(triage=True)).result
+        plain = batch.score_row(2, self.ROW, threatdata=self.data(triage=False)).result
+        self.assertTrue(any("forensic triage" in r for r in flagged.reasons))
+        self.assertIn(("Forensic triage advised", "neutral"), [(f.label, f.direction) for f in flagged.factors])
+        self.assertFalse(any("forensic triage" in r for r in plain.reasons))
+        self.assertNotIn("Forensic triage advised", [f.label for f in plain.factors])
+
+    def test_the_export_has_the_new_columns_last_and_neutralises_formulas(self):
+        items = [batch.score_row(2, self.ROW, threatdata=self.data(triage=True)),
+                 batch.score_row(3, {**self.ROW, "cve": "", "threat": "none"}, threatdata=self.data())]
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, batch.sort_items(items), self.data())
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                reader = csv.DictReader(fh)
+                rows = list(reader)
+        self.assertEqual(reader.fieldnames[-2:], ["references", "forensic_triage"])
+        by_cve = {r["cve"]: r for r in rows}
+        kev_row = by_cve["CVE-2024-0001"]
+        self.assertEqual(kev_row["forensic_triage"], "Yes")
+        self.assertTrue(kev_row["references"].startswith("https://vendor.example.com/a ; "))
+        self.assertIn(" ; =Click me: https://www.cisa.gov/bod ; ", kev_row["references"])
+        self.assertIn("http://insecure.example.com/x", kev_row["references"])
+        manual = by_cve[""]
+        self.assertEqual((manual["references"], manual["forensic_triage"]), ("", ""))
+
+    def test_a_reference_text_that_starts_like_a_formula_is_neutralised_in_the_export(self):
+        entry = td.KevEntry("CVE-2024-0001", "A", "B", "C", "2024-01-02", "Apply.", "", False,
+                            "=HYPERLINK(\"http://evil.example.com\") ; plain", False)
+        data = td.ThreatData(td.KevData("1", "2026-10-04", {entry.cve: entry}), td.EpssData("v", "2026-10-07", {}))
+        item = batch.score_row(2, self.ROW, threatdata=data)
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, [item], data)
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                row = next(csv.DictReader(fh))
+        self.assertTrue(row["references"].startswith("'="), row["references"])
+
+
 if __name__ == "__main__":
     unittest.main()

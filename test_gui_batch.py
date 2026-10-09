@@ -9,6 +9,7 @@ from unittest import mock
 
 import batch
 import gui_batch
+import gui_widgets
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
@@ -360,9 +361,13 @@ class BatchFilterSortTests(BatchViewTestCase):
             self.assertEqual(len(self.rows()), len(view.state.items))
 
 
+NOTES = " ; ".join(f"Link {i}: https://vendor.example.com/{i}" for i in range(8))
+
+
 class BatchThreatDataTests(BatchViewTestCase):
     def load_data(self):
-        entries = [kev_entry("CVE-2024-0001", knownRansomwareCampaignUse="Known")]
+        entries = [kev_entry("CVE-2024-0001", knownRansomwareCampaignUse="Known", notes=NOTES,
+                              forensicTriage="Yes")]
         rows = ["CVE-2024-0001,0.5,0.97", "CVE-2024-0002,0.4,0.99", "CVE-2024-0003,0.001,0.2"]
         (self.work / "kev.json").write_bytes(kev_bytes(entries))
         (self.work / "epss.csv.gz").write_bytes(epss_bytes(epss_text(rows)))
@@ -491,6 +496,79 @@ class BatchRebuildTests(BatchViewTestCase):
         rebuilt = self.build()
         self.assertEqual(self.rows(rebuilt), before)
         self.assertEqual((rebuilt.state.filter, rebuilt.state.sort_key), ("NEXT", "score"))
+
+
+
+class BatchReferenceTests(BatchViewTestCase):
+    load_data = BatchThreatDataTests.load_data
+    CSV = BatchThreatDataTests.CSV
+
+    def select(self, view, item_id):
+        iid = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[1] == item_id)
+        view.tree.selection_set(iid)
+        view.tree.focus(iid)
+        self.pump(0.1)
+
+    def link_texts(self, view):
+        return [w.cget("text") for w in self.walk(view.detail_refs) if isinstance(w, gui_widgets.LinkLabel)]
+
+    def walk(self, widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from self.walk(child)
+
+    def test_the_details_of_a_kev_row_list_its_references_and_other_rows_show_none(self):
+        self.load_data()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        self.assertEqual(view.detail_refs.winfo_manager(), "pack")
+        self.assertEqual(self.link_texts(view), [f"Link {i}" for i in range(gui_batch.REFERENCE_LIMIT)])
+        more = [w.cget("text") for w in self.walk(view.detail_refs) if isinstance(w, tk.Label)
+                and "more" in w.cget("text")]
+        self.assertEqual(more, [f"and {8 - gui_batch.REFERENCE_LIMIT} more (see Assess or the CSV export)"])
+        self.assertTrue(any("Forensic triage advised" in c.cget("text") for c in view.detail_chips.items))
+        for other in ("B", "C", "D"):
+            self.select(view, other)
+            self.assertEqual((view.detail_refs.winfo_manager(), view.detail_refs_title.winfo_manager()), ("", ""))
+
+    def test_clicking_a_reference_in_the_details_opens_exactly_that_address(self):
+        self.load_data()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        link = next(w for w in self.walk(view.detail_refs) if isinstance(w, gui_widgets.LinkLabel))
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
+            link.event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://vendor.example.com/0")
+
+    def test_long_details_scroll_inside_a_limited_height_instead_of_growing(self):
+        self.load_data()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        self.pump(0.2)
+        limit = int(gui_batch.DETAILS_MAX_HEIGHT * self.style.scale)
+        self.assertLessEqual(view.detail_scroll.canvas.winfo_reqheight(), limit)
+        self.assertGreater(view.detail_scroll.body.winfo_reqheight(), limit)
+        self.select(view, "D")
+        self.pump(0.2)
+        self.assertLess(view.detail_scroll.canvas.winfo_reqheight(), limit)
+
+    def test_a_new_selection_starts_at_the_top(self):
+        self.load_data()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        self.pump(0.2)
+        view.detail_scroll.canvas.yview_moveto(1.0)
+        self.select(view, "B")
+        self.pump(0.2)
+        self.assertEqual(view.detail_scroll.canvas.yview()[0], 0.0)
+
+    def test_the_search_box_keeps_its_label_even_with_a_long_file_description(self):
+        self.load_data()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.pump(0.2)
+        toolbar_slaves = view.toolbar.pack_slaves()
+        self.assertLess(toolbar_slaves.index(view.search_entry), toolbar_slaves.index(view.file_label))
 
 
 if __name__ == "__main__":

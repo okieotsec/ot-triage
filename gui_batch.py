@@ -8,8 +8,10 @@ import explain
 import threatdata
 from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
-from gui_widgets import FlowFrame, button, card, chip, rounded_entry, set_enabled
+from gui_widgets import FlowFrame, ReferenceList, ScrollFrame, button, card, chip, rounded_entry, set_enabled
 
+REFERENCE_LIMIT = 5
+DETAILS_MAX_HEIGHT = 190
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
 COLUMNS = [("rank", "#", 50, "center"), ("id", "ID", 100, "w"), ("cve", "CVE", 130, "w"), ("name", "Name", 240, "w"),
            ("priority", "Priority", 100, "w"), ("score", "Score", 70, "center"), ("cvss", "CVSS", 60, "center"),
@@ -64,12 +66,13 @@ class BatchView:
         self.open_button = button(bar, s, "Open CSV…", self.open_file)
         self.open_button.pack(side=tk.LEFT)
         self.file_label = tk.Label(bar, text="No file loaded", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
-        self.file_label.pack(side=tk.LEFT, padx=12)
         self.export_button = button(bar, s, "Export ranked CSV", self.export, "secondary")
         self.export_button.pack(side=tk.RIGHT)
         self.search_entry = rounded_entry(bar, s, self.search_var, width=26, size=10, outside=t.bg)
         self.search_entry.pack(side=tk.RIGHT, padx=10, ipady=5)
         tk.Label(bar, text="Search", font=s.font(9), bg=t.bg, fg=t.muted).pack(side=tk.RIGHT)
+        # Packed last, so a long file description is clipped instead of squeezing the search box out.
+        self.file_label.pack(side=tk.LEFT, padx=12, fill=tk.X, expand=True)
         self.progress_row = tk.Frame(self.body, bg=t.bg)
         self.progress_label = tk.Label(self.progress_row, text="", font=s.font(9), bg=t.bg, fg=t.muted)
         self.progress_label.pack(side=tk.LEFT)
@@ -127,15 +130,22 @@ class BatchView:
         self.details = card(self.body, s, "Details", pady=(12, 0))
         # Claim the space before the expanding table does, so a short window shrinks the table and never the details.
         self.details.master.pack_configure(side=tk.BOTTOM, before=self.table_wrap)
-        self.detail_title = tk.Label(self.details, text="Select a row to see why.", font=s.font(10, "bold"),
+        # Long details scroll inside a limited height, so they can never push the results table out of view.
+        self.detail_scroll = ScrollFrame(self.details, t.card, max_height=int(DETAILS_MAX_HEIGHT * s.scale))
+        self.detail_scroll.pack(fill=tk.X)
+        area = self.detail_scroll.body
+        self.detail_title = tk.Label(area, text="Select a row to see why.", font=s.font(10, "bold"),
                                      bg=t.card, fg=t.text, anchor="w")
         self.detail_title.pack(fill=tk.X)
-        self.detail_chips = FlowFrame(self.details, t.card)
+        self.detail_chips = FlowFrame(area, t.card)
         self.detail_chips.pack(fill=tk.X, pady=(6, 0))
-        self.detail_text = tk.Label(self.details, text="", font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
+        self.detail_text = tk.Label(area, text="", font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
                                     justify="left")
         self.detail_text.pack(fill=tk.X, pady=(6, 0))
         self.detail_text.bind("<Configure>", lambda e: self.detail_text.configure(wraplength=max(e.width - 4, 100)))
+        self.detail_refs_title = tk.Label(area, text="REFERENCES FROM CISA", font=s.font(9, "bold"), bg=t.card,
+                                          fg=t.accent, anchor="w")
+        self.detail_refs = ReferenceList(area, s, self.ctx.open_reference, compact=True, limit=REFERENCE_LIMIT)
 
     # ---- loading ----
     def open_file(self):
@@ -287,6 +297,7 @@ class BatchView:
                                     "exposure, and threat (or cve).")
         self.detail_chips.set_items([])
         self.detail_text.configure(text="")
+        self._show_references(())
 
     def _on_select(self, _event):
         selection = self.tree.selection()
@@ -308,6 +319,17 @@ class BatchView:
             if item.cvss_vector:
                 lines += ["", f"CVSS vector as given: {item.cvss_vector}"]
         self.detail_text.configure(text="\n".join(lines))
+        self._show_references(item.references)
+        self.detail_scroll.scroll_to_top()
+
+    def _show_references(self, references):
+        """Show the selected row's KEV references under the details, or nothing when it has none."""
+        self.detail_refs_title.pack_forget()
+        self.detail_refs.pack_forget()
+        self.detail_refs.show(references)
+        if references:
+            self.detail_refs_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
+            self.detail_refs.pack(fill=tk.X, before=self.detail_text)
 
     # ---- export ----
     def export(self):
