@@ -1,5 +1,5 @@
 Reviewer: Claude Code (developer and reviewer)
-Checkpoint / commit: CP3 / 554416b (tag cp3, v0.3.0 candidate; branch gui-refresh)
+Checkpoint / commit: CP3 / 8b6e399 (tag cp3, v0.3.0 candidate; branch gui-refresh)
 Tools run (with versions): bandit 1.9.4, semgrep 1.179.0 (p/python, p/security-audit; 200 rules, 34 files), ruff 0.16.10 (E,F,W,S,B at line length 120), pip-audit 2.10.1 (requirements.txt and requirements-dev.txt), osv-scanner 2.5.1 (requirements-dev.txt), gitleaks 8.30.1 (25 commits), cyclonedx-bom 7.5.0, hypothesis 6.168.5, openssl 3.6.3 (test certificate), headless Chromium (mockup check), ImageMagick import (screenshots of the real app), grep for eval/exec/pickle/subprocess/yaml.load/shell=True/unverified TLS contexts
 Tools not run (and why): mitmproxy and atheris (as at CP2: the local TLS server tests and hypothesis property tests were used instead); Excel (not available); screen readers (Tkinter has weak support; not attempted); a keyboard-only manual walk-through by a person and a real 1366x768 screen (this machine runs a tiling window manager that ignores requested window sizes, so narrow layouts were checked by logic tests and by forcing the layout in the real window)
 Command deviations from the plan: osv-scanner 2.x syntax; malicious files generated on demand (see CP1 and CP2)

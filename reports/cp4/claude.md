@@ -1,5 +1,5 @@
 Reviewer: Claude Code (developer and reviewer)
-Checkpoint / commit: CP4 / 469bdbe (tags cp4 and v0.4.0-rc1)
+Checkpoint / commit: CP4 / 4daa7e0 (tags cp4 and v0.4.0-rc1)
 Tools run (with versions): bandit 1.9.4, semgrep 1.179.0 (p/python, p/security-audit; 200 rules, 41 files), ruff 0.16.10 (E,F,W,S,B at line length 120), pip-audit 2.10.1 (requirements.txt and requirements-dev.txt), osv-scanner 2.5.1 (requirements-dev.txt), gitleaks 8.30.1 (31 commits, full history), cyclonedx-bom 7.5.0, hypothesis 6.168.5, openssl 3.6.3 (test certificate), Node.js 26.7.0 with FIRST's official CVSS calculators (verification only, pinned by SHA-256), ImageMagick import (screenshots of the running application), grep for eval/exec/pickle/os.system/yaml.load/shell=True/unverified TLS
 Tools not run (and why): mitmproxy and atheris (as at CP2 and CP3: a local TLS server and hypothesis property tests were used instead); Excel (unavailable; LibreOffice was used for the export check at CP1); screen readers (Tkinter support is weak and was not attempted)
 Command deviations from the plan: osv-scanner 2.x syntax; malicious files are generated on demand by malicious_cases.py instead of stored under tests/data/malicious/ (see CP1)

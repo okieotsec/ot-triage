@@ -1,5 +1,5 @@
 Reviewer: Claude Code (developer and reviewer)
-Checkpoint / commit: CP2 / d19aef3 (tag cp2)
+Checkpoint / commit: CP2 / 180b3a8 (tag cp2)
 Tools run (with versions): bandit 1.9.4, semgrep 1.179.0 (p/python, p/security-audit; 200 rules, 12 files), ruff 0.16.10 (E,F,W,S,B at line length 120), pip-audit 2.10.1, osv-scanner 2.5.1, gitleaks 8.30.1 (13 commits), cyclonedx-bom 7.5.0, hypothesis 6.168.5, openssl 3.6.3 (test certificate), manual grep for eval/exec/pickle/subprocess/yaml.load/shell=True/unverified TLS contexts
 Tools not run (and why): mitmproxy (replaced by a local TLS server in test_threatdata.py that covers an untrusted certificate, a wrong host name, redirects, oversized and slow responses, timeouts, truncation and HTTP errors; no run through a real intercepting proxy was made); atheris coverage-guided fuzzing (optional in the plan; hypothesis property tests were run instead); Excel export check (Excel unavailable; LibreOffice was used at CP1)
 Command deviations from the plan: osv-scanner 2.x syntax (see CP1); malicious files generated on demand by malicious_cases.py

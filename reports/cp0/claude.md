@@ -1,5 +1,5 @@
 Reviewer: Claude Code (developer and reviewer)
-Checkpoint / commit: CP0 / adc35db (tag baseline-cp0)
+Checkpoint / commit: CP0 / 096e1ad (tag baseline-cp0)
 Tools run (with versions): bandit 1.9.4, semgrep 1.179.0 (p/python, p/security-audit; 200 rules), ruff 0.16.10 (E,F,W,S,B), pip-audit 2.10.1, cyclonedx-bom 7.5.0 (cyclonedx-py), manual grep for eval/exec/pickle/subprocess/yaml.load/urlopen
 Tools run later (added after installation): gitleaks 8.30.1 over the history up to the baseline tag: no leaks (reports/cp0/gitleaks.json); osv-scanner 2.5.1 found no packages to scan (requirements.txt is empty)
 Tools not run (and why): hypothesis, atheris, mitmproxy and the malicious file set (planned for CP1 and CP2; the app has no network code yet)

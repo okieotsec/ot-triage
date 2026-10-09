@@ -1,5 +1,5 @@
 Reviewer: Claude Code (developer and reviewer)
-Checkpoint / commit: CP1 / 6678a39 (tag cp1; re-run after the policy changes, v0.1 candidate)
+Checkpoint / commit: CP1 / 5b1b2a2 (tag cp1; re-run after the policy changes, v0.1 candidate)
 Tools run (with versions): bandit 1.9.4, semgrep 1.179.0 (p/python, p/security-audit; 200 rules, 8 files), ruff 0.16.10 (E,F,W,S,B at line length 120), pip-audit 2.10.1 (requirements.txt and requirements-dev.txt), cyclonedx-bom 7.5.0, hypothesis 6.168.5 (property tests), gitleaks 8.30.1 (9 commits, full history), osv-scanner 2.5.1 (requirements-dev.txt), LibreOffice (headless CSV export check)
 Command deviations from the plan: osv-scanner 2.x uses `osv-scanner scan source --lockfile=<file>` (the plan's older syntax is not accepted); the malicious file set is generated on demand by malicious_cases.py instead of stored under tests/data/malicious/
 Tools not run (and why): atheris fuzzing, mitmproxy and network tests (no network code until CP2); Excel export check (Excel unavailable on this machine)
