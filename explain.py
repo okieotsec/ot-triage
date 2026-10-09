@@ -1,6 +1,7 @@
 """Plain-language explanations of a prioritization: what would change it, summaries, chips (no GUI)."""
 from dataclasses import dataclass
 
+import references as refs
 from prioritizer import Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Threat, prioritize
 from settings import DEFAULT_SETTINGS
 
@@ -115,7 +116,7 @@ def sorted_factors(factors):
     return sorted(factors, key=lambda f: order.get(f.direction, 3))
 
 
-def summary_text(result, data_versions="", extra=()):
+def summary_text(result, data_versions="", extra=(), references=()):
     """Return a plain-text summary of a result, with inputs and settings so it can be reproduced."""
     headline = HEADLINES[result.priority][0]
     lines = [f"Priority: {result.priority} ({headline})", f"Ordering score: {result.score:.2f}/10",
@@ -124,10 +125,12 @@ def summary_text(result, data_versions="", extra=()):
     if data_versions:
         lines.append(f"- Threat data: {data_versions}")
     lines += ["", "Rationale:", *[f"- {r}" for r in result.reasons]]
+    if references:
+        lines += ["", "References (from the CISA KEV notes):", *[f"- {refs.describe(r)}" for r in references]]
     return "\n".join(lines)
 
 
-def markdown_summary(result, data_versions="", extra=()):
+def markdown_summary(result, data_versions="", extra=(), references=()):
     """Return a Markdown summary of a result, suitable for pasting into a ticket."""
     headline = HEADLINES[result.priority][0]
     lines = [f"**Priority: {result.priority}** ({headline})", "", f"- Ordering score: {result.score:.2f} / 10",
@@ -136,4 +139,6 @@ def markdown_summary(result, data_versions="", extra=()):
     if data_versions:
         lines.append(f"- Threat data: {data_versions}")
     lines += ["", "**Rationale**", "", *[f"- {r}" for r in result.reasons]]
+    if references:
+        lines += ["", "**References (from the CISA KEV notes)**", "", *[refs.markdown_item(r) for r in references]]
     return "\n".join(lines)

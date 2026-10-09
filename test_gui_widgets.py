@@ -154,6 +154,33 @@ class WidgetTests(DisplayTestCase):
         self.assertEqual(len(helped.winfo_children()), 2)
 
 
+class LinkLabelTests(DisplayTestCase):
+    def make(self, calls):
+        link = gw.LinkLabel(self.root, self.style, "Advisory", lambda: calls.append(1))
+        link.pack()
+        self.root.deiconify()
+        self.pump(0.1)
+        return link
+
+    def test_a_click_runs_the_command_once(self):
+        calls = []
+        link = self.make(calls)
+        link.event_generate("<Button-1>")
+        self.pump(0.1)
+        self.assertEqual(calls, [1])
+
+    def test_it_looks_like_a_link_and_shows_hover_and_focus(self):
+        link = self.make([])
+        self.assertEqual(str(link.cget("cursor")), "hand2")
+        self.assertEqual(str(link.cget("fg")), self.style.theme.accent)
+        self.assertEqual(str(link.cget("takefocus")), "1")
+        plain = str(link.cget("font"))
+        link.event_generate("<Enter>")
+        self.assertIn("underline", str(link.cget("font")))
+        link.event_generate("<Leave>")
+        self.assertEqual(str(link.cget("font")), plain)
+
+
 class RoundedLookTests(DisplayTestCase):
     def test_cards_hide_their_square_corners_with_the_card_colour_inside(self):
         frame = self.make_frame()

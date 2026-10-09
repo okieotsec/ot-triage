@@ -1,12 +1,13 @@
 """The Assess view: assess one vulnerability, with CVE lookup, why-chips and a what-would-change panel."""
 import tkinter as tk
+import webbrowser
 from tkinter import ttk
 
 import cvss
 import explain
 from explain import SHORT_LABELS, AssessInputs
-from gui_widgets import (Expander, FlowFrame, MessageLabel, ScrollFrame, Segmented, ask_text, button, card, chip,
-                         field_label, priority_badge, rounded_entry, set_enabled)
+from gui_widgets import (Expander, FlowFrame, LinkLabel, MessageLabel, ScrollFrame, Segmented, ask_text, button, card,
+                         chip, field_label, priority_badge, rounded_entry, set_enabled)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -232,7 +233,13 @@ class AssessView:
         self.action_label.pack(fill=tk.X)
         self.action_label.bind("<Configure>", lambda e: self.action_label.configure(wraplength=max(e.width - 4, 100)))
 
+        self.refs_body = card(parent, s, "References from CISA")
+        self.refs_card = self.refs_body.master
+        self.refs_card.pack_forget()
+        self.references = ()
+
         what = card(parent, s, "What would change this?")
+        self.what_card = what.master
         self.whatif = tk.Frame(what, bg=t.card)
         self.whatif.pack(fill=tk.X)
 
@@ -439,6 +446,7 @@ class AssessView:
         self.score_bar.configure(value=0)
         self.score_label.configure(text="")
         self.action_label.configure(text="")
+        self._set_references(())
         self.chips.set_items([])
         self.reasoning_text.configure(text="")
         self._set_whatif([])
@@ -457,6 +465,8 @@ class AssessView:
         self.score_bar.configure(value=result.score)
         self.score_label.configure(text=f"{result.score:.2f} / 10")
         self.action_label.configure(text=result.action)
+        info = self.state.info
+        self._set_references(info.kev.references if info is not None and info.kev is not None else ())
         self.chips.set_items([chip(self.chips, s, f.label, f.direction)
                               for f in explain.sorted_factors(result.factors)])
         lines = [f"• {r}" for r in result.reasons] + ["", *result.inputs, *self.vector_lines(),
@@ -493,6 +503,50 @@ class AssessView:
                              anchor="w", justify="left")
             label.pack(side=tk.LEFT, fill=tk.X, expand=True)
             label.bind("<Configure>", lambda e, w=label: w.configure(wraplength=max(e.width - 4, 100)))
+
+    # ---- references from the KEV notes ----
+    def _set_references(self, references):
+        """Show the KEV notes as links (safe https addresses only) and plain text, or hide the card if none."""
+        self.references = tuple(references)
+        for child in self.refs_body.winfo_children():
+            child.destroy()
+        s, t = self.style, self.style.theme
+        for reference in self.references:
+            row = tk.Frame(self.refs_body, bg=t.card)
+            row.pack(fill=tk.X, pady=(0, 8))
+            if reference.is_link:
+                title, where = reference.label, reference.host
+                if not title:
+                    title, where = reference.host, self._short_path(reference.url)
+                LinkLabel(row, s, title, lambda r=reference: self.open_reference(r)).pack(anchor="w")
+                tk.Label(row, text=where, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(anchor="w")
+            else:
+                text = tk.Label(row, text=reference.text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
+                                justify="left")
+                text.pack(fill=tk.X)
+                text.bind("<Configure>", lambda e, w=text: w.configure(wraplength=max(e.width - 4, 100)))
+        if self.references:
+            self.refs_card.pack(fill=tk.X, pady=(0, 16), before=self.what_card)
+        else:
+            self.refs_card.pack_forget()
+
+    @staticmethod
+    def _short_path(url):
+        """Return what follows the host name, shortened so a long link does not take over the card."""
+        text = url.removeprefix("https://").partition("/")[2]
+        text = "/" + text if text else ""
+        return text if len(text) <= 60 else text[:57] + "..."
+
+    def open_reference(self, reference):
+        """Open a reference's link in the default browser; this only ever happens when the person clicks it."""
+        try:
+            opened = webbrowser.open(reference.url)
+        except (webbrowser.Error, OSError):
+            opened = False
+        if not opened:
+            self.ctx.copy(reference.url)
+            self.ctx.warn("Could not open the browser", "The address was copied instead, so you can paste it into "
+                                                        f"a browser yourself:\n\n{reference.url}")
 
     # ---- CVSS vector ----
     def vector_lines(self):
@@ -564,13 +618,13 @@ class AssessView:
     def copy_summary(self):
         """Copy the plain-text summary."""
         if self.result:
-            self.ctx.copy(explain.summary_text(self.result, self.versions, self.vector_lines()))
+            self.ctx.copy(explain.summary_text(self.result, self.versions, self.vector_lines(), self.references))
             self._flash("Summary copied")
 
     def copy_markdown(self):
         """Copy the Markdown summary."""
         if self.result:
-            self.ctx.copy(explain.markdown_summary(self.result, self.versions, self.vector_lines()))
+            self.ctx.copy(explain.markdown_summary(self.result, self.versions, self.vector_lines(), self.references))
             self._flash("Markdown copied")
 
     def _flash(self, text):

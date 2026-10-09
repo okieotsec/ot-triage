@@ -17,7 +17,7 @@ property-based tests.
 
 | View | What it does |
 | --- | --- |
-| **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV and EPSS data to fill in the threat level. Shows the bucket, why-chips, the recommended action, and what single change would move the result. |
+| **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV and EPSS data to fill in the threat level. Shows the bucket, why-chips, the recommended action, the reference links CISA lists for a KEV entry, and what single change would move the result. |
 | **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. |
 | **Threat data** | See how fresh the KEV and EPSS data is. Update it (after a confirmation) or import files for offline use. |
 | **Settings** | Change the four scoring settings with live validation, and choose the theme and text size. |

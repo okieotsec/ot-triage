@@ -9,6 +9,7 @@ from unittest import mock
 import explain
 import gui_assess
 import gui_theme
+import gui_widgets
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
@@ -19,6 +20,8 @@ from test_threatdata import epss_bytes, epss_text, kev_bytes, kev_entry
 from uiprefs import DEFAULT_PREFS
 
 KEV_CVE, EPSS_CVE, QUIET_CVE = "CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"
+KEV_NOTES = ("https://vendor.example.com/advisory/1 ; BOD 26-04: https://www.cisa.gov/bod-26-04 ; "
+             "http://insecure.example.com/patch ; See the vendor page")
 
 
 class AssessTestCase(DisplayTestCase):
@@ -43,7 +46,7 @@ class AssessTestCase(DisplayTestCase):
         return self.view
 
     def load_data(self):
-        entries = [kev_entry(KEV_CVE, knownRansomwareCampaignUse="Known")]
+        entries = [kev_entry(KEV_CVE, knownRansomwareCampaignUse="Known", notes=KEV_NOTES)]
         rows = [f"{KEV_CVE},0.50000,0.97000", f"{EPSS_CVE},0.40000,0.99000", f"{QUIET_CVE},0.00100,0.20000"]
         results = td.import_from_files(self._write("kev.json", kev_bytes(entries)),
                                        self._write("epss.csv.gz", epss_bytes(epss_text(rows))), self.data_dir)
@@ -61,6 +64,11 @@ class AssessTestCase(DisplayTestCase):
                            (state.exposure, exposure.name), (state.controls, controls.name),
                            (state.patch, patch.name)):
             var.set(value)
+        self.pump()
+
+    def lookup(self, cve):
+        self.ctx.assess_state.cve.set(cve)
+        self.view.lookup()
         self.pump()
 
     def chip_texts(self, flow):
@@ -152,11 +160,6 @@ class AssessResultTests(AssessTestCase):
 
 
 class AssessCveTests(AssessTestCase):
-    def lookup(self, cve):
-        self.ctx.assess_state.cve.set(cve)
-        self.view.lookup()
-        self.pump()
-
     def test_invalid_cve_shows_a_message_and_changes_nothing(self):
         view = self.build()
         self.fill("8.0", Threat.NONE)
@@ -564,6 +567,105 @@ class AssessTextScaleTests(AssessTestCase):
         expected = round(16 * gui_theme.FONT_BOOST * 1.3)
         self.assertEqual(tkfont.Font(root=self.root, font=view.verdict.cget("font")).actual("size"), expected)
         self.assertGreater(view.scroll.body.winfo_reqheight(), 0)
+
+
+class AssessReferenceTests(AssessTestCase):
+    def labels(self, view):
+        return [w for w in self.walk(view.refs_body) if isinstance(w, gui_widgets.LinkLabel)]
+
+    def walk(self, widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from self.walk(child)
+
+    def texts(self, view):
+        return [w.cget("text") for w in self.walk(view.refs_body) if isinstance(w, tk.Label)]
+
+    def test_a_kev_lookup_shows_the_notes_as_links_with_their_real_hosts(self):
+        self.load_data()
+        view = self.build()
+        self.assertFalse(view.refs_card.winfo_manager())
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertEqual(view.refs_card.winfo_manager(), "pack")
+        links = self.labels(view)
+        self.assertEqual([w.cget("text") for w in links], ["vendor.example.com", "BOD 26-04"])
+        shown = self.texts(view)
+        for expected in ("/advisory/1", "www.cisa.gov", "http://insecure.example.com/patch", "See the vendor page"):
+            self.assertIn(expected, shown)
+
+    def test_a_cve_that_is_not_in_kev_or_a_cleared_cve_hides_the_card(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertTrue(view.references)
+        self.lookup(EPSS_CVE)
+        self.assertEqual((view.references, view.refs_card.winfo_manager()), ((), ""))
+        self.lookup(KEV_CVE)
+        self.ctx.assess_state.cve.set("")
+        self.pump()
+        self.assertEqual((view.references, view.refs_card.winfo_manager()), ((), ""))
+
+    def test_clicking_a_link_opens_exactly_that_address_and_nothing_opens_on_its_own(self):
+        self.load_data()
+        view = self.build()
+        with mock.patch("gui_assess.webbrowser.open", return_value=True) as opener:
+            self.fill("8.0", Threat.NONE)
+            self.lookup(KEV_CVE)
+            opener.assert_not_called()
+            self.labels(view)[1].event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://www.cisa.gov/bod-26-04")
+
+    def test_a_link_can_be_opened_from_the_keyboard(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        link = self.labels(view)[0]
+        self.assertEqual(str(link.cget("takefocus")), "1")
+        link.focus_force()
+        self.pump(0.2)
+        if link.focus_get() is not link:
+            self.skipTest("the window manager did not give the test window keyboard focus")
+        with mock.patch("gui_assess.webbrowser.open", return_value=True) as opener:
+            link.event_generate("<Return>")
+            self.pump()
+        opener.assert_called_once_with("https://vendor.example.com/advisory/1")
+
+    def test_a_browser_that_cannot_open_copies_the_address_and_explains(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        for failure in ({"return_value": False}, {"side_effect": OSError("no browser")}):
+            self.ctx.copy.reset_mock()
+            self.ctx.warn.reset_mock()
+            with mock.patch("gui_assess.webbrowser.open", **failure):
+                view.open_reference(view.references[0])
+            self.ctx.copy.assert_called_once_with("https://vendor.example.com/advisory/1")
+            self.assertIn("https://vendor.example.com/advisory/1", self.ctx.warn.call_args[0][1])
+
+    def test_both_summaries_include_the_references(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        view.copy_summary()
+        plain = self.ctx.copy.call_args[0][0]
+        self.assertIn("References (from the CISA KEV notes):", plain)
+        self.assertIn("BOD 26-04: https://www.cisa.gov/bod-26-04", plain)
+        view.copy_markdown()
+        markdown = self.ctx.copy.call_args[0][0]
+        self.assertIn("[BOD 26-04](https://www.cisa.gov/bod-26-04)", markdown)
+        self.assertIn("[vendor.example.com](https://vendor.example.com/advisory/1)", markdown)
+
+    def test_a_manual_item_has_no_reference_section_in_its_summary(self):
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        view.copy_summary()
+        self.assertNotIn("References", self.ctx.copy.call_args[0][0])
 
 
 if __name__ == "__main__":
