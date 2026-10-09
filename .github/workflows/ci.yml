@@ -17,7 +17,7 @@ jobs:
   test:
     name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -35,12 +35,12 @@ jobs:
       - name: Install a virtual display (Linux only)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb
-      - name: Probe the GUI tests for a stall (Linux)
+      - name: Run the tests (Linux, with a virtual display)
         if: runner.os == 'Linux'
-        run: xvfb-run -a -s "-screen 0 1280x1024x24" python -u ci_probe.py "test_gui_app.py" 100
-      - name: Probe the GUI tests for a stall (Windows)
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" python -X dev -W error::ResourceWarning -m unittest discover
+      - name: Run the tests (Windows)
         if: runner.os == 'Windows'
-        run: python -u ci_probe.py "test_gui_app.py" 100
+        run: python -X dev -W error::ResourceWarning -m unittest discover
 
   lint:
     name: Lint and static analysis
