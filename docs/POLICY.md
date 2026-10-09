@@ -53,9 +53,11 @@ NEVER does not mean "safe". It means "not worth a scheduled fix under today's co
 
 **What it replaced.** Before, CVSS 5.0 / no known exploitation / crown jewel / high exposure was NEVER.
 
-### 4. Partial controls change the ranking, not the bucket
+### 4. Controls lower the ranking; only strong controls can move the bucket
 
-**Rule.** Partial controls (for example ACLs or monitoring only) lower the item's ordering score by 0.5 points so it ranks lower inside its bucket. They never move an item from one bucket to another.
+**Rule.** Partial controls (for example ACLs or monitoring only) lower the item's ordering score by 0.5 points so it ranks lower inside its bucket. They never move an item from one bucket to another. Strong controls lower the ordering score by 1.0 point, and (as described in the earlier rules) can also lower the bucket by one level.
+
+**Why strong controls also lower the score.** Originally only partial controls changed the score, so an item with strong controls ranked *above* the same item with partial controls whenever strong controls could not move the bucket (for example an actively exploited item already at NEXT, which can never go lower). That was backwards: better protection must never rank an item higher. Strong controls actually stop attacks, so they earn twice the credit of partial ones. The score still only orders items inside a bucket and never decides the bucket, so this changes the order of a list, not any decision.
 
 **Why.** Monitoring tells you an attack is happening. It does not stop it. ACLs that are only partly effective do not reliably stop it either. Moving an item to a less urgent bucket because of controls that may not hold would create false comfort. Strong controls (segmentation, virtual patching, allow-listing) do stop attacks, so they still lower the bucket by one level.
 
@@ -86,6 +88,7 @@ Generated from the current rules.
 
 - **Monotonic:** making any single input worse (higher CVSS, stronger threat, more critical asset, more exposure, weaker controls, worse patch status) never lowers the priority.
 - **Partial controls never change a bucket** for any combination of the other inputs.
+- **Better controls never rank higher:** for every combination of the other inputs, the ordering score with no controls is at least the score with partial controls, which is at least the score with strong controls.
 - **Boundaries** sit exactly where documented: 4.0, 7.0 and 9.0 use "greater than or equal to".
 
 ## When to revisit

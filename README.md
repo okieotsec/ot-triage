@@ -61,7 +61,7 @@ For the reasoning behind each rule, see [docs/POLICY.md](docs/POLICY.md).
 3. **Patch available**: strong controls lower the bucket one level, but never below NEXT for actively exploited items.
 4. **No patch (pending or end of life)**: with CVSS of 4.0 or more, the bucket is raised one level unless strong controls are in place. Strong controls withhold the raise but earn no additional downgrade. End-of-life items with CVSS of 7.0 or more are floored at NEXT, since they need a replacement plan.
 5. **Exposed crown jewel floor**: a crown jewel with high exposure and CVSS of 4.0 or more is never below NEXT.
-6. **Partial controls** never change the bucket. They lower the ordering score by 0.5.
+6. **Controls and ranking**: partial controls never change the bucket and lower the ordering score by 0.5; strong controls lower it by 1.0 (and can also lower the bucket, see rule 3).
 
 The **ordering score** (0 to 10) only ranks items within a bucket; it never decides the bucket.
 

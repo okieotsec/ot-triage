@@ -26,7 +26,7 @@ Only four values can be changed. Everything else (the rule structure, the 4.0 lo
 | --- | --- |
 | The 4.0 low-severity line | It is the CVSS standard's boundary for "Medium", and several rules depend on it. |
 | Ordering-score weights | They only rank items inside a bucket, so changing them cannot change a decision, only the order. |
-| Partial-controls credit (0.5) | Same reason: it only affects ranking. See [POLICY.md](POLICY.md). |
+| Controls credit (0.5 partial, 1.0 strong) | Same reason: it only affects ranking. See [POLICY.md](POLICY.md). |
 | The rule structure | Settings change numbers, not logic. Active exploitation, exposure and strong controls always work the same way. |
 
 ## Where settings are stored
