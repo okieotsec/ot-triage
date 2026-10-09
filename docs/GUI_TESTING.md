@@ -21,7 +21,7 @@ The tests never touch the network (any attempt fails the test) and never write t
 
 ## Manual checklist
 
-Run this before a release, with `python3 vuln_prioritizer_gui.py`.
+Run this before a release, with `python3 ot_triage_gui.py`.
 
 **Keyboard only (no mouse)**
 - [ ] Tab reaches every field, button and choice in a sensible order; the focused control has a visible outline.

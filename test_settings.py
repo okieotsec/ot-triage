@@ -196,9 +196,9 @@ class SettingsFileTests(unittest.TestCase):
         if sys.platform in ("win32", "darwin"):
             self.skipTest("XDG applies to Linux")
         with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.dir)}):
-            self.assertEqual(settings.default_path(), self.dir / "vuln-prioritizer" / "settings.json")
+            self.assertEqual(settings.default_path(), self.dir / "ot-triage" / "settings.json")
         with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": "relative/path"}):
-            self.assertEqual(settings.default_path(), Path.home() / ".config" / "vuln-prioritizer" / "settings.json")
+            self.assertEqual(settings.default_path(), Path.home() / ".config" / "ot-triage" / "settings.json")
 
 
 class CustomSettingsBehaviorTests(unittest.TestCase):

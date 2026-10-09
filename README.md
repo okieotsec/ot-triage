@@ -1,16 +1,36 @@
-# Vulnerability Prioritizer
+# OT Triage
 
-[![CI](https://github.com/okieotsec/vuln-prioritizer/actions/workflows/ci.yml/badge.svg)](https://github.com/okieotsec/vuln-prioritizer/actions/workflows/ci.yml)
+[![CI](https://github.com/okieotsec/ot-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/okieotsec/ot-triage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Rule-based Now / Next / Never triage for vulnerabilities, with a Tkinter GUI and CSV batch mode.
-Pure standard library: no third-party dependencies. It works fully offline; the only network access is a threat-data update that you start yourself.
+**Now / Next / Never triage for OT/ICS vulnerabilities**, by [OkieOTSec](https://okieotsec.com).
+
+Give it a CVSS score or vector, a CVE, how critical and how exposed the asset is, and what protections exist. It
+answers **NOW**, **NEXT** or **NEVER**, shows *why* in plain language, and shows what single change would move the
+answer. It pulls in CISA's Known Exploited Vulnerabilities (KEV) catalog and EPSS scores, including CISA's own
+advisory links, and ranks whole spreadsheets of findings in one go.
+
+![The Assess view: a crown-jewel asset with an actively exploited CVE is NOW, with the reasons, CISA's required action and its reference links](docs/images/assess-dark.png)
+
+Pure standard library: no third-party dependencies. It works fully offline; the only network access is a
+threat-data update that you start yourself.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/batch-dark.png" alt="The Batch view ranking six findings, with the selected row's reasons and CISA references"></td>
+    <td width="50%"><img src="docs/images/assess-light.png" alt="The Assess view in the light theme"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Batch: rank a whole CSV, filter by bucket, see the references behind a row</em></td>
+    <td align="center"><em>A light theme, a text-size setting, and keyboard shortcuts throughout</em></td>
+  </tr>
+</table>
 
 ## Run
 
 ```
-python3 vuln_prioritizer_gui.py     # GUI
-python3 -m unittest                 # tests
+python3 ot_triage_gui.py            # the app (Python 3.12 or newer, with Tkinter)
+python3 -m unittest                 # the tests
 ```
 
 The tests that need a display skip themselves when none is available. `pip install hypothesis` adds the optional

@@ -2,7 +2,9 @@
 import tkinter as tk
 
 from gui_assess import EXPOSURE_HELP
-from gui_widgets import ScrollFrame, card
+from gui_brand import BRAND_NAME, LINKS, TAGLINE, wordmark
+from gui_widgets import LinkLabel, ScrollFrame, card, wrap_to_width
+from references import Reference
 from version import __version__
 
 ATTRIBUTION = ("The Now / Next / Never categories come from Dragos' annual ICS/OT Cybersecurity Year in Review "
@@ -29,11 +31,17 @@ class AboutView:
         scroll = ScrollFrame(self.frame, t.bg)
         scroll.pack(fill=tk.BOTH, expand=True)
         scroll.body.configure(padx=28, pady=24)
-        self._paragraphs(card(scroll.body, self.style, "About"), [
-            (f"Vulnerability Prioritizer {__version__}", True),
+        about = card(scroll.body, self.style, "About")
+        byline = tk.Frame(about, bg=t.card)
+        byline.pack(fill=tk.X, pady=(0, 8))
+        tk.Label(byline, text=f"OT Triage {__version__}  by", font=self.style.font(11, "bold"), bg=t.card, fg=t.text,
+                 padx=0).pack(side=tk.LEFT)
+        wordmark(byline, self.style, t.card, size=11).pack(side=tk.LEFT, padx=(5, 0))
+        self._paragraphs(about, [
             (("Rule-based Now / Next / Never triage. It works fully offline; the only network access is a "
               "threat-data update that you start yourself."), False),
             ("Low exposure: " + EXPOSURE_HELP, False)])
+        self._build_links(scroll.body)
         self._paragraphs(card(scroll.body, self.style, "Where the categories come from"), [(ATTRIBUTION, False)])
         docs = card(scroll.body, self.style, "Documentation")
         docs.columnconfigure(1, weight=1)
@@ -45,7 +53,22 @@ class AboutView:
             text = tk.Label(docs, text=description, font=self.style.font(10), bg=t.card, fg=t.muted, anchor="w",
                             justify="left")
             text.grid(row=row, column=1, sticky="ew", pady=2)
-            text.bind("<Configure>", lambda e, w=text: w.configure(wraplength=max(e.width - 4, 100)))
+            wrap_to_width(text)
+
+    def _build_links(self, parent):
+        """A card with the project's public links; each opens in the browser only when it is clicked."""
+        t = self.style.theme
+        box = card(parent, self.style, f"Made by {BRAND_NAME}")
+        self._paragraphs(box, [(TAGLINE, False)])
+        self.link_labels = []
+        for name, url in LINKS:
+            row = tk.Frame(box, bg=t.card)
+            row.pack(fill=tk.X, pady=2)
+            link = LinkLabel(row, self.style, name, lambda u=url, n=name: self.ctx.open_reference(Reference(n, u)))
+            link.pack(side=tk.LEFT)
+            tk.Label(row, text="  " + url.removeprefix("https://"), font=self.style.font(9), bg=t.card,
+                     fg=t.muted).pack(side=tk.LEFT)
+            self.link_labels.append(link)
 
     def _paragraphs(self, box, paragraphs):
         t = self.style.theme
@@ -53,4 +76,4 @@ class AboutView:
             label = tk.Label(box, text=text, font=self.style.font(11 if bold else 10, "bold" if bold else "normal"),
                              bg=t.card, fg=t.text if bold else t.muted, anchor="w", justify="left")
             label.pack(fill=tk.X, pady=(0, 8))
-            label.bind("<Configure>", lambda e, w=label: w.configure(wraplength=max(e.width - 4, 100)))
+            wrap_to_width(label)

@@ -34,6 +34,8 @@ class AssessTestCase(DisplayTestCase):
         self.ctx.warn = mock.Mock()
         self.ctx.copy = mock.Mock()
         self.holder = tk.Toplevel(self.root)
+        if self.holder.tk.call("tk", "windowingsystem") == "x11":
+            self.holder.wm_attributes("-type", "dialog")  # a floating window keeps its size on tiling window managers
         self.holder.geometry("1100x900+0+0")
         self.addCleanup(self.holder.destroy)
         self.view = None
@@ -517,6 +519,20 @@ class AssessLayoutTests(AssessTestCase):
         # Stacked stays stacked until the width is clearly above the line
         self.assertEqual(sizes(889, 906, 930, 939), [False, False, False, False])
         self.assertEqual(sizes(940, 906, 889), [True, True, True])
+
+    def test_long_messages_in_the_left_column_never_widen_the_window_or_push_the_results_column_away(self):
+        view = self.build()
+        view._layout(wide=True)
+        self.root.deiconify()
+        self.pump(0.3)
+        window, left, right = self.holder.winfo_width(), view.left.winfo_width(), view.right.winfo_width()
+        long_text = "This is a long explanation that keeps going and going so that it cannot fit on one line. " * 6
+        for message in (view.cve_message, view.vector_message, view.threat_note, view.cvss_hint):
+            message.configure(text=long_text)
+        self.pump(0.5)
+        self.assertLessEqual(self.holder.winfo_width(), window + 2, "the window grew to fit the text")
+        self.assertLessEqual(view.left.winfo_width(), left + 40, "the inputs column grew to fit the text")
+        self.assertGreaterEqual(view.right.winfo_width(), right - 40)
 
     def test_a_rebuild_keeps_the_inputs_and_the_result(self):
         view = self.build()

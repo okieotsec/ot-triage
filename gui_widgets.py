@@ -27,8 +27,22 @@ def card(parent, style, title, expand=False, pady=(0, 16)):
     return inner
 
 
+LABEL_MAX_CHARS = 60  # a longer text in front of a link is shown as an explanation, not as the link
+WRAP_START = 320  # a sane width to wrap at until the label has been laid out and knows its real width
+
+
+def wrap_to_width(label, start=WRAP_START):
+    """Make a label wrap its text to its own width, starting from a bounded width.
+
+    Without a starting width, long text that is set before the first layout makes the label request its whole
+    unwrapped length, which can squeeze neighbouring columns to almost nothing.
+    """
+    label.configure(wraplength=start)
+    label.bind("<Configure>", lambda e: label.configure(wraplength=max(e.width - 4, 100)), add="+")
+
+
 class MessageLabel(tk.Label):
-    """A one-line message that takes almost no space while it is empty."""
+    """A message that takes almost no space while it is empty, and wraps to its width when it has text."""
 
     def __init__(self, parent, style, **options):
         self._normal, self._tiny = style.font(9), (style.family, 1)
@@ -36,6 +50,7 @@ class MessageLabel(tk.Label):
         options.setdefault("fg", style.theme.muted)
         super().__init__(parent, text="", font=self._tiny, anchor="w", justify="left", pady=0, bd=0,
                          highlightthickness=0, **options)
+        wrap_to_width(self)
 
     def configure(self, cnf=None, **options):
         """Configure the label; setting text also switches between the normal and the collapsed size."""
@@ -465,6 +480,14 @@ class ReferenceList(tk.Frame):
             row.pack(fill=tk.X, pady=(0, 3 if self.compact else 8))
             if reference.is_link:
                 title, where = reference.label, reference.host
+                if len(title) > LABEL_MAX_CHARS:
+                    # A whole sentence in front of the link is an explanation, not a link title.
+                    if not self.compact:
+                        intro = tk.Label(row, text=title, font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
+                                         justify="left")
+                        intro.pack(fill=tk.X, pady=(0, 2))
+                        wrap_to_width(intro)
+                    title = ""
                 if not title:
                     title, where = reference.host, _short_path(reference.url)
                 side = tk.LEFT if self.compact else None
@@ -475,7 +498,7 @@ class ReferenceList(tk.Frame):
                 text = tk.Label(row, text=reference.text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
                                 justify="left")
                 text.pack(fill=tk.X)
-                text.bind("<Configure>", lambda e, w=text: w.configure(wraplength=max(e.width - 4, 100)))
+                wrap_to_width(text)
         left_out = len(references) - len(shown)
         if left_out:
             tk.Label(self, text=f"and {left_out} more (see Assess or the CSV export)", font=s.font(9), bg=t.card,

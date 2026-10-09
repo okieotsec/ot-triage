@@ -332,7 +332,7 @@ def fetch(url, max_bytes, allowed_hosts, context=None, timeout=FETCH_TIMEOUT_SEC
     opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context or ssl.create_default_context()),
                                          _SafeRedirect(frozenset(allowed_hosts)))
     request = urllib.request.Request(  # noqa: S310  # nosec B310
-        url, headers={"User-Agent": "vuln-prioritizer", "Accept-Encoding": "identity"})
+        url, headers={"User-Agent": "ot-triage", "Accept-Encoding": "identity"})
     started = time.monotonic()
     try:
         with opener.open(request, timeout=timeout) as response:  # nosec B310
@@ -396,7 +396,7 @@ def default_data_dir():
     else:
         xdg = os.environ.get("XDG_DATA_HOME", "")
         base = Path(xdg) if xdg and os.path.isabs(xdg) else Path.home() / ".local" / "share"
-    return base / "vuln-prioritizer" / "data"
+    return base / "ot-triage" / "data"
 
 
 def _write_atomic(path, data):

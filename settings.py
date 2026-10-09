@@ -126,7 +126,7 @@ def default_path():
     else:
         xdg = os.environ.get("XDG_CONFIG_HOME", "")
         base = Path(xdg) if xdg and os.path.isabs(xdg) else Path.home() / ".config"
-    return base / "vuln-prioritizer" / "settings.json"
+    return base / "ot-triage" / "settings.json"
 
 
 def load(path=None):
