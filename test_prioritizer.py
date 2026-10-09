@@ -100,9 +100,30 @@ class PrioritizeTests(unittest.TestCase):
         strong = prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH, Controls.STRONG)
         self.assertEqual(part.priority, none.priority)
         self.assertAlmostEqual(none.score - part.score, 0.5, places=6)
-        self.assertEqual(strong.score, none.score)
+        self.assertAlmostEqual(none.score - strong.score, 1.0, places=6)
+        self.assertLess(strong.score, part.score)
         lowest = prioritize(0.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, Controls.PARTIAL)
         self.assertGreaterEqual(lowest.score, 0.0)
+
+    def test_better_controls_never_rank_higher_for_any_combination_of_the_other_inputs(self):
+        for cvss in (0.0, 0.5, 3.9, 4.0, 7.0, 8.8, 9.0, 10.0):
+            for threat, asset, exposure, patch in itertools.product(Threat, Asset, Exposure, Patch):
+                scores = [prioritize(cvss, threat, asset, exposure, c, patch).score
+                          for c in (Controls.NONE, Controls.PARTIAL, Controls.STRONG)]
+                with self.subTest(cvss=cvss, threat=threat.name, asset=asset.name, exposure=exposure.name,
+                                  patch=patch.name):
+                    self.assertGreaterEqual(scores[0], scores[1])
+                    self.assertGreaterEqual(scores[1], scores[2])
+                    if scores[2] > 0.0:
+                        self.assertGreater(scores[0], scores[1])
+                        self.assertGreater(scores[1], scores[2])
+
+    def test_strong_controls_that_cannot_lower_the_bucket_still_lower_the_ranking(self):
+        # Actively exploited items are never lowered below NEXT, so the bucket stays put; the score must still drop.
+        results = [prioritize(8.8, Threat.ACTIVE, Asset.STANDARD, Exposure.LOW, c)
+                   for c in (Controls.NONE, Controls.PARTIAL, Controls.STRONG)]
+        self.assertEqual({r.priority for r in results}, {NEXT})
+        self.assertEqual([r.score for r in results], [6.49, 5.99, 5.49])
 
     def test_unpatched_partial_controls_still_raise_priority(self):
         # PUBLIC 7.5 high exposure is already NOW; partial controls do not change that.

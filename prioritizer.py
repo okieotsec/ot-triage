@@ -41,8 +41,9 @@ class Controls(Enum):
     STRONG = "Strong (e.g. segmentation, virtual patching, allow-listing)"
 
 
-# Points subtracted from the ordering score when partial controls are in place
+# Points subtracted from the ordering score when controls are in place (strong controls count for twice as much)
 PARTIAL_SCORE_CREDIT = 0.5
+STRONG_SCORE_CREDIT = 1.0
 
 NOW, NEXT, NEVER = "NOW", "NEXT", "NEVER"
 _ORDER = [NOW, NEXT, NEVER]
@@ -212,6 +213,9 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
     if controls is Controls.PARTIAL:
         score -= PARTIAL_SCORE_CREDIT
         reasons.append("Partial controls: ranked lower within the bucket; the bucket itself is unchanged")
+    elif controls is Controls.STRONG:
+        score -= STRONG_SCORE_CREDIT
+        reasons.append("Strong controls: ranked lower within the bucket, on top of any bucket change above")
     score = max(0.0, min(10.0, score))
     factors = _factors(cvss, threat, asset, exposure, controls, patch, high, notes)
     inputs = [
