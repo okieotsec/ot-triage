@@ -35,9 +35,9 @@ A JSON file in your user config folder:
 
 | System | Location |
 | --- | --- |
-| Linux | `$XDG_CONFIG_HOME/vuln-prioritizer/settings.json` (usually `~/.config/vuln-prioritizer/settings.json`) |
-| macOS | `~/Library/Application Support/vuln-prioritizer/settings.json` |
-| Windows | `%APPDATA%\vuln-prioritizer\settings.json` |
+| Linux | `$XDG_CONFIG_HOME/ot-triage/settings.json` (usually `~/.config/ot-triage/settings.json`) |
+| macOS | `~/Library/Application Support/ot-triage/settings.json` |
+| Windows | `%APPDATA%\ot-triage\settings.json` |
 
 The file is created with user-only permissions, and writes are atomic: a new file is written and checked, then swapped in, so a failed save keeps the previous file.
 

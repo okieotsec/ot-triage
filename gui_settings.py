@@ -3,7 +3,7 @@ import tkinter as tk
 
 import settings as scoring
 import uiprefs
-from gui_widgets import ScrollFrame, Segmented, button, card, rounded_entry, set_enabled
+from gui_widgets import ScrollFrame, Segmented, button, card, rounded_entry, set_enabled, wrap_to_width
 from settings import SPEC, Settings
 
 TITLES = {"cvss_high": "CVSS High line", "cvss_critical": "CVSS Critical line",
@@ -88,7 +88,7 @@ class SettingsView:
                                     "values show a Custom scoring badge and are recorded in summaries and exports."),
                          font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
         intro.pack(fill=tk.X)
-        intro.bind("<Configure>", lambda e: intro.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(intro)
         for name in SPEC:
             _kind, default, low, high, _description = SPEC[name]
             row = tk.Frame(box, bg=t.card)
@@ -100,7 +100,7 @@ class SettingsView:
             hint = tk.Label(text, text=f"{DESCRIPTIONS[name]} Default {_show(default)}, allowed {low} to {high}.",
                             font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
             hint.pack(fill=tk.X)
-            hint.bind("<Configure>", lambda e, w=hint: w.configure(wraplength=max(e.width - 4, 100)))
+            wrap_to_width(hint)
             entry = rounded_entry(row, s, self.state.vars[name], width=9, justify="center", outside=t.card)
             entry.grid(row=0, column=1, ipady=5)
             message = tk.Label(row, text="", font=s.font(9), bg=t.card, fg=t.error, anchor="w", justify="left")
@@ -143,7 +143,7 @@ class SettingsView:
                                    "changing the theme can never make a result look custom."), font=s.font(9),
                         bg=t.card, fg=t.muted, anchor="w", justify="left")
         note.pack(fill=tk.X, pady=(8, 0))
-        note.bind("<Configure>", lambda e: note.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(note)
 
     # ---- scoring ----
     def typed(self):

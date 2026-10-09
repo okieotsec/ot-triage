@@ -1,4 +1,4 @@
-# Security Test Plan: Vulnerability Prioritizer
+# Security Test Plan: OT Triage
 
 **Owner:** okieotsec (project lead, final approver)
 **Reviewers:** Claude Code (developer and reviewer), OpenAI Codex (independent reviewer), Google Gemini (independent reviewer)

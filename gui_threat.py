@@ -4,7 +4,7 @@ from tkinter import ttk
 
 import threatdata
 from gui_round import round_corners
-from gui_widgets import ScrollFrame, button, card, chip, set_enabled
+from gui_widgets import ScrollFrame, button, card, chip, set_enabled, wrap_to_width
 
 HOSTS = ("www.cisa.gov", "epss.empiricalsecurity.com")
 CONFIRM_TEXT = ("This will download two public files over HTTPS from:\n\n" + "\n".join(f"  • {h}" for h in HOSTS)
@@ -122,7 +122,7 @@ class ThreatView:
             version.pack(side=tk.LEFT, padx=10)
             detail = tk.Label(outer, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
             detail.pack(fill=tk.X, padx=16, pady=(8, 2))
-            detail.bind("<Configure>", lambda e, w=detail: w.configure(wraplength=max(e.width - 4, 100)))
+            wrap_to_width(detail)
             tk.Label(outer, text=f"Source: {host}", font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
                 fill=tk.X, padx=16, pady=(0, 14))
             round_corners(outer, 12, t.border, t.bg, fill=t.card)
@@ -157,7 +157,7 @@ class ThreatView:
                                        "per-user data folder."), font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
                         justify="left")
         text.pack(fill=tk.X)
-        text.bind("<Configure>", lambda e: text.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(text)
 
     # ---- behaviour ----
     def update(self):
@@ -230,4 +230,4 @@ class ThreatView:
             message = tk.Label(line, text=" " + result.message, font=s.font(10), bg=t.card, fg=t.text, anchor="w",
                                justify="left")
             message.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            message.bind("<Configure>", lambda e, w=message: w.configure(wraplength=max(e.width - 4, 100)))
+            wrap_to_width(message)

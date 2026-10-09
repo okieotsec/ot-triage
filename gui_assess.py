@@ -21,6 +21,7 @@ from gui_widgets import (
     priority_badge,
     rounded_entry,
     set_enabled,
+    wrap_to_width,
 )
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
@@ -166,8 +167,7 @@ class AssessView:
         self.vector_entry.bind("<FocusOut>", lambda _e: self.apply_vector(), add="+")
         self.vector_message = MessageLabel(vuln, s)
         self.vector_message.pack(fill=tk.X)
-        self.vector_message.bind("<Configure>",
-                                 lambda e: self.vector_message.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(self.vector_message)
 
         field_label(vuln, s, "CVSS base score")
         row = tk.Frame(vuln, bg=t.card)
@@ -179,12 +179,14 @@ class AssessView:
         self.cvss_band.pack(side=tk.LEFT, padx=12)
         self.cvss_hint = tk.Label(vuln, text=SCORE_HINT, font=s.font(9), bg=t.card,
                                   fg=t.muted, anchor="w")
+        wrap_to_width(self.cvss_hint)
         self.cvss_hint.pack(fill=tk.X, pady=(4, 0))
 
         field_label(vuln, s, "Threat", THREAT_HELP)
         self.threat_control = Segmented(vuln, s, _options(Threat), state.threat, self._threat_clicked)
         self.threat_control.pack(fill=tk.X)
         self.threat_note = tk.Label(vuln, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
+        wrap_to_width(self.threat_note)
         self.threat_note.pack(fill=tk.X, pady=(6, 0))
         self.clear_override = button(vuln, s, "Clear override", self._clear_override, "secondary")
         self.analyst_check = self._check(vuln, "Analyst-confirmed exploitation", state.analyst)
@@ -223,10 +225,10 @@ class AssessView:
         self.verdict = tk.Label(info, text="", font=s.font(16, "bold"), bg=t.card, fg=t.text, anchor="w",
                                 justify="left")
         self.verdict.pack(fill=tk.X)
-        self.verdict.bind("<Configure>", lambda e: self.verdict.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(self.verdict)
         self.subtitle = tk.Label(info, text="", font=s.font(10), bg=t.card, fg=t.muted, anchor="w", justify="left")
         self.subtitle.pack(fill=tk.X, pady=(4, 0))
-        self.subtitle.bind("<Configure>", lambda e: self.subtitle.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(self.subtitle)
         score_row = tk.Frame(result, bg=t.card)
         score_row.pack(fill=tk.X, pady=(14, 4))
         tk.Label(score_row, text="Ordering score", font=s.font(9), bg=t.card, fg=t.muted).pack(side=tk.LEFT)
@@ -243,13 +245,12 @@ class AssessView:
         self.reasoning_text = tk.Label(self.reasoning.body, text="", font=s.font(10), bg=t.card, fg=t.text,
                                        anchor="w", justify="left")
         self.reasoning_text.pack(fill=tk.X)
-        self.reasoning_text.bind("<Configure>",
-                                 lambda e: self.reasoning_text.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(self.reasoning_text)
 
         action = card(parent, s, "Recommended action")
         self.action_label = tk.Label(action, text="", font=s.font(11), bg=t.card, fg=t.text, anchor="w", justify="left")
         self.action_label.pack(fill=tk.X)
-        self.action_label.bind("<Configure>", lambda e: self.action_label.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(self.action_label)
 
         self.refs_body = card(parent, s, "References from CISA")
         self.refs_card = self.refs_body.master
@@ -522,7 +523,7 @@ class AssessView:
             label = tk.Label(row, text=" " + text, font=s.font(10), bg=t.card, fg=t.text if priority else t.muted,
                              anchor="w", justify="left")
             label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            label.bind("<Configure>", lambda e, w=label: w.configure(wraplength=max(e.width - 4, 100)))
+            wrap_to_width(label)
 
     # ---- references from the KEV notes ----
     def _set_references(self, references):

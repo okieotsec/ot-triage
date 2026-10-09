@@ -374,9 +374,9 @@ class StorageTests(unittest.TestCase):
         if sys.platform in ("win32", "darwin"):
             self.skipTest("XDG applies to Linux")
         with mock.patch.dict(os.environ, {"XDG_DATA_HOME": str(self.dir)}):
-            self.assertEqual(td.default_data_dir(), self.dir / "vuln-prioritizer" / "data")
+            self.assertEqual(td.default_data_dir(), self.dir / "ot-triage" / "data")
         with mock.patch.dict(os.environ, {"XDG_DATA_HOME": "relative"}):
-            self.assertEqual(td.default_data_dir(), Path.home() / ".local" / "share" / "vuln-prioritizer" / "data")
+            self.assertEqual(td.default_data_dir(), Path.home() / ".local" / "share" / "ot-triage" / "data")
 
 
 def info_for(kev=False, epss=None, percentile=None, kev_loaded=True, epss_loaded=True, ransomware=False):

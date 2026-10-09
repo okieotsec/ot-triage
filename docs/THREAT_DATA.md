@@ -102,9 +102,9 @@ Then restart the app and update again. If it still fails, repeat with `AmazonRoo
 
 | System | Location |
 | --- | --- |
-| Linux | `$XDG_DATA_HOME/vuln-prioritizer/data/` (usually `~/.local/share/vuln-prioritizer/data/`) |
-| macOS | `~/Library/Application Support/vuln-prioritizer/data/` |
-| Windows | `%LOCALAPPDATA%\vuln-prioritizer\data\` |
+| Linux | `$XDG_DATA_HOME/ot-triage/data/` (usually `~/.local/share/ot-triage/data/`) |
+| macOS | `~/Library/Application Support/ot-triage/data/` |
+| Windows | `%LOCALAPPDATA%\ot-triage\data\` |
 
 Files: `kev.json`, `epss.csv.gz` and `meta.json` (where and when each was retrieved, plus a checksum). Files are written with user-only permissions, using a temporary file that replaces the old copy only once the new one is complete.
 

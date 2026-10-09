@@ -8,7 +8,17 @@ import explain
 import threatdata
 from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
-from gui_widgets import FlowFrame, ReferenceList, ScrollFrame, button, card, chip, rounded_entry, set_enabled
+from gui_widgets import (
+    FlowFrame,
+    ReferenceList,
+    ScrollFrame,
+    button,
+    card,
+    chip,
+    rounded_entry,
+    set_enabled,
+    wrap_to_width,
+)
 
 REFERENCE_LIMIT = 5
 DETAILS_MAX_HEIGHT = 190
@@ -142,7 +152,7 @@ class BatchView:
         self.detail_text = tk.Label(area, text="", font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
                                     justify="left")
         self.detail_text.pack(fill=tk.X, pady=(6, 0))
-        self.detail_text.bind("<Configure>", lambda e: self.detail_text.configure(wraplength=max(e.width - 4, 100)))
+        wrap_to_width(self.detail_text)
         self.detail_refs_title = tk.Label(area, text="REFERENCES FROM CISA", font=s.font(9, "bold"), bg=t.card,
                                           fg=t.accent, anchor="w")
         self.detail_refs = ReferenceList(area, s, self.ctx.open_reference, compact=True, limit=REFERENCE_LIMIT)

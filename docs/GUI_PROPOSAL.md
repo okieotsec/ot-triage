@@ -19,7 +19,7 @@ Open [gui-mockup.html](gui-mockup.html) in a browser to click through all five v
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ Vulnerability Prioritizer                    [⚠ Custom scoring] │  header
+│ OT Triage                    [⚠ Custom scoring] │  header
 ├──────────┬─────────────────────────────────────────────────────┤
 │ Assess   │                                                     │
 │ Batch    │               the active view                       │
@@ -103,7 +103,7 @@ The current single file grows too big, so the GUI is split into small modules, c
 | `gui_theme.py` | Colour tokens for dark and light, fonts, ttk style setup | Yes |
 | `gui_widgets.py` | Segmented control, chip, tooltip, card, status bar, background worker | Yes |
 | `gui_assess.py`, `gui_batch.py`, `gui_threat.py`, `gui_settings.py`, `gui_about.py` | One view each | Yes |
-| `vuln_prioritizer_gui.py` | Window shell, navigation, shortcuts | Yes |
+| `ot_triage_gui.py` | Window shell, navigation, shortcuts | Yes |
 
 One small change to the core: `Result` gets a `factors` list (label plus raise, lower or neutral) so chips come from the rules themselves instead of being guessed from reason text. Bucket results are unchanged, and the existing tests keep passing.
 

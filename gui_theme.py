@@ -36,10 +36,10 @@ DARK = Theme("dark", bg="#0f172a", header="#111c33", card="#1e293b", field="#0f1
              text="#e2e8f0", muted="#94a3b8", accent="#38bdf8", on_accent="#0f172a", error="#f87171",
              now="#dc2626", on_now="#ffffff", next="#f59e0b", on_next="#0f172a", never="#22c55e", on_never="#0f172a",
              raise_="#f87171", lower="#4ade80", neutral="#94a3b8", ok="#4ade80", warn="#fbbf24")
-LIGHT = Theme("light", bg="#f1f5f9", header="#ffffff", card="#ffffff", field="#f8fafc", border="#cbd5e1",
-              text="#0f172a", muted="#475569", accent="#0369a1", on_accent="#ffffff", error="#b91c1c",
+LIGHT = Theme("light", bg="#f4efe2", header="#fffdf8", card="#fffdf8", field="#faf6ea", border="#cfc6ad",
+              text="#111c2e", muted="#4a4a42", accent="#0369a1", on_accent="#ffffff", error="#b91c1c",
               now="#dc2626", on_now="#ffffff", next="#f59e0b", on_next="#0f172a", never="#22c55e", on_never="#0f172a",
-              raise_="#b91c1c", lower="#15803d", neutral="#475569", ok="#15803d", warn="#b45309")
+              raise_="#b91c1c", lower="#166534", neutral="#4a4a42", ok="#166534", warn="#92400e")
 THEMES = {"dark": DARK, "light": LIGHT}
 
 PREFERRED_FONTS = ("Inter", "Adwaita Sans", "Cantarell", "Noto Sans", "Segoe UI", "SF Pro Text", "Helvetica Neue")

@@ -199,6 +199,20 @@ class ReferenceListTests(DisplayTestCase):
         link = next(w for w in walk(box) if isinstance(w, gw.LinkLabel))
         self.assertEqual(link.pack_info()["side"], "left")
 
+    def test_a_long_sentence_in_front_of_a_link_is_an_explanation_and_the_domain_is_the_link(self):
+        sentence = "This affects an open-source component that different products could use. For more information:"
+        reference = refs.Reference(sentence, "https://cwiki.apache.org/confluence/display/x")
+        box, _opened = self.make()
+        box.show((reference,))
+        links = [w for w in walk(box) if isinstance(w, gw.LinkLabel)]
+        self.assertEqual([w.cget("text") for w in links], ["cwiki.apache.org"])
+        texts = [w.cget("text") for w in walk(box) if isinstance(w, tk.Label) and not isinstance(w, gw.LinkLabel)]
+        self.assertIn(sentence, texts)
+        compact, _opened = self.make(compact=True)
+        compact.show((reference,))
+        compact_texts = [w.cget("text") for w in walk(compact) if isinstance(w, tk.Label)]
+        self.assertNotIn(sentence, compact_texts)
+
     def test_showing_again_replaces_the_old_contents(self):
         box, _opened = self.make()
         box.show(self.REFS)

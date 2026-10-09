@@ -7,11 +7,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import gui_brand
 import gui_testing
+import ot_triage_gui as app_module
 import settings as scoring
 import threatdata as td
 import uiprefs
-import vuln_prioritizer_gui as app_module
 from gui_theme import DARK, LIGHT
 from settings import DEFAULT_SETTINGS, Settings
 from test_threatdata import epss_bytes, kev_bytes
@@ -50,7 +51,13 @@ class AppTestCase(unittest.TestCase):
         gc.enable()
 
     def make(self, **kwargs):
+        if self.root.tk.call("tk", "windowingsystem") == "x11":
+            self.root.wm_attributes("-type", "dialog")  # a floating window keeps its size on tiling window managers
         self.app = app_module.App(self.root, self.settings_path, self.prefs_path, self.data_dir, **kwargs)
+        # A window that is never shown has no definite size, so wrapped text and the layout can keep resizing each
+        # other forever. Giving it a real size, like a user's window has, makes the layout settle.
+        self.root.geometry("1180x800+0+0")
+        self.root.deiconify()
         self.pump()
         return self.app
 
@@ -260,7 +267,7 @@ class ShellTests(AppTestCase):
 
     def test_header_has_the_title_and_the_exposure_definition_lives_in_assess(self):
         app = self.make()
-        self.assertIn("Vulnerability Prioritizer", self.labels(app.header))
+        self.assertIn("OT Triage", self.labels(app.header))
         self.assertIn(app_module.SUBTITLE, self.labels(app.header))
 
     def test_unexpected_errors_show_a_short_message_and_keep_details_off_the_screen(self):
@@ -464,7 +471,7 @@ class KeyboardReachabilityTests(AppTestCase):
                 if name != "about":
                     self.assertGreaterEqual(len(controls), 1, name)
                 else:
-                    self.assertEqual(controls, [], "the About view is read-only text")
+                    self.assertEqual(len(controls), len(gui_brand.LINKS), "the About view only has its links")
                 missing = [str(c) for c in controls if c not in path]
                 self.assertEqual(missing, [], f"{name}: not reachable with Tab")
         self.assertIn(app.nav_buttons["about"], self.tab_path(app.nav_buttons["assess"]))

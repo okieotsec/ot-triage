@@ -12,6 +12,7 @@ import uiprefs
 from gui_about import AboutView
 from gui_assess import AssessView
 from gui_batch import BatchView
+from gui_brand import BRAND_NAME, app_icon, wordmark
 from gui_context import Context
 from gui_round import shape_label
 from gui_settings import SettingsView
@@ -49,7 +50,8 @@ class App:
         self.ctx.updater = ThreatUpdater(self.ctx)
         self.ctx.updater.listeners.append(self.refresh_status)
         self.views, self.current, self.narrow = {}, "assess", None
-        root.title("Vulnerability Prioritizer")
+        root.title(f"OT Triage \u00b7 {BRAND_NAME}")
+        app_icon(root)
         fit_window(root, 1180, 800, 700, 560)
         root.report_callback_exception = self.report_exception
         self._bind_shortcuts()
@@ -108,11 +110,15 @@ class App:
         tk.Frame(self.header, bg=t.accent, height=3).pack(side=tk.BOTTOM, fill=tk.X)
         text = tk.Frame(self.header, bg=t.header)
         text.pack(side=tk.LEFT, padx=20, pady=12)
-        tk.Label(text, text="Vulnerability Prioritizer", font=s.font(18, "bold"), bg=t.header, fg=t.text).pack(
+        tk.Label(text, text="OT Triage", font=s.font(18, "bold"), bg=t.header, fg=t.text).pack(
             anchor="w")
         subtitle = tk.Label(text, text=SUBTITLE, font=s.font(9), bg=t.header, fg=t.muted, anchor="w", justify="left")
         subtitle.pack(anchor="w")
         subtitle.bind("<Configure>", lambda e: subtitle.configure(wraplength=max(e.width, 200)))
+        brand = tk.Frame(self.header, bg=t.header)
+        brand.pack(side=tk.RIGHT, padx=(0, 20))
+        tk.Label(brand, text="by", font=s.font(9), bg=t.header, fg=t.muted, padx=0).pack(side=tk.LEFT, padx=(0, 4))
+        wordmark(brand, s, t.header, size=11).pack(side=tk.LEFT)
         self.badge = shape_label(self.header, "\u26a0 Custom scoring", s.font(9, "bold"), t.on_next, fill=t.next,
                                  outside=t.header, padx=14, pady=5)
         self._update_badge()
@@ -300,5 +306,5 @@ def main():
 
 
 if __name__ == "__main__":
-    print(f"Vulnerability Prioritizer {__version__}", file=sys.stderr)
+    print(f"OT Triage {__version__}", file=sys.stderr)
     main()
