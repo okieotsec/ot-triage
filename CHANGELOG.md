@@ -3,6 +3,7 @@
 ## 0.4.0 (release candidate)
 
 - **References from CISA's notes:** the Assess view lists the links CISA adds to a KEV entry (advisories, vendor pages, BOD guidance) under Recommended action, each with its real domain. Links open in your browser only when you click them, only safe `https` links are clickable, and the copied summaries include them. See [docs/THREAT_DATA.md](docs/THREAT_DATA.md).
+- **More from the KEV data:** the Batch Details box lists a row's CISA references (compact, with a scrolling area so long details never hide the table), the CSV export gains `references` and `forensic_triage` columns, and entries CISA flags for forensic triage get a neutral "Forensic triage advised" chip. None of these change a bucket or score.
 - **Text size shortcuts:** Ctrl+plus, Ctrl+minus and Ctrl+0 make the whole interface larger or smaller (90% to 130%) or reset it, and the choice is remembered. This helps on window managers where resizing the window is awkward.
 - **Clearer Windows certificate error:** on a fresh Windows install the EPSS download can fail with "unable to get local issuer certificate" because Windows has not installed a trusted root yet. The message now points to a verified fix in [docs/THREAT_DATA.md](docs/THREAT_DATA.md) (install Amazon Trust's published root, checked against its SHA-256). Certificate checking stays on.
 - **Fixed:** in the Batch view the Details box could be cut off in shorter windows; the results table now gives up space first.

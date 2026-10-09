@@ -120,10 +120,11 @@ def set_enabled(widget, enabled):
 
 
 class ScrollFrame(tk.Frame):
-    """A vertically scrollable area; put content in .body."""
+    """A vertically scrollable area; put content in .body. With max_height it grows with its content up to that."""
 
-    def __init__(self, parent, bg):
+    def __init__(self, parent, bg, max_height=None):
         super().__init__(parent, bg=bg)
+        self.max_height = max_height
         self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
         self.bar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.bar.set)
@@ -138,6 +139,8 @@ class ScrollFrame(tk.Frame):
 
     def _on_body_resize(self, _event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        if self.max_height is not None:
+            self.canvas.configure(height=max(1, min(self.body.winfo_reqheight(), self.max_height)))
         self._toggle_bar()
 
     def _on_canvas_resize(self, event):
@@ -157,7 +160,15 @@ class ScrollFrame(tk.Frame):
         self.bind_all("<Button-4>", self._wheel)
         self.bind_all("<Button-5>", self._wheel)
 
-    def _unbind_wheel(self, _event):
+    def _unbind_wheel(self, event):
+        try:
+            under = self.winfo_containing(event.x_root, event.y_root)
+        except KeyError:
+            under = None
+        while under is not None:
+            if under is self:
+                return  # the pointer only moved onto something inside this area
+            under = under.master
         for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
             self.unbind_all(sequence)
 
@@ -385,6 +396,52 @@ class LinkLabel(tk.Label):
         self.focus_set()
         self.command()
         return "break"
+
+
+class ReferenceList(tk.Frame):
+    """A list of references: safe links that open on click, with their real domain shown, and plain text.
+
+    In compact mode each link is one line and at most `limit` items are shown, so the list stays small.
+    """
+
+    def __init__(self, parent, style, open_reference, compact=False, limit=None):
+        super().__init__(parent, bg=style.theme.card)
+        self.style, self.open_reference, self.compact, self.limit = style, open_reference, compact, limit
+
+    def show(self, references):
+        """Replace the list's contents; return the number of items that were left out because of the limit."""
+        for child in self.winfo_children():
+            child.destroy()
+        s, t = self.style, self.style.theme
+        shown = references if self.limit is None else references[:self.limit]
+        for reference in shown:
+            row = tk.Frame(self, bg=t.card)
+            row.pack(fill=tk.X, pady=(0, 3 if self.compact else 8))
+            if reference.is_link:
+                title, where = reference.label, reference.host
+                if not title:
+                    title, where = reference.host, _short_path(reference.url)
+                side = tk.LEFT if self.compact else None
+                LinkLabel(row, s, title, lambda r=reference: self.open_reference(r)).pack(side=side, anchor="w")
+                text = f"  {where}" if self.compact else where
+                tk.Label(row, text=text, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(side=side, anchor="w")
+            else:
+                text = tk.Label(row, text=reference.text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
+                                justify="left")
+                text.pack(fill=tk.X)
+                text.bind("<Configure>", lambda e, w=text: w.configure(wraplength=max(e.width - 4, 100)))
+        left_out = len(references) - len(shown)
+        if left_out:
+            tk.Label(self, text=f"and {left_out} more (see Assess or the CSV export)", font=s.font(9), bg=t.card,
+                     fg=t.muted, anchor="w").pack(fill=tk.X)
+        return left_out
+
+
+def _short_path(url):
+    """Return what follows the host name of an https address, shortened so a long link cannot take over."""
+    text = url.removeprefix("https://").partition("/")[2]
+    text = "/" + text if text else ""
+    return text if len(text) <= 60 else text[:57] + "..."
 
 
 class PriorityBadge(tk.Label):

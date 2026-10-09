@@ -1,13 +1,12 @@
 """The Assess view: assess one vulnerability, with CVE lookup, why-chips and a what-would-change panel."""
 import tkinter as tk
-import webbrowser
 from tkinter import ttk
 
 import cvss
 import explain
 from explain import SHORT_LABELS, AssessInputs
-from gui_widgets import (Expander, FlowFrame, LinkLabel, MessageLabel, ScrollFrame, Segmented, ask_text, button, card,
-                         chip, field_label, priority_badge, rounded_entry, set_enabled)
+from gui_widgets import (Expander, FlowFrame, MessageLabel, ReferenceList, ScrollFrame, Segmented, ask_text, button,
+                         card, chip, field_label, priority_badge, rounded_entry, set_enabled)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -236,6 +235,8 @@ class AssessView:
         self.refs_body = card(parent, s, "References from CISA")
         self.refs_card = self.refs_body.master
         self.refs_card.pack_forget()
+        self.reference_list = ReferenceList(self.refs_body, s, self.ctx.open_reference)
+        self.reference_list.pack(fill=tk.X)
         self.references = ()
 
         what = card(parent, s, "What would change this?")
@@ -508,45 +509,11 @@ class AssessView:
     def _set_references(self, references):
         """Show the KEV notes as links (safe https addresses only) and plain text, or hide the card if none."""
         self.references = tuple(references)
-        for child in self.refs_body.winfo_children():
-            child.destroy()
-        s, t = self.style, self.style.theme
-        for reference in self.references:
-            row = tk.Frame(self.refs_body, bg=t.card)
-            row.pack(fill=tk.X, pady=(0, 8))
-            if reference.is_link:
-                title, where = reference.label, reference.host
-                if not title:
-                    title, where = reference.host, self._short_path(reference.url)
-                LinkLabel(row, s, title, lambda r=reference: self.open_reference(r)).pack(anchor="w")
-                tk.Label(row, text=where, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(anchor="w")
-            else:
-                text = tk.Label(row, text=reference.text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
-                                justify="left")
-                text.pack(fill=tk.X)
-                text.bind("<Configure>", lambda e, w=text: w.configure(wraplength=max(e.width - 4, 100)))
+        self.reference_list.show(self.references)
         if self.references:
             self.refs_card.pack(fill=tk.X, pady=(0, 16), before=self.what_card)
         else:
             self.refs_card.pack_forget()
-
-    @staticmethod
-    def _short_path(url):
-        """Return what follows the host name, shortened so a long link does not take over the card."""
-        text = url.removeprefix("https://").partition("/")[2]
-        text = "/" + text if text else ""
-        return text if len(text) <= 60 else text[:57] + "..."
-
-    def open_reference(self, reference):
-        """Open a reference's link in the default browser; this only ever happens when the person clicks it."""
-        try:
-            opened = webbrowser.open(reference.url)
-        except (webbrowser.Error, OSError):
-            opened = False
-        if not opened:
-            self.ctx.copy(reference.url)
-            self.ctx.warn("Could not open the browser", "The address was copied instead, so you can paste it into "
-                                                        f"a browser yourself:\n\n{reference.url}")
 
     # ---- CVSS vector ----
     def vector_lines(self):

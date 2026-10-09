@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import cvss
 from prioritizer import (Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Result, Threat,
                          parse_cvss, prioritize)
+from references import describe
 from settings import DEFAULT_SETTINGS
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -80,6 +81,8 @@ class BatchItem:
     cvss_vector: str = ""
     cvss_version: str = ""
     threat_sources: str = ""
+    references: tuple = ()
+    forensic_triage: bool = False
     cvss_raw: str = ""
     inputs: dict = field(default_factory=dict)   # field -> enum member, for successfully parsed cells
     cvss: float = None
@@ -214,6 +217,8 @@ def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None):
                              item.inputs["controls"], item.inputs["patch"], settings)
     if decision is not None:
         item.result = apply_threat_context(item.result, decision, info)
+        if info.kev is not None:
+            item.references, item.forensic_triage = info.kev.references, info.kev.forensic_triage
     return item
 
 
@@ -251,7 +256,7 @@ def _safe(text):
 OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cvss", "cvss_version", "cvss_vector",
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
-                  "scoring_settings", "error", "source_line"]
+                  "scoring_settings", "error", "source_line", "references", "forensic_triage"]
 
 
 def write_results(path, items, threatdata=None):
@@ -264,7 +269,9 @@ def write_results(path, items, threatdata=None):
         for item in items:
             row = {"id": _safe(item.id), "cve": _safe(item.cve), "name": _safe(item.name),
                    "priority": item.priority, "source_line": item.line, "cvss_version": item.cvss_version,
-                   "cvss_vector": _safe(item.cvss_vector)}
+                   "cvss_vector": _safe(item.cvss_vector),
+                   "references": _safe(" ; ".join(describe(r) for r in item.references)),
+                   "forensic_triage": "Yes" if item.forensic_triage else ""}
             if item.result:
                 rank += 1
                 row.update(

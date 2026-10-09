@@ -136,6 +136,13 @@ class KevIntegrationTests(unittest.TestCase):
         with self.assertRaisesRegex(td.ThreatDataError, "notes"):
             self.parse(notes="x" * (td.MAX_FIELD_CHARS + 1))
 
+    def test_the_forensic_triage_flag_is_read_leniently(self):
+        for value, expected in (("Yes", True), ("No", False), ("yes", False), ("", False), (5, False), (None, False),
+                                (["Yes"], False)):
+            self.assertIs(self.parse(forensicTriage=value).forensic_triage, expected, repr(value))
+        without = {k: v for k, v in kev_entry().items() if k != "forensicTriage"}
+        self.assertFalse(td.parse_kev(kev_bytes([without])).entries["CVE-2024-0001"].forensic_triage)
+
     def test_the_stored_notes_have_no_control_characters(self):
         entry = self.parse(notes="a\x00b\x1b[2J ; https://a.example.com/")
         self.assertFalse(any(ord(ch) < 32 for ch in entry.notes))

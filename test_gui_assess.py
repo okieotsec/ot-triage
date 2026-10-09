@@ -46,7 +46,8 @@ class AssessTestCase(DisplayTestCase):
         return self.view
 
     def load_data(self):
-        entries = [kev_entry(KEV_CVE, knownRansomwareCampaignUse="Known", notes=KEV_NOTES)]
+        entries = [kev_entry(KEV_CVE, knownRansomwareCampaignUse="Known", notes=KEV_NOTES,
+                              forensicTriage="Yes")]
         rows = [f"{KEV_CVE},0.50000,0.97000", f"{EPSS_CVE},0.40000,0.99000", f"{QUIET_CVE},0.00100,0.20000"]
         results = td.import_from_files(self._write("kev.json", kev_bytes(entries)),
                                        self._write("epss.csv.gz", epss_bytes(epss_text(rows))), self.data_dir)
@@ -610,7 +611,7 @@ class AssessReferenceTests(AssessTestCase):
     def test_clicking_a_link_opens_exactly_that_address_and_nothing_opens_on_its_own(self):
         self.load_data()
         view = self.build()
-        with mock.patch("gui_assess.webbrowser.open", return_value=True) as opener:
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
             self.fill("8.0", Threat.NONE)
             self.lookup(KEV_CVE)
             opener.assert_not_called()
@@ -629,7 +630,7 @@ class AssessReferenceTests(AssessTestCase):
         self.pump(0.2)
         if link.focus_get() is not link:
             self.skipTest("the window manager did not give the test window keyboard focus")
-        with mock.patch("gui_assess.webbrowser.open", return_value=True) as opener:
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
             link.event_generate("<Return>")
             self.pump()
         opener.assert_called_once_with("https://vendor.example.com/advisory/1")
@@ -642,8 +643,8 @@ class AssessReferenceTests(AssessTestCase):
         for failure in ({"return_value": False}, {"side_effect": OSError("no browser")}):
             self.ctx.copy.reset_mock()
             self.ctx.warn.reset_mock()
-            with mock.patch("gui_assess.webbrowser.open", **failure):
-                view.open_reference(view.references[0])
+            with mock.patch("gui_context.webbrowser.open", **failure):
+                Context.open_reference(self.ctx, view.references[0])
             self.ctx.copy.assert_called_once_with("https://vendor.example.com/advisory/1")
             self.assertIn("https://vendor.example.com/advisory/1", self.ctx.warn.call_args[0][1])
 
@@ -660,6 +661,15 @@ class AssessReferenceTests(AssessTestCase):
         markdown = self.ctx.copy.call_args[0][0]
         self.assertIn("[BOD 26-04](https://www.cisa.gov/bod-26-04)", markdown)
         self.assertIn("[vendor.example.com](https://vendor.example.com/advisory/1)", markdown)
+
+    def test_the_triage_flag_shows_as_a_neutral_chip_and_a_note_and_does_not_change_the_bucket(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertIn("Forensic triage advised", [i.cget("text") for i in view.chips.items][-1])
+        self.assertTrue(any("forensic triage" in r for r in view.result.reasons))
+        self.assertEqual(view.result.priority, "NOW")
 
     def test_a_manual_item_has_no_reference_section_in_its_summary(self):
         view = self.build()

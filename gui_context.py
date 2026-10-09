@@ -1,4 +1,5 @@
 """State and services shared by all GUI views: settings, preferences, threat data, dialogs, background work."""
+import webbrowser
 from tkinter import filedialog, messagebox
 
 import threatdata
@@ -64,6 +65,18 @@ class Context:
         self.prefs = prefs
         if self.app is not None:
             self.app.prefs_changed()
+
+    # ---- links ----
+    def open_reference(self, reference):
+        """Open a reference's link in the default browser. This only ever happens when the person asks for it."""
+        try:
+            opened = reference.is_link and webbrowser.open(reference.url)
+        except (webbrowser.Error, OSError):
+            opened = False
+        if not opened and reference.is_link:
+            self.copy(reference.url)
+            self.warn("Could not open the browser", "The address was copied instead, so you can paste it into "
+                                                    f"a browser yourself:\n\n{reference.url}")
 
     # ---- services views call, which tests replace ----
     def warn(self, title, message):

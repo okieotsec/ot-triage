@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 import gui_widgets as gw
+import references as refs
 from gui_testing import DisplayTestCase
 
 
@@ -152,6 +153,94 @@ class WidgetTests(DisplayTestCase):
         helped = gw.field_label(frame, self.style, "Exposure", "Explained")
         self.assertEqual(len(plain.winfo_children()), 1)
         self.assertEqual(len(helped.winfo_children()), 2)
+
+
+def walk(widget):
+    for child in widget.winfo_children():
+        yield child
+        yield from walk(child)
+
+
+class ReferenceListTests(DisplayTestCase):
+    REFS = (refs.Reference("BOD 26-04", "https://www.cisa.gov/bod"), refs.Reference(url="https://a.example.com/x/y"),
+            refs.Reference(text="See the vendor page"), refs.Reference(text="http://old.example.com/z"))
+
+    def make(self, **options):
+        opened = []
+        box = gw.ReferenceList(self.root, self.style, opened.append, **options)
+        box.pack()
+        self.root.deiconify()
+        self.pump(0.1)
+        return box, opened
+
+    def test_links_show_their_domain_and_text_items_are_not_links(self):
+        box, _opened = self.make()
+        box.show(self.REFS)
+        links = [w for w in walk(box) if isinstance(w, gw.LinkLabel)]
+        self.assertEqual([w.cget("text") for w in links], ["BOD 26-04", "a.example.com"])
+        texts = [w.cget("text") for w in walk(box) if isinstance(w, tk.Label) and not isinstance(w, gw.LinkLabel)]
+        self.assertEqual(texts, ["www.cisa.gov", "/x/y", "See the vendor page", "http://old.example.com/z"])
+
+    def test_clicking_a_link_passes_that_reference_on(self):
+        box, opened = self.make()
+        box.show(self.REFS)
+        self.pump(0.2)
+        next(w for w in walk(box) if isinstance(w, gw.LinkLabel)).event_generate("<Button-1>")
+        self.pump(0.1)
+        self.assertEqual(opened, [self.REFS[0]])
+
+    def test_compact_mode_puts_the_domain_on_the_same_line_and_a_limit_says_how_many_are_left_out(self):
+        box, _opened = self.make(compact=True, limit=2)
+        left_out = box.show(self.REFS)
+        self.assertEqual(left_out, 2)
+        texts = [w.cget("text") for w in walk(box) if isinstance(w, tk.Label)]
+        self.assertIn("and 2 more (see Assess or the CSV export)", texts)
+        link = next(w for w in walk(box) if isinstance(w, gw.LinkLabel))
+        self.assertEqual(link.pack_info()["side"], "left")
+
+    def test_showing_again_replaces_the_old_contents(self):
+        box, _opened = self.make()
+        box.show(self.REFS)
+        box.show(())
+        self.assertEqual(list(box.winfo_children()), [])
+
+    def test_a_long_address_is_shortened_for_display_only(self):
+        box, _opened = self.make()
+        box.show((refs.Reference(url="https://a.example.com/" + "p" * 200),))
+        shown = [w.cget("text") for w in walk(box) if isinstance(w, tk.Label) and not isinstance(w, gw.LinkLabel)]
+        self.assertTrue(shown[0].endswith("...") and len(shown[0]) == 60)
+
+
+class ScrollAreaTests(DisplayTestCase):
+    def make(self, rows, max_height):
+        area = gw.ScrollFrame(self.root, self.style.theme.card, max_height=max_height)
+        area.pack(fill=tk.X)
+        for i in range(rows):
+            tk.Label(area.body, text=f"row {i}", bg=self.style.theme.card).pack(anchor="w")
+        self.root.deiconify()
+        self.pump(0.2)
+        return area
+
+    def test_it_grows_with_its_content_up_to_the_limit_then_shows_a_scrollbar(self):
+        small = self.make(2, 150)
+        self.assertLess(small.canvas.winfo_reqheight(), 150)
+        self.assertFalse(small.bar.winfo_ismapped())
+        small.destroy()
+        big = self.make(40, 150)
+        self.assertEqual(big.canvas.winfo_reqheight(), 150)
+        self.assertTrue(big.bar.winfo_ismapped())
+
+    def test_mouse_wheel_scrolling_survives_the_pointer_moving_over_a_label_inside(self):
+        area = self.make(40, 150)
+        label = area.body.winfo_children()[0]
+        area.canvas.event_generate("<Enter>")
+        self.assertTrue(area.bind_all("<MouseWheel>"))
+        event = mock.Mock(x_root=label.winfo_rootx() + 2, y_root=label.winfo_rooty() + 2)
+        area._unbind_wheel(event)
+        self.assertTrue(area.bind_all("<MouseWheel>"), "the wheel binding was dropped over a child widget")
+        outside = mock.Mock(x_root=-50, y_root=-50)
+        area._unbind_wheel(outside)
+        self.assertFalse(area.bind_all("<MouseWheel>"))
 
 
 class LinkLabelTests(DisplayTestCase):

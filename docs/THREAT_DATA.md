@@ -64,6 +64,12 @@ CISA's required action often says "see URL in Notes". The notes field holds thos
 - Only plain `https` links to an ordinary host name are clickable. Anything else in the notes (`http` links, odd ports, addresses with a user name, IP addresses, look-alike characters, other kinds of link) is shown as plain text and never opened. Invisible and control characters are removed.
 - At most 12 references are shown, with duplicates removed.
 - **Copy summary** and **Copy as Markdown** include the references, so a ticket carries the same links.
+- **Batch:** when a row has a `cve` that is in KEV, the Details box under the table lists its references too (the first 5, with a note if there are more). Long details scroll inside the box, so they never push the results table out of view.
+- **CSV export:** two columns are added at the end: `references` (each item as `label: address`, separated by ` ; `, as plain text) and `forensic_triage` (`Yes` or empty). Like every exported text cell they are neutralised so a spreadsheet cannot run them as a formula.
+
+### Forensic triage
+
+CISA's feed marks some entries `forensicTriage: Yes`. Those are entries where the BOD 26-04 guidance asks organisations to look for signs of compromise, not only to patch. The app shows a neutral **Forensic triage advised** chip and a line in the reasoning. Like the rest of the KEV context it never changes the bucket or the ordering score. The flag is read leniently: only the exact text `Yes` counts, and a missing or unexpected value just means "not flagged", so a change in CISA's wording can never make an update fail.
 
 ## Download safety
 
@@ -113,7 +119,7 @@ Add an optional `cve` column. Then:
 - With data loaded, the `threat` cell can be left blank and the level comes from KEV and EPSS.
 - A `threat` value can still be given. It can raise the level but never lower what the data says.
 - With no data loaded and a blank `threat` cell, the row is reported as an error that says so. It is **not** scored as "no known exploitation".
-- The export adds `cve`, `threat_source` (why the level was chosen) and `threat_data` (the KEV and EPSS versions used) columns, so results can be reproduced.
+- The export adds `cve`, `threat_source` (why the level was chosen) and `threat_data` (the KEV and EPSS versions used) columns, so results can be reproduced. It also adds `references` and `forensic_triage` (see above).
 
 ## In the GUI
 

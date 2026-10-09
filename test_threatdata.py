@@ -24,7 +24,7 @@ def kev_entry(cve="CVE-2024-0001", **changes):
     entry = {"cveID": cve, "vendorProject": "Acme", "product": "Widget", "vulnerabilityName": "Widget flaw",
              "dateAdded": "2024-01-02", "shortDescription": "text", "requiredAction": "Apply updates.",
              "dueDate": "2024-01-23", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": ["CWE-79"],
-             "forensicTriage": "future field"}
+             "someFutureField": "future field"}
     entry.update(changes)
     return entry
 
