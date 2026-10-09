@@ -122,9 +122,10 @@ def button(parent, style, text, command, kind="primary", **options):
     widget.images, widget.fill = images, fill
     widget.look = {"normal": (fill, fg, "hand2", images["normal"]), "disabled": (t.border, t.muted, "arrow",
                                                                                   images["disabled"])}
-    widget.bind("<ButtonPress-1>", lambda _e: widget.cget("state") == "normal" and widget.configure(
+    # "Not disabled" rather than "normal": on Windows a pressed button is already "active" when the release arrives.
+    widget.bind("<ButtonPress-1>", lambda _e: widget.cget("state") != "disabled" and widget.configure(
         image=images["pressed"]), add="+")
-    widget.bind("<ButtonRelease-1>", lambda _e: widget.cget("state") == "normal" and widget.configure(
+    widget.bind("<ButtonRelease-1>", lambda _e: widget.cget("state") != "disabled" and widget.configure(
         image=images["normal"]), add="+")
     return widget
 

@@ -3,6 +3,7 @@
 ## 0.4.0 (release candidate)
 
 - **References from CISA's notes:** the Assess view lists the links CISA adds to a KEV entry (advisories, vendor pages, BOD guidance) under Recommended action, each with its real domain. Links open in your browser only when you click them, only safe `https` links are clickable, and the copied summaries include them. See [docs/THREAT_DATA.md](docs/THREAT_DATA.md).
+- **Fixed (Windows):** a button stayed in its darker pressed colour after a click until the pointer moved; it now returns to normal at once.
 - **Fixed:** pasting an enormous text into a text box could freeze the app on Windows (Tk becomes extremely slow showing megabytes on one line). Text boxes now refuse input beyond 2,000 characters immediately, and the CVSS vector box says so. Layout switches and the scrollbar also no longer flip back and forth in some window sizes, which made the interface stall on some systems.
 - **License:** the project is released under the MIT License (see [LICENSE](LICENSE)).
 - **Fixed:** strong compensating controls did not lower the ordering score, so an item with strong controls could rank above the same item with partial controls (for example an actively exploited item already at NEXT). Strong controls now take 1.0 off the ordering score (partial still 0.5), and a test checks that better controls never rank higher. Buckets are unchanged. See [docs/POLICY.md](docs/POLICY.md), rule 4.

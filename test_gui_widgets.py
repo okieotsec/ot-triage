@@ -420,9 +420,9 @@ class RoundedLookTests(DisplayTestCase):
         b.event_generate("<ButtonPress-1>")
         pressed = str(b.cget("image"))
         self.assertNotEqual(pressed, normal)
+        b.configure(state="active")  # what Windows does to a pressed button before the release arrives
         b.event_generate("<ButtonRelease-1>")
-        # Back to the resting look, or the hover look if the real pointer happens to be over the button
-        self.assertNotEqual(str(b.cget("image")), pressed)
+        self.assertEqual(str(b.cget("image")), normal)
 
     def test_a_disabled_button_does_not_show_the_pressed_state(self):
         frame = self.make_frame()
