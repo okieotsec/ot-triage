@@ -69,7 +69,7 @@ class ThreatViewTests(ThreatViewTestCase):
     def test_nothing_stored_says_so_and_never_implies_safety(self):
         view = self.build()
         for name in ("kev", "epss"):
-            chips, version, detail = self.card_text(name)
+            chips, _version, detail = self.card_text(name)
             self.assertEqual(chips, ["⚠ Not loaded"])
             self.assertIn("CVE lookups cannot use this source", detail)
         self.assertIn("No update has been run", self.results_text()[0])
@@ -104,7 +104,7 @@ class ThreatViewTests(ThreatViewTestCase):
             view.update()
             self.wait_idle()
         self.assertEqual(self.card_text("kev")[0], ["✓ Fresh"])
-        chips, version, detail = self.card_text("kev")
+        _chips, version, detail = self.card_text("kev")
         self.assertEqual(version, "Catalog 2026.10.04")
         self.assertIn("Released 2026-10-04", detail)
         self.assertIn("1 entry", detail)
@@ -149,7 +149,7 @@ class ThreatViewTests(ThreatViewTestCase):
 
     def test_stale_data_is_flagged_but_still_listed(self):
         view = self.build()
-        long_ago = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+        long_ago = datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC)
         td.update_from_network(self.ctx.data_dir, lambda url, cap, hosts, **_kw: kev_bytes() if url == td.KEV_URL
                                else epss_bytes(), long_ago)
         view.refresh()

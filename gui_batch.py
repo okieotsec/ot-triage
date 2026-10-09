@@ -31,7 +31,7 @@ class BatchState:
 
 
 def _text(item):
-    return " ".join([item.id, item.name, item.cve, item.error, item.threat_sources]).lower()
+    return f"{item.id} {item.name} {item.cve} {item.error} {item.threat_sources}".lower()
 
 
 class BatchView:

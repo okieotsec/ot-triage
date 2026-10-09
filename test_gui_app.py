@@ -423,7 +423,7 @@ class KeyboardReachabilityTests(AppTestCase):
             if not widget.winfo_ismapped():
                 continue
             kind = type(widget).__name__
-            takes_focus = str(widget.cget("takefocus")) if "takefocus" in widget.keys() else "0"
+            takes_focus = str(widget.cget("takefocus")) if "takefocus" in widget.keys() else "0"  # noqa: SIM118 (a Tk widget, not a dict)
             if (isinstance(widget, (tk.Entry, tk.Checkbutton)) or kind in ("Treeview", "Segmented")
                     or (isinstance(widget, tk.Button) and str(widget.cget("state")) == "normal")
                     or (isinstance(widget, (tk.Frame, tk.Label)) and takes_focus == "1")):
@@ -551,7 +551,7 @@ class StatusBarTests(AppTestCase):
         with mock.patch("threatdata.fetch", fake):
             app.start_update()
             self.pump(0.3)
-            button = [w for w in app.status_bar.winfo_children() if isinstance(w, tk.Button)][0]
+            button = next(w for w in app.status_bar.winfo_children() if isinstance(w, tk.Button))
             self.assertEqual((button.cget("text"), str(button.cget("state"))), ("Updating…", "disabled"))
             release.set()
             self.pump(10, until=lambda: bool(app.ctx.updater.results) and not app.ctx.worker.running)

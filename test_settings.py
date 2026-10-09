@@ -12,7 +12,7 @@ from unittest import mock
 
 import batch
 import settings
-from prioritizer import Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Threat, prioritize
+from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Threat, prioritize
 from settings import DEFAULT_SETTINGS, Settings
 
 

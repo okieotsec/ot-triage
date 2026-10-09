@@ -1,7 +1,7 @@
 import itertools
 import unittest
 
-from prioritizer import Asset, Controls, Exposure, Patch, Threat, NOW, NEXT, NEVER, parse_cvss, prioritize
+from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Threat, parse_cvss, prioritize
 from settings import DEFAULT_SETTINGS, Settings
 
 

@@ -5,7 +5,9 @@ import threatdata as td
 from test_threatdata import kev_bytes, kev_entry
 
 try:
-    from hypothesis import given, settings as hyp_settings, strategies as st
+    from hypothesis import given
+    from hypothesis import settings as hyp_settings
+    from hypothesis import strategies as st
 except ImportError:  # hypothesis is an optional test dependency
     st = None
 

@@ -4,8 +4,7 @@ import os
 from dataclasses import dataclass, field
 
 import cvss
-from prioritizer import (Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Result, Threat,
-                         parse_cvss, prioritize)
+from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Result, Threat, parse_cvss, prioritize
 from references import describe
 from settings import DEFAULT_SETTINGS
 from threatdata import apply_threat_context, derive_threat, normalize_cve
@@ -67,7 +66,7 @@ def _parse_enum(field_name, text):
     try:
         return _LOOKUPS[cls][_norm(text)]
     except KeyError:
-        options = ", ".join(sorted({k for k in _VALUE_ALIASES[cls]}))
+        options = ", ".join(sorted(set(_VALUE_ALIASES[cls])))
         raise ValueError(f"{field_name}: unrecognized value {text.strip()!r} (try: {options})") from None
 
 

@@ -4,7 +4,7 @@ import unittest
 import explain
 import threatdata as td
 from explain import AssessInputs
-from prioritizer import Asset, Controls, Exposure, NEVER, NEXT, NOW, Patch, Threat, prioritize
+from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Threat, prioritize
 from settings import DEFAULT_SETTINGS, Settings
 
 CUSTOM = Settings(cvss_high=7.5, cvss_critical=9.5)

@@ -31,8 +31,8 @@ class AboutView:
         scroll.body.configure(padx=28, pady=24)
         self._paragraphs(card(scroll.body, self.style, "About"), [
             (f"Vulnerability Prioritizer {__version__}", True),
-            ("Rule-based Now / Next / Never triage. It works fully offline; the only network access is a "
-             "threat-data update that you start yourself.", False),
+            (("Rule-based Now / Next / Never triage. It works fully offline; the only network access is a "
+              "threat-data update that you start yourself."), False),
             ("Low exposure: " + EXPOSURE_HELP, False)])
         self._paragraphs(card(scroll.body, self.style, "Where the categories come from"), [(ATTRIBUTION, False)])
         docs = card(scroll.body, self.style, "Documentation")
