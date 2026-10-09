@@ -107,6 +107,7 @@ class BatchView:
         wrap = tk.Frame(self.body, bg=t.card, highlightthickness=1, highlightbackground=t.border,
                         highlightcolor=t.border)
         wrap.pack(fill=tk.BOTH, expand=True)
+        self.table_wrap = wrap
         scroll = ttk.Scrollbar(wrap, orient=tk.VERTICAL)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.tree = ttk.Treeview(wrap, columns=[c[0] for c in COLUMNS], show="headings", selectmode="browse",
@@ -124,6 +125,8 @@ class BatchView:
     def _build_details(self):
         s, t = self.style, self.style.theme
         self.details = card(self.body, s, "Details", pady=(12, 0))
+        # Claim the space before the expanding table does, so a short window shrinks the table and never the details.
+        self.details.master.pack_configure(side=tk.BOTTOM, before=self.table_wrap)
         self.detail_title = tk.Label(self.details, text="Select a row to see why.", font=s.font(10, "bold"),
                                      bg=t.card, fg=t.text, anchor="w")
         self.detail_title.pack(fill=tk.X)
