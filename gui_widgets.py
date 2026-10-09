@@ -1,12 +1,14 @@
 """Reusable Tk widgets: cards, buttons, segmented controls, chips, tooltips, expanders, background work."""
 import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk
 
 from gui_round import photo, recolor_corners, round_corners, shape_label, text_size
 from gui_theme import SYMBOLS
 
+BAR_FLIP_WINDOW, BAR_FLIP_LIMIT = 2.0, 6  # seconds, and how many bar changes in that time are accepted
 CARD_RADIUS, BUTTON_RADIUS, SEGMENT_RADIUS, BADGE_RADIUS, ENTRY_RADIUS = 12, 9, 9, 14, 9
 
 
@@ -125,6 +127,7 @@ class ScrollFrame(tk.Frame):
     def __init__(self, parent, bg, max_height=None):
         super().__init__(parent, bg=bg)
         self.max_height = max_height
+        self._bar_job, self._bar_changes = None, []
         self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
         self.bar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.bar.set)
@@ -136,6 +139,12 @@ class ScrollFrame(tk.Frame):
         for widget in (self.canvas, self.body):
             widget.bind("<Enter>", self._bind_wheel)
             widget.bind("<Leave>", self._unbind_wheel)
+        self.bind("<Destroy>", self._on_destroy)
+
+    def _on_destroy(self, event):
+        if event.widget is self and self._bar_job is not None:
+            self.after_cancel(self._bar_job)
+            self._bar_job = None
 
     def _on_body_resize(self, _event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -148,11 +157,32 @@ class ScrollFrame(tk.Frame):
         self._toggle_bar()
 
     def _toggle_bar(self):
-        """Show the scrollbar only when the content is taller than the visible area."""
-        needed = self.body.winfo_reqheight() > self.canvas.winfo_height() > 1
-        if needed and not self.bar.winfo_ismapped():
+        """Decide about the scrollbar once the layout has settled (never in the middle of a resize)."""
+        if self._bar_job is None:
+            self._bar_job = self.after_idle(self._apply_bar)
+
+    def _apply_bar(self):
+        """Show the scrollbar only when the content is taller than the visible area.
+
+        The text inside rewraps after the canvas changes width, so the content height is only trustworthy once all
+        pending resizes are done; deciding earlier made the bar appear and disappear forever. As a last safeguard, a
+        bar that has changed many times within a couple of seconds is left as it is.
+        """
+        self._bar_job = None
+        try:
+            needed = self.body.winfo_reqheight() > self.canvas.winfo_height() > 1
+            shown = self.bar.winfo_manager() == "pack"
+        except tk.TclError:  # the widget was destroyed while the decision was pending
+            return
+        if needed == shown:
+            return
+        now = time.monotonic()
+        self._bar_changes = [t for t in self._bar_changes if now - t < BAR_FLIP_WINDOW] + [now]
+        if len(self._bar_changes) > BAR_FLIP_LIMIT:
+            return
+        if needed:
             self.bar.pack(side=tk.RIGHT, fill=tk.Y, before=self.canvas)
-        elif not needed and self.bar.winfo_ismapped():
+        else:
             self.bar.pack_forget()
 
     def _bind_wheel(self, _event):
