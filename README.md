@@ -1,5 +1,8 @@
 # Vulnerability Prioritizer
 
+[![CI](https://github.com/okieotsec/vuln-prioritizer/actions/workflows/ci.yml/badge.svg)](https://github.com/okieotsec/vuln-prioritizer/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Rule-based Now / Next / Never triage for vulnerabilities, with a Tkinter GUI and CSV batch mode.
 Pure standard library: no third-party dependencies. It works fully offline; the only network access is a threat-data update that you start yourself.
 
