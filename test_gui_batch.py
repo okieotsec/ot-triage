@@ -169,6 +169,12 @@ class BatchLoadTests(BatchViewTestCase):
             self.pump(5, until=lambda: bool(view.state.items))
         self.assertTrue(view.state.items)
 
+    def test_the_details_card_claims_its_space_before_the_expanding_table(self):
+        view = self.build()
+        order = view.body.pack_slaves()
+        self.assertLess(order.index(view.details.master), order.index(view.table_wrap))
+        self.assertEqual(view.details.master.pack_info()["side"], "bottom")
+
     def test_the_progress_row_sits_right_under_the_toolbar_so_a_tall_table_cannot_squeeze_it_out(self):
         view = self.build()
         release = threading.Event()
