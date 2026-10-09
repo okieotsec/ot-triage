@@ -118,3 +118,7 @@ Techniques used:
 - **Mutation checks:** key rules and security controls were deliberately broken to confirm the tests catch them.
 
 Run `python3 -m unittest` for the test suite (see [docs/GUI_TESTING.md](docs/GUI_TESTING.md)).
+
+## License
+
+Released under the [MIT License](LICENSE). The CVSS v4.0 scoring tables come from FIRST under their own license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

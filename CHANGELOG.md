@@ -3,6 +3,7 @@
 ## 0.4.0 (release candidate)
 
 - **References from CISA's notes:** the Assess view lists the links CISA adds to a KEV entry (advisories, vendor pages, BOD guidance) under Recommended action, each with its real domain. Links open in your browser only when you click them, only safe `https` links are clickable, and the copied summaries include them. See [docs/THREAT_DATA.md](docs/THREAT_DATA.md).
+- **License:** the project is released under the MIT License (see [LICENSE](LICENSE)).
 - **Fixed:** strong compensating controls did not lower the ordering score, so an item with strong controls could rank above the same item with partial controls (for example an actively exploited item already at NEXT). Strong controls now take 1.0 off the ordering score (partial still 0.5), and a test checks that better controls never rank higher. Buckets are unchanged. See [docs/POLICY.md](docs/POLICY.md), rule 4.
 - **More from the KEV data:** the Batch Details box lists a row's CISA references (compact, with a scrolling area so long details never hide the table), the CSV export gains `references` and `forensic_triage` columns, and entries CISA flags for forensic triage get a neutral "Forensic triage advised" chip. None of these change a bucket or score.
 - **Text size shortcuts:** Ctrl+plus, Ctrl+minus and Ctrl+0 make the whole interface larger or smaller (90% to 130%) or reset it, and the choice is remembered. This helps on window managers where resizing the window is awkward.
