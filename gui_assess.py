@@ -11,6 +11,7 @@ from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
 STACK_BELOW = 900
+STACK_MARGIN = 40  # a scrollbar appearing changes the width by about 20 px; the margin stops the layout flip-flopping
 SCORE_HINT = "Enter a base score from 0.0 to 10.0, or paste a vector above"
 VECTOR_HELP = ("Paste a CVSS 3.0, 3.1 or 4.0 vector such as CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H. The "
                "base score is worked out for you and filled in below. Temporal, threat and environmental metrics are "
@@ -69,7 +70,7 @@ class AssessView:
         self._flash_job = None
         self._pending = None
         self.updating = False
-        self.stacked = None
+        self.wide = None
         self.frame = tk.Frame(parent, bg=ctx.style.theme.bg)
         self.scroll = ScrollFrame(self.frame, ctx.style.theme.bg)
         self.scroll.pack(fill=tk.BOTH, expand=True)
@@ -109,12 +110,15 @@ class AssessView:
 
     # ---- layout ----
     def _on_resize(self, event):
-        self._layout(wide=event.width >= STACK_BELOW)
+        # Hysteresis: leaving the current layout needs a clearly different width, so a width sitting right on the
+        # threshold (or a scrollbar appearing) can never make the two layouts trigger each other forever.
+        threshold = STACK_BELOW - STACK_MARGIN if self.wide else STACK_BELOW + STACK_MARGIN
+        self._layout(wide=event.width >= threshold)
 
     def _layout(self, wide):
-        if wide == self.stacked:
+        if wide == self.wide:
             return
-        self.stacked = wide
+        self.wide = wide
         self.left.grid_forget()
         self.right.grid_forget()
         if wide:

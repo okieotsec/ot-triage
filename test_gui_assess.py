@@ -495,6 +495,17 @@ class AssessLayoutTests(AssessTestCase):
             self.pump(0.1)
             self.assertLessEqual(view.verdict.winfo_reqwidth(), view.verdict.winfo_width() + 1, headline)
 
+    def test_the_layout_needs_a_clearly_different_width_to_switch_so_it_cannot_flip_flop(self):
+        view = self.build()
+        view._layout(wide=True)
+        sizes = lambda *widths: [view._on_resize(mock.Mock(width=w)) or view.wide for w in widths]  # noqa: E731
+        # Wide stays wide until the width is clearly below the line, even when a scrollbar takes ~20 px
+        self.assertEqual(sizes(906, 889, 870, 861), [True, True, True, True])
+        self.assertEqual(sizes(859), [False])
+        # Stacked stays stacked until the width is clearly above the line
+        self.assertEqual(sizes(889, 906, 930, 939), [False, False, False, False])
+        self.assertEqual(sizes(940, 906, 889), [True, True, True])
+
     def test_a_rebuild_keeps_the_inputs_and_the_result(self):
         view = self.build()
         self.fill("8.8", Threat.ACTIVE, Asset.CROWN, Exposure.HIGH)
