@@ -167,7 +167,7 @@ class StorageTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.dir = Path(tmp.name) / "data"
-        self.now = datetime.datetime(2026, 10, 7, 12, 0, tzinfo=datetime.timezone.utc)
+        self.now = datetime.datetime(2026, 10, 7, 12, 0, tzinfo=datetime.UTC)
 
     def fetcher(self, kev=None, epss=None):
         def fetch(url, max_bytes, allowed_hosts, **_kwargs):
@@ -486,7 +486,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         try:
             self.route()
         except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
@@ -629,9 +629,9 @@ class FetchTests(unittest.TestCase):
             self.get("/truncated")
 
     def test_the_system_proxy_setting_is_honored(self):
-        with mock.patch.dict(os.environ, {"HTTPS_PROXY": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1"}):
-            with self.assertRaisesRegex(td.FetchError, "could not connect"):
-                self.get("/ok")
+        proxies = {"HTTPS_PROXY": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1"}
+        with mock.patch.dict(os.environ, proxies), self.assertRaisesRegex(td.FetchError, "could not connect"):
+            self.get("/ok")
         self.assertEqual(self.get("/ok"), b"hello")
 
     def test_http_errors_are_reported_plainly(self):

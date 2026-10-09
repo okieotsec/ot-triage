@@ -161,7 +161,7 @@ _DISTANCE_METRICS = ("AV", "PR", "UI", "AC", "AT", "VC", "VI", "VA", "SC", "SI",
 
 def _selection(base_metrics):
     """Return all v4.0 metrics, with every non-base metric left undefined (X) so only the base score is computed."""
-    selected = {name: "X" for name in V4_OPTIONAL}
+    selected = dict.fromkeys(V4_OPTIONAL, "X")
     selected.update({name: base_metrics[name] for name in V4_BASE})
     return selected
 
@@ -222,9 +222,7 @@ def _score_v4(base_metrics):
         return LOOKUP.get("".join(str(d) for d in digits))
 
     score_eq1, score_eq2 = lower(eq1 + 1, eq2, eq3, eq4, eq5, eq6), lower(eq1, eq2 + 1, eq3, eq4, eq5, eq6)
-    if eq3 == 1 and eq6 == 1:
-        score_eq3eq6 = lower(eq1, eq2, eq3 + 1, eq4, eq5, eq6)
-    elif eq3 == 0 and eq6 == 1:
+    if (eq3 == 1 and eq6 == 1) or (eq3 == 0 and eq6 == 1):
         score_eq3eq6 = lower(eq1, eq2, eq3 + 1, eq4, eq5, eq6)
     elif eq3 == 1 and eq6 == 0:
         score_eq3eq6 = lower(eq1, eq2, eq3, eq4, eq5, eq6 + 1)

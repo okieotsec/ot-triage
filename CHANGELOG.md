@@ -3,6 +3,7 @@
 ## 0.4.0 (release candidate)
 
 - **References from CISA's notes:** the Assess view lists the links CISA adds to a KEV entry (advisories, vendor pages, BOD guidance) under Recommended action, each with its real domain. Links open in your browser only when you click them, only safe `https` links are clickable, and the copied summaries include them. See [docs/THREAT_DATA.md](docs/THREAT_DATA.md).
+- **Code quality:** the lint rules are now listed explicitly in `ruff.toml` (bugs, security, import order, modern syntax, simplifications) and CI uses that file with a pinned ruff version. About 50 style findings were fixed; behaviour is unchanged (all tests pass and all 110,160 CVSS vectors still match FIRST's calculators).
 - **Fixed (Windows):** a button stayed in its darker pressed colour after a click until the pointer moved; it now returns to normal at once.
 - **Fixed:** pasting an enormous text into a text box could freeze the app on Windows (Tk becomes extremely slow showing megabytes on one line). Text boxes now refuse input beyond 2,000 characters immediately, and the CVSS vector box says so. Layout switches and the scrollbar also no longer flip back and forth in some window sizes, which made the interface stall on some systems.
 - **License:** the project is released under the MIT License (see [LICENSE](LICENSE)).

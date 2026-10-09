@@ -78,8 +78,8 @@ def load(path=None):
     try:
         return PrefsLoad(UiPrefs.from_dict(jsonfile.read_json(path, MAX_PREFS_BYTES)))
     except (OSError, ValueError, RecursionError) as error:
-        return PrefsLoad(DEFAULT_PREFS, (f"Appearance preferences in {path} could not be used ({error}). "
-                                         "Default preferences are in effect.",))
+        return PrefsLoad(DEFAULT_PREFS, ((f"Appearance preferences in {path} could not be used ({error}). "
+                                          "Default preferences are in effect."),))
 
 
 def save(prefs, path=None):

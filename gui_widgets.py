@@ -100,7 +100,7 @@ def field_label(parent, style, text, help_text=None, bg=None):
 def _shade(color, toward, amount):
     """Blend a #rrggbb colour towards another by a fraction."""
     mixed = [round(int(color[i:i + 2], 16) * (1 - amount) + int(toward[i:i + 2], 16) * amount) for i in (1, 3, 5)]
-    return "#%02x%02x%02x" % tuple(mixed)
+    return "#{:02x}{:02x}{:02x}".format(*mixed)
 
 
 def button(parent, style, text, command, kind="primary", **options):
@@ -551,7 +551,7 @@ class Worker:
         try:
             result = job(cancel_event, lambda message: events.put(("progress", message)))
             events.put(("done", (result, "")))
-        except Exception as error:  # noqa: BLE001  # report any failure as a message, never a traceback
+        except Exception as error:  # report any failure as a message, never a traceback
             text = str(error) or type(error).__name__
             events.put(("done", (None, text[:300])))
 

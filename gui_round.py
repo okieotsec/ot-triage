@@ -122,8 +122,9 @@ def round_corners(frame, radius, ring, outside, ring_width=1, fill=None):
     The overlays are placed against the widget's outer edge, so this works for frames, entries and canvases alike.
     """
     frame.corner_labels = []
-    placements = {"tl": dict(x=0, y=0), "tr": dict(relx=1.0, x=-radius, y=0),
-                  "bl": dict(x=0, rely=1.0, y=-radius), "br": dict(relx=1.0, x=-radius, rely=1.0, y=-radius)}
+    placements = {"tl": {"x": 0, "y": 0}, "tr": {"relx": 1.0, "x": -radius, "y": 0},
+                  "bl": {"x": 0, "rely": 1.0, "y": -radius},
+                  "br": {"relx": 1.0, "x": -radius, "rely": 1.0, "y": -radius}}
     fills = _fills(fill)
     for which, where in placements.items():
         image = corner_photo(frame, which, radius, ring, outside, ring_width, fills[which])

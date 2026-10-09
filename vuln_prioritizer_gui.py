@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Tkinter GUI for the Now / Next / Never vulnerability prioritizer: window shell, navigation and status bar."""
 import dataclasses
 import gc

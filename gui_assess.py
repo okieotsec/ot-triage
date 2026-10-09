@@ -5,8 +5,23 @@ from tkinter import ttk
 import cvss
 import explain
 from explain import SHORT_LABELS, AssessInputs
-from gui_widgets import (MAX_ENTRY_CHARS, Expander, FlowFrame, MessageLabel, ReferenceList, ScrollFrame, Segmented,
-                         ask_text, button, card, chip, field_label, priority_badge, rounded_entry, set_enabled)
+from gui_widgets import (
+    MAX_ENTRY_CHARS,
+    Expander,
+    FlowFrame,
+    MessageLabel,
+    ReferenceList,
+    ScrollFrame,
+    Segmented,
+    ask_text,
+    button,
+    card,
+    chip,
+    field_label,
+    priority_badge,
+    rounded_entry,
+    set_enabled,
+)
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, parse_cvss
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 

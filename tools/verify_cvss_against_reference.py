@@ -95,7 +95,7 @@ def main():
         shutil.copy(HERE / "cvss_reference_scores.js", work / "cvss_reference_scores.js")
         vectors = [v for version in VERSIONS for v in all_vectors(version)]
         (work / "vectors.json").write_text(json.dumps(vectors))
-        subprocess.run(["node", "cvss_reference_scores.js", "vectors.json", "scores.json"], cwd=work,  # noqa: S603, S607  # nosec B603 B607
+        subprocess.run(["node", "cvss_reference_scores.js", "vectors.json", "scores.json"], cwd=work,  # noqa: S607  # nosec B603 B607
                        check=True, env={**os.environ, "NODE_OPTIONS": ""})
         reference = json.loads((work / "scores.json").read_text())
     failed = False

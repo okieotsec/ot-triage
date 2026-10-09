@@ -335,7 +335,7 @@ def fetch(url, max_bytes, allowed_hosts, context=None, timeout=FETCH_TIMEOUT_SEC
         url, headers={"User-Agent": "vuln-prioritizer", "Accept-Encoding": "identity"})
     started = time.monotonic()
     try:
-        with opener.open(request, timeout=timeout) as response:  # noqa: S310  # nosec B310
+        with opener.open(request, timeout=timeout) as response:  # nosec B310
             length = response.headers.get("Content-Length")
             expected = int(length) if length and length.isdigit() else None
             if expected is not None and expected > max_bytes:
@@ -429,7 +429,7 @@ def _label(text):
 
 
 def _now():
-    return datetime.datetime.now(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
 
 
 def _read_meta(data_dir):
@@ -561,7 +561,7 @@ class ThreatData:
 
 def _freshness(label, version, retrieved, stale_days, now):
     try:
-        when = datetime.datetime.strptime(retrieved, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+        when = datetime.datetime.strptime(retrieved, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.UTC)
         days = max(0, (now - when).days)
     except ValueError:
         return Freshness(label, f"{label} {version}: retrieval date unknown", True, False)

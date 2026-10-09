@@ -13,8 +13,8 @@ import gui_widgets
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
-from test_threatdata import epss_bytes, epss_text, kev_bytes, kev_entry
 from settings import DEFAULT_SETTINGS, Settings
+from test_threatdata import epss_bytes, epss_text, kev_bytes, kev_entry
 from uiprefs import DEFAULT_PREFS
 
 HERE = Path(__file__).resolve().parent
@@ -44,7 +44,7 @@ class BatchViewTestCase(DisplayTestCase):
     def load(self, path=SAMPLE):
         view = self.view or self.build()
         view.load(path)
-        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running and bool(self.view.state.items)
+        self.assertTrue(self.pump(10, until=lambda: (not self.ctx.worker.running and bool(self.view.state.items))
                                   or self.ctx.error.called or self.ctx.info.called))
         self.pump(0.05)
         return view
@@ -67,7 +67,7 @@ class BatchLoadTests(BatchViewTestCase):
         view = self.build()
         self.assertIn("Open a CSV file", view.detail_title.cget("text"))
         self.assertEqual(str(view.export_button.cget("state")), "disabled")
-        self.assertEqual(self.counter_numbers(), {k: "0" for k in view.counters})
+        self.assertEqual(self.counter_numbers(), dict.fromkeys(view.counters, "0"))
 
     def test_sample_file_is_loaded_ranked_and_counted(self):
         view = self.load()

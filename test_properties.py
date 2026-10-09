@@ -10,10 +10,12 @@ import cvss
 import settings
 import threatdata
 import uiprefs
-from prioritizer import Asset, Controls, Exposure, Patch, Threat, NOW, NEXT, NEVER, parse_cvss, prioritize
+from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Threat, parse_cvss, prioritize
 
 try:
-    from hypothesis import given, settings as hyp_settings, strategies as st
+    from hypothesis import given
+    from hypothesis import settings as hyp_settings
+    from hypothesis import strategies as st
 except ImportError:  # hypothesis is an optional test dependency
     st = None
 
@@ -160,8 +162,8 @@ class PropertyTests(unittest.TestCase):
             info = threatdata.CveInfo("CVE-2024-0001", entry, None if percentile is None else 0.1, percentile,
                                       kev_loaded, epss_loaded)
             base = threatdata.derive_threat(info, settings.DEFAULT_SETTINGS, analyst, public).level
-            for extra in (dict(analyst_confirmed=True), dict(public_exploit=True)):
-                kwargs = dict(analyst_confirmed=analyst, public_exploit=public)
+            for extra in ({"analyst_confirmed": True}, {"public_exploit": True}):
+                kwargs = {"analyst_confirmed": analyst, "public_exploit": public}
                 kwargs.update(extra)
                 raised = threatdata.derive_threat(info, settings.DEFAULT_SETTINGS, **kwargs).level
                 self.assertGreaterEqual(order[raised], order[base])

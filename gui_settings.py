@@ -90,7 +90,7 @@ class SettingsView:
         intro.pack(fill=tk.X)
         intro.bind("<Configure>", lambda e: intro.configure(wraplength=max(e.width - 4, 100)))
         for name in SPEC:
-            kind, default, low, high, _description = SPEC[name]
+            _kind, default, low, high, _description = SPEC[name]
             row = tk.Frame(box, bg=t.card)
             row.pack(fill=tk.X, pady=(12, 0))
             row.columnconfigure(0, weight=1)
