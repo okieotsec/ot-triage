@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.4.0 (release candidate)
+## 0.4.0 (2026-10-09)
 
+- **Software bill of materials:** `sbom/sbom.cdx.json` now describes OT Triage itself (version, license, project links) with no third-party components, and is generated reproducibly by `tools/make_sbom.py`; a test keeps it in step with the version.
 - **References from CISA's notes:** the Assess view lists the links CISA adds to a KEV entry (advisories, vendor pages, BOD guidance) under Recommended action, each with its real domain. Links open in your browser only when you click them, only safe `https` links are clickable, and the copied summaries include them. See [docs/THREAT_DATA.md](docs/THREAT_DATA.md).
 - **Changed:** looking up a CVE that is in CISA KEV now shows CISA's required action, the reference links and the KEV chips straight away, without waiting for a CVSS score. Only the priority itself needs the score, and it says so.
 - **New name and branding:** the project is now **OT Triage by OkieOTSec** (it was "Vulnerability Prioritizer"). The window shows the OkieOTSec wordmark and a new icon (three bars in the result colours), the About page links to the project's website, GitHub, YouTube and X, and the light theme is now a warm cream. The entry point is `ot_triage_gui.py`, and the settings and data folders are now named `ot-triage` (an existing install should move its old `vuln-prioritizer` folders, or just download the threat data again).

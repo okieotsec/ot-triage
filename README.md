@@ -114,7 +114,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 
 - **[SECURITY.md](SECURITY.md)** explains how to report a vulnerability, which two public files the app can download (and that it works fully offline otherwise), and what it reads and writes.
 - **[SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md)** is the test plan. Each checkpoint's evidence is archived in `reports/`.
-- **Software bill of materials:** [sbom/sbom.cdx.json](sbom/sbom.cdx.json) (CycloneDX). The application uses only the Python standard library, so there are no third-party runtime dependencies; the SBOM lists only `pip`, which belongs to the clean environment it was generated from.
+- **Software bill of materials:** [sbom/sbom.cdx.json](sbom/sbom.cdx.json) (CycloneDX). The application uses only the Python standard library, so the SBOM lists the application itself and no third-party components. It is generated from a brand-new empty environment by `tools/make_sbom.py`, and a test fails if it goes out of date.
 - **Third-party material:** the CVSS 4.0 scoring tables come from FIRST's calculator (BSD-2-Clause); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### What was tested
