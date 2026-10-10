@@ -59,7 +59,7 @@ Stored files are checked again every time they are loaded, so a file changed on 
 
 CISA's required action often says "see URL in Notes". The notes field holds those links (advisories, vendor pages, the BOD 26-04 guidance) as a list separated by semicolons, sometimes with a label such as `BOD 26-04:`.
 
-- After you look up a CVE that is in KEV, the Assess view shows a **References from CISA** card under Recommended action. Each link has its label (or its host name) and the real domain underneath, so you can see where it goes before you click.
+- After you look up a CVE that is in KEV (even before you have entered a CVSS score; only the priority needs that), the Assess view shows a **References from CISA** card under Recommended action. Each link has its label (or its host name) and the real domain underneath, so you can see where it goes before you click.
 - Clicking a link, or pressing Enter or Space while it has the keyboard focus, opens it in your default web browser. Nothing is opened or fetched automatically. If no browser can be opened, the address is copied to the clipboard instead.
 - Only plain `https` links to an ordinary host name are clickable. Anything else in the notes (`http` links, odd ports, addresses with a user name, IP addresses, look-alike characters, other kinds of link) is shown as plain text and never opened. Invisible and control characters are removed.
 - At most 12 references are shown, with duplicates removed.
