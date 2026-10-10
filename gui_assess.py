@@ -466,13 +466,31 @@ class AssessView:
         self.subtitle.configure(text=sub)
         self.score_bar.configure(value=0)
         self.score_label.configure(text="")
-        self.action_label.configure(text="")
-        self._set_references(())
-        self.chips.set_items([])
         self.reasoning_text.configure(text="")
         self._set_whatif([])
+        self._show_kev_context()
         for b in (self.copy_button, self.markdown_button):
             set_enabled(b, False)
+
+    def _show_kev_context(self):
+        """While no result exists yet, still show what a looked-up CVE's KEV entry says: it does not need a score."""
+        info = self.state.info
+        entry = info.kev if info is not None else None
+        if entry is None:
+            self.action_label.configure(text="")
+            self._set_references(())
+            self.chips.set_items([])
+            return
+        s = self.style
+        self.action_label.configure(text=f"CISA required action: {entry.required_action}" if entry.required_action
+                                    else "")
+        self._set_references(entry.references)
+        facts = [("In CISA KEV", "raise")]
+        if entry.ransomware:
+            facts.append(("Ransomware use", "raise"))
+        if entry.forensic_triage:
+            facts.append(("Forensic triage advised", "neutral"))
+        self.chips.set_items([chip(self.chips, s, label, direction) for label, direction in facts])
 
     def _show_result(self, result, inputs, decision):
         s = self.style

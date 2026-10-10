@@ -710,6 +710,41 @@ class AssessReferenceTests(AssessTestCase):
         self.assertTrue(any("forensic triage" in r for r in view.result.reasons))
         self.assertEqual(view.result.priority, "NOW")
 
+    def test_a_kev_lookup_shows_its_data_straight_away_without_waiting_for_a_cvss_score(self):
+        self.load_data()
+        view = self.build()
+        self.ctx.assess_state.cvss.set("")
+        self.lookup(KEV_CVE)
+        self.assertEqual(view.verdict.cget("text"), "Waiting for input")
+        self.assertEqual(view.refs_card.winfo_manager(), "pack")
+        self.assertEqual([w.cget("text") for w in self.labels(view)], ["vendor.example.com", "BOD 26-04"])
+        self.assertTrue(view.action_label.cget("text").startswith("CISA required action: "))
+        chips = [c.cget("text") for c in view.chips.items]
+        for expected in ("In CISA KEV", "Ransomware use", "Forensic triage advised"):
+            self.assertTrue(any(expected in text for text in chips), expected)
+        self.assertFalse(view.copy_button.cget("state") == "normal", "there is still no result to copy")
+
+    def test_an_invalid_score_still_keeps_the_kev_data_and_a_cve_outside_kev_shows_none(self):
+        self.load_data()
+        view = self.build()
+        self.ctx.assess_state.cvss.set("abc")
+        self.lookup(KEV_CVE)
+        self.assertEqual(view.verdict.cget("text"), "Invalid input")
+        self.assertEqual(view.refs_card.winfo_manager(), "pack")
+        self.lookup(EPSS_CVE)
+        self.assertEqual((view.references, view.refs_card.winfo_manager(), view.action_label.cget("text")),
+                         ((), "", ""))
+
+    def test_entering_the_score_afterwards_replaces_the_preview_with_the_full_result(self):
+        self.load_data()
+        view = self.build()
+        self.ctx.assess_state.cvss.set("")
+        self.lookup(KEV_CVE)
+        self.fill("8.0", Threat.NONE)
+        self.assertIn(view.badge.cget("text"), ("NOW", "NEXT"))
+        self.assertEqual(len(self.labels(view)), 2)
+        self.assertIn("Apply the patch", view.action_label.cget("text"))
+
     def test_a_manual_item_has_no_reference_section_in_its_summary(self):
         view = self.build()
         self.fill("8.0", Threat.NONE)
