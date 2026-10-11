@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Environmental CVSS scores:** a CVSS 3.0, 3.1 or 4.0 vector that sets environmental metrics (security requirements, modified base metrics; for 4.0 including the Safety value) now also gets an environmental score, shown next to the base score in Assess, the copied summaries, Batch details and a new `cvss_environmental` export column. The priority still uses only the base score (decided with the project owner; see docs/POLICY.md). Checked against FIRST's official calculators on about 180,000 generated vectors (every score identical); the 60,000 vectors per version are rebuilt and re-checked by the offline tests.
 - **Asset inventory import:** in Batch, **Load inventory...** reads a CSV of assets (`asset_id`, criticality, exposure, controls) and fills those values into findings that carry an `asset_id`, so they no longer need typing on every row. A value on the finding row always wins; an unknown or duplicated asset is an error, never a guess. The open file is scored again whenever the inventory changes. The export gains `asset_id` and `from_inventory` columns. No rule changes. Sample files and docs in [docs/INVENTORY.md](docs/INVENTORY.md).
 - **Fixed:** the shared text cleaner turned line breaks and tabs into nothing, which could glue two words together (for example in a CISA note); they now become spaces.
 

@@ -442,7 +442,8 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh)
                 rows = list(reader)
-        self.assertEqual(reader.fieldnames[-4:], ["references", "forensic_triage", "asset_id", "from_inventory"])
+        self.assertEqual(reader.fieldnames[-5:], ["references", "forensic_triage", "asset_id", "from_inventory",
+                                                  "cvss_environmental"])
         by_cve = {r["cve"]: r for r in rows}
         kev_row = by_cve["CVE-2024-0001"]
         self.assertEqual(kev_row["forensic_triage"], "Yes")
@@ -463,6 +464,39 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 row = next(csv.DictReader(fh))
         self.assertTrue(row["references"].startswith("'="), row["references"])
+
+
+class EnvironmentalScoreTests(unittest.TestCase):
+    BASE = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    ENV = BASE + "/CR:L/IR:L/AR:L/MAV:A/MAC:H"
+    ROW = {"threat": "none", "asset": "important", "exposure": "medium"}
+
+    def item(self, vector):
+        return batch.score_row(2, {**self.ROW, "cvss_vector": vector})
+
+    def test_the_environmental_score_is_recorded_for_comparison(self):
+        with_env, without = self.item(self.ENV), self.item(self.BASE)
+        self.assertEqual((with_env.cvss, with_env.cvss_environmental), (9.8, 5.7))
+        self.assertIsNone(without.cvss_environmental)
+
+    def test_the_environmental_score_never_changes_the_priority_or_the_ordering_score(self):
+        for vector in (self.ENV, self.BASE + "/MC:N/MI:N/MA:N", self.BASE + "/MAV:P/CR:L",
+                       "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/MAV:P/CR:L"):
+            base = vector.split("/MAV")[0].split("/CR")[0].split("/MC")[0]
+            a, b = self.item(vector), self.item(base)
+            self.assertEqual((a.priority, a.result.score, a.cvss), (b.priority, b.result.score, b.cvss), vector)
+
+    def test_a_vector_with_only_temporal_metrics_has_no_environmental_score(self):
+        self.assertIsNone(self.item(self.BASE + "/E:P/RL:O/RC:R").cvss_environmental)
+
+    def test_the_export_has_the_environmental_column(self):
+        import csv as csvmodule
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, batch.sort_items([self.item(self.ENV), self.item(self.BASE)]))
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                values = sorted(row["cvss_environmental"] for row in csvmodule.DictReader(fh))
+        self.assertEqual(values, ["", "5.7"])
 
 
 if __name__ == "__main__":

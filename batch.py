@@ -81,6 +81,7 @@ class BatchItem:
     cve: str = ""
     cvss_vector: str = ""
     cvss_version: str = ""
+    cvss_environmental: float = None   # shown for comparison only; the priority always uses the base score
     threat_sources: str = ""
     references: tuple = ()
     forensic_triage: bool = False
@@ -160,6 +161,7 @@ def _read_cvss(item, vector_text, errors):
         errors.append(f"cvss_vector: {e}")
         return
     item.cvss_vector, item.cvss_version, score = parsed.normalized, parsed.version, parsed.score
+    item.cvss_environmental = parsed.environmental_score
     if item.cvss_raw.strip():
         try:
             typed = parse_cvss(item.cvss_raw)
@@ -290,7 +292,7 @@ OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cv
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
-                  "from_inventory"]
+                  "from_inventory", "cvss_environmental"]
 
 
 def write_results(path, items, threatdata=None):
@@ -306,7 +308,8 @@ def write_results(path, items, threatdata=None):
                    "cvss_vector": _safe(item.cvss_vector),
                    "references": _safe(" ; ".join(describe(r) for r in item.references)),
                    "forensic_triage": "Yes" if item.forensic_triage else "",
-                   "asset_id": _safe(item.asset_id), "from_inventory": "; ".join(item.from_inventory)}
+                   "asset_id": _safe(item.asset_id), "from_inventory": "; ".join(item.from_inventory),
+                   "cvss_environmental": "" if item.cvss_environmental is None else f"{item.cvss_environmental:.1f}"}
             if item.result:
                 rank += 1
                 row.update(

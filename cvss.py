@@ -1,7 +1,10 @@
-"""Parse CVSS vector strings and compute base scores for CVSS 3.0, 3.1 and 4.0 (no GUI dependencies).
+"""Parse CVSS vector strings and compute base and environmental scores for CVSS 3.0, 3.1 and 4.0 (no GUI dependencies).
 
-Scoring follows the official FIRST reference calculators. Only the base score is computed: temporal, threat,
-environmental and supplemental metrics are accepted and checked, but they never change the result.
+Scoring follows the official FIRST reference calculators. The base score never depends on anything but the base
+metrics. The environmental score (modified base metrics and security requirements, with the temporal or threat metrics
+that apply to it) is computed only when the vector sets at least one environmental metric. Supplemental metrics are
+accepted and checked, but never change a score. Neither score is used to decide a priority bucket on its own: the
+application shows the environmental score next to the base score for comparison (see docs/CVSS.md).
 """
 import math
 import re
@@ -21,6 +24,8 @@ V3_OPTIONAL = {"E": "XUPFH", "RL": "XOTWU", "RC": "XURC", "CR": "XLMH", "IR": "X
 V4_BASE = {"AV": ("N", "A", "L", "P"), "AC": ("L", "H"), "AT": ("N", "P"), "PR": ("N", "L", "H"),
            "UI": ("N", "P", "A"), "VC": ("H", "L", "N"), "VI": ("H", "L", "N"), "VA": ("H", "L", "N"),
            "SC": ("H", "L", "N"), "SI": ("H", "L", "N"), "SA": ("H", "L", "N")}
+V3_ENVIRONMENTAL = ("CR", "IR", "AR", "MAV", "MAC", "MPR", "MUI", "MS", "MC", "MI", "MA")
+V4_ENVIRONMENTAL = ("CR", "IR", "AR", "MAV", "MAC", "MAT", "MPR", "MUI", "MVC", "MVI", "MVA", "MSC", "MSI", "MSA")
 V4_OPTIONAL = {"E": ("X", "A", "P", "U"), "CR": ("X", "H", "M", "L"), "IR": ("X", "H", "M", "L"),
                "AR": ("X", "H", "M", "L"), "MAV": ("X", "N", "A", "L", "P"), "MAC": ("X", "L", "H"),
                "MAT": ("X", "N", "P"), "MPR": ("X", "N", "L", "H"), "MUI": ("X", "N", "P", "A"),
@@ -54,6 +59,17 @@ class CvssVector:
     def score(self):
         """Return the base score (0.0 to 10.0)."""
         return base_score(self)
+
+    @property
+    def has_environmental(self):
+        """True when the vector sets an environmental metric (a modified base metric or a security requirement)."""
+        names = V4_ENVIRONMENTAL if self.version == "4.0" else V3_ENVIRONMENTAL
+        return any(self.metrics.get(name, "X") != "X" for name in names)
+
+    @property
+    def environmental_score(self):
+        """Return the environmental score (0.0 to 10.0), or None when the vector sets no environmental metric."""
+        return environmental_score(self) if self.has_environmental else None
 
 
 def parse_vector(text):
@@ -105,6 +121,13 @@ def base_score(vector):
     return _score_v3(vector.metrics, vector.version)
 
 
+def environmental_score(vector):
+    """Return the environmental score of a parsed vector (the base score if no environmental metric is set)."""
+    if vector.version == "4.0":
+        return _score_v4(vector.metrics, environmental=True)
+    return _environmental_v3(vector.metrics, vector.version)
+
+
 # ---- CVSS 3.0 and 3.1 -----------------------------------------------------
 
 _V3_WEIGHTS = {
@@ -146,6 +169,45 @@ def _score_v3(metrics, version):
     return float(roundup(min(1.08 * (exploitability + impact), 10)))
 
 
+_SECURITY_REQUIREMENT = {"X": 1.0, "L": 0.5, "M": 1.0, "H": 1.5}
+_V3_TEMPORAL = {"E": {"X": 1.0, "U": 0.91, "P": 0.94, "F": 0.97, "H": 1.0},
+                "RL": {"X": 1.0, "O": 0.95, "T": 0.96, "W": 0.97, "U": 1.0},
+                "RC": {"X": 1.0, "U": 0.92, "R": 0.96, "C": 1.0}}
+
+
+def _environmental_v3(metrics, version):
+    """The CVSS 3.0 / 3.1 environmental score: the base formula on the modified metrics, weighted by the security
+    requirements and multiplied by the temporal metrics. A modified metric that is not set (X) keeps its base value."""
+    roundup = _roundup_v31 if version == "3.1" else _roundup_v30
+    w = _V3_WEIGHTS
+
+    def modified(name):
+        value = metrics.get("M" + name, "X")
+        return metrics[name] if value == "X" else value
+
+    def requirement(name):
+        return _SECURITY_REQUIREMENT[metrics.get(name, "X")]
+
+    scope = modified("S")
+    miss = min(1 - ((1 - w["CIA"][modified("C")] * requirement("CR"))
+                    * (1 - w["CIA"][modified("I")] * requirement("IR"))
+                    * (1 - w["CIA"][modified("A")] * requirement("AR"))), 0.915)
+    if scope == "U":
+        impact = w["S"][scope] * miss
+    elif version == "3.1":
+        impact = w["S"][scope] * (miss - 0.029) - 3.25 * math.pow(miss * 0.9731 - 0.02, 13)
+    else:
+        impact = w["S"][scope] * (miss - 0.029) - 3.25 * math.pow(miss - 0.02, 15)
+    exploitability = 8.22 * w["AV"][modified("AV")] * w["AC"][modified("AC")] * w["PR"][scope][modified("PR")] \
+        * w["UI"][modified("UI")]
+    if impact <= 0:
+        return 0.0
+    temporal = _V3_TEMPORAL["E"][metrics.get("E", "X")] * _V3_TEMPORAL["RL"][metrics.get("RL", "X")] \
+        * _V3_TEMPORAL["RC"][metrics.get("RC", "X")]
+    combined = exploitability + impact if scope == "U" else 1.08 * (exploitability + impact)
+    return float(roundup(roundup(min(combined, 10)) * temporal))
+
+
 # ---- CVSS 4.0 -------------------------------------------------------------
 
 _LEVELS = {
@@ -159,10 +221,13 @@ _LEVELS = {
 _DISTANCE_METRICS = ("AV", "PR", "UI", "AC", "AT", "VC", "VI", "VA", "SC", "SI", "SA", "CR", "IR", "AR")
 
 
-def _selection(base_metrics):
-    """Return all v4.0 metrics, with every non-base metric left undefined (X) so only the base score is computed."""
+def _selection(metrics, environmental=False):
+    """Return all v4.0 metrics. For the base score every non-base metric is left undefined (X); for the environmental
+    score the threat, security requirement and modified metrics the vector sets are used as well."""
     selected = dict.fromkeys(V4_OPTIONAL, "X")
-    selected.update({name: base_metrics[name] for name in V4_BASE})
+    selected.update({name: metrics[name] for name in V4_BASE})
+    if environmental:
+        selected.update({name: metrics[name] for name in (*V4_ENVIRONMENTAL, "E") if name in metrics})
     return selected
 
 
@@ -210,8 +275,8 @@ def _parse_max_vector(text):
     return dict(part.split(":") for part in text.strip("/").split("/"))
 
 
-def _score_v4(base_metrics):
-    selected = _selection(base_metrics)
+def _score_v4(metrics, environmental=False):
+    selected = _selection(metrics, environmental)
     if all(_effective(selected, name) == "N" for name in ("VC", "VI", "VA", "SC", "SI", "SA")):
         return 0.0
     macro = _macro_vector(selected)

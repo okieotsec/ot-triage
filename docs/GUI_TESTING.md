@@ -27,6 +27,7 @@ Run this before a release, with `python3 ot_triage_gui.py`.
 - [ ] Tab reaches every field, button and choice in a sensible order; the focused control has a visible outline.
 - [ ] Left and Right arrows change a focused choice (for example Threat or Exposure).
 - [ ] Ctrl+1 to Ctrl+5 switch views; Ctrl+L focuses the CVE field; Ctrl+Shift+C copies the summary; after looking up a KEV CVE the References card (and the Batch Details box for a row with a KEV `cve`) lists links that open in your browser when clicked (and from the keyboard with Enter); Ctrl+plus, Ctrl+minus and Ctrl+0 change the text size, keep what you typed, and the size is still there after a restart.
+- [ ] Assess: paste `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/CR:L/IR:L/AR:L/MAV:A/MAC:H`. The base score is 9.8, a line under it says the environmental score is 5.7 "shown for comparison", and the priority does not change. Pasting the vector without the last five metrics removes the line.
 - [ ] Batch: **Load inventory...** with `sample_inventory.csv`, then open `sample_findings_with_assets.csv`: six rows are scored, the row for an unknown asset shows an error, and a selected row shows a **From inventory** chip. **Clear** returns the rows to errors.
 - [ ] Enter in the CVE field looks the CVE up; Space or Enter opens "Show reasoning".
 

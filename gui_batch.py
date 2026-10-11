@@ -387,6 +387,9 @@ class BatchView:
             lines = [f"Action: {item.result.action}", ""] + [f"• {r}" for r in item.result.reasons]
             if item.cvss_version:
                 lines += ["", f"CVSS vector: {item.cvss_vector} (CVSS {item.cvss_version}, base score {item.cvss:.1f})"]
+                if item.cvss_environmental is not None:
+                    lines.append(f"Environmental score: {item.cvss_environmental:.1f}, shown for comparison; the "
+                                 "priority uses the base score.")
             if item.asset_id:
                 taken = ", ".join(item.from_inventory) or "nothing"
                 lines += ["", f"Asset {item.asset_id}: {taken} filled in from the inventory"

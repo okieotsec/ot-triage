@@ -454,6 +454,33 @@ class AssessVectorTests(AssessTestCase):
         self.assertIn("longer than 400", self.view.vector_message.cget("text"))
         self.assertLess(len(self.view.vector_message.cget("text")), 200)
 
+    def test_environmental_metrics_show_a_second_score_for_comparison_and_never_change_the_priority(self):
+        self.setup_inputs()
+        view = self.view
+        self.paste(V31)
+        badge_without = view.badge.cget("text")
+        self.assertEqual(view.cvss_env.winfo_manager(), "")
+        env_vector = V31 + "/CR:L/IR:L/AR:L/MAV:A/MAC:H"
+        self.paste(env_vector)
+        self.assertEqual(self.ctx.assess_state.cvss.get(), "9.8")
+        self.assertEqual(view.badge.cget("text"), badge_without)
+        self.assertEqual(view.cvss_env.winfo_manager(), "pack")
+        self.assertIn("Environmental score: 5.7", view.cvss_env.cget("text"))
+        self.assertIn("the priority uses the base score", view.cvss_env.cget("text"))
+        self.assertNotIn("Environmental", view.vector_message.cget("text"), "said once, next to the score")
+        self.assertIn("CVSS environmental score: 5.7", "\n".join(view.vector_lines()))
+        self.paste(V31)
+        self.assertEqual(view.cvss_env.winfo_manager(), "")
+        self.assertNotIn("environmental", "\n".join(view.vector_lines()).lower())
+
+    def test_the_environmental_note_goes_away_when_the_score_is_typed_by_hand(self):
+        self.setup_inputs()
+        self.paste(V31 + "/CR:L/MAV:A")
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "pack")
+        self.ctx.assess_state.cvss.set("7.0")
+        self.pump(0.2)
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "")
+
     def test_a_huge_paste_into_the_box_is_refused_at_once_and_never_reaches_the_widget(self):
         self.setup_inputs()
         entry = self.view.vector_entry

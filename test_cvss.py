@@ -202,6 +202,121 @@ class OfficialReferenceTests(unittest.TestCase):
             self.assertRegex(digest, r"^[0-9a-f]{64}$")
 
 
+def _load_generator():
+    import importlib.util
+    path = Path(__file__).resolve().parent / "tools" / "cvss_vectors.py"
+    spec = importlib.util.spec_from_file_location("cvss_vectors_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class EnvironmentalReferenceTests(unittest.TestCase):
+    """The environmental scores must equal the official FIRST calculators' for 180,000 mixed vectors."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.generator = _load_generator()
+
+    def rows(self, version):
+        for text in self.generator.environmental_vectors(version):
+            vector = cvss.parse_vector(text)
+            if vector.has_environmental:
+                yield text, vector.score, vector.environmental_score
+
+    def test_every_generated_vector_matches_the_official_calculators(self):
+        for version in cvss.SUPPORTED_VERSIONS:
+            expected = FIXTURE["environmental"][version]
+            rows = list(self.rows(version))
+            lines = "\n".join(f"{text} {base:.1f} {env:.1f}" for text, base, env in rows)
+            self.assertEqual(hashlib.sha256(lines.encode()).hexdigest(), expected["digest"], version)
+            self.assertEqual((len(rows), len(self.generator.environmental_vectors(version))),
+                             (expected["scored"], expected["vectors"]))
+
+    def test_every_recorded_readable_sample_matches(self):
+        for block in FIXTURE["environmental"].values():
+            self.assertGreaterEqual(len(block["samples"]), 150)
+            for text, base, env in block["samples"]:
+                parsed = cvss.parse_vector(text)
+                self.assertEqual((parsed.score, parsed.environmental_score), (base, env), text)
+
+    def test_the_generated_v4_vectors_reach_all_270_macrovectors(self):
+        reached = self.generator.macro_vectors_reached("4.0", self.generator.environmental_vectors("4.0"))
+        self.assertEqual(len(reached), 270)
+
+    def test_the_generator_is_deterministic_and_has_no_duplicates(self):
+        for version in cvss.SUPPORTED_VERSIONS:
+            first = self.generator.environmental_vectors(version, 500)
+            self.assertEqual(first, self.generator.environmental_vectors(version, 500))
+            self.assertEqual(len(set(first)), len(first))
+
+    def test_the_fixture_has_the_environmental_block_for_every_version(self):
+        self.assertEqual(set(FIXTURE["environmental"]), {"3.0", "3.1", "4.0"})
+        for block in FIXTURE["environmental"].values():
+            self.assertRegex(block["digest"], r"^[0-9a-f]{64}$")
+
+
+class EnvironmentalScoreTests(unittest.TestCase):
+    V31_BASE = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+
+    def score(self, text):
+        return cvss.parse_vector(text).environmental_score
+
+    def test_a_vector_without_environmental_metrics_has_no_environmental_score(self):
+        for text in (self.V31_BASE, V40, "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"):
+            parsed = cvss.parse_vector(text)
+            self.assertFalse(parsed.has_environmental)
+            self.assertIsNone(parsed.environmental_score)
+
+    def test_temporal_threat_and_supplemental_metrics_alone_do_not_make_an_environmental_score(self):
+        for text in (self.V31_BASE + "/E:P/RL:O/RC:R", V40 + "/E:P", V40 + "/S:P/AU:Y/R:A/V:C/RE:L/U:Red",
+                     self.V31_BASE + "/CR:X/MAV:X/MS:X", V40 + "/CR:X/MSI:X"):
+            self.assertIsNone(cvss.parse_vector(text).environmental_score, text)
+
+    def test_any_environmental_metric_gives_a_score_and_it_never_changes_the_base_score(self):
+        for text in (self.V31_BASE + "/CR:L", self.V31_BASE + "/MAV:P", self.V31_BASE + "/MC:N", V40 + "/CR:M",
+                     V40 + "/MAV:P", V40 + "/MSI:S"):
+            parsed = cvss.parse_vector(text)
+            self.assertTrue(parsed.has_environmental, text)
+            self.assertIsNotNone(parsed.environmental_score, text)
+            self.assertEqual(parsed.score, cvss.parse_vector(text.split("/CR")[0].split("/MAV")[0].split("/MC")[0]
+                                                             .split("/MSI")[0]).score)
+
+    def test_known_examples(self):
+        examples = {
+            self.V31_BASE + "/CR:L/IR:L/AR:L/MAV:A/MAC:H": 5.7,
+            "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H/MS:U/MC:L/CR:H": 9.5,
+            self.V31_BASE + "/MC:N/MI:N/MA:N": 0.0,
+        }
+        for text, expected in examples.items():
+            self.assertEqual(self.score(text), expected, text)
+
+    def test_lower_security_requirements_never_raise_a_v3_score_and_higher_ones_never_lower_it(self):
+        for version in ("3.0", "3.1"):
+            base = f"CVSS:{version}/AV:N/AC:L/PR:L/UI:R/S:C/C:H/I:L/A:L"
+            for metric in ("CR", "IR", "AR"):
+                scores = [self.score(f"{base}/{metric}:{level}") for level in ("L", "M", "H")]
+                self.assertEqual(scores, sorted(scores), (version, metric, scores))
+
+    def test_every_score_is_between_0_and_10_with_one_decimal(self):
+        generator = _load_generator()
+        for version in cvss.SUPPORTED_VERSIONS:
+            for text in generator.environmental_vectors(version, 3000):
+                value = cvss.parse_vector(text).environmental_score
+                if value is not None:
+                    self.assertTrue(0.0 <= value <= 10.0 and round(value, 1) == value, (text, value))
+
+    def test_the_v3_changed_scope_formulas_differ_between_3_0_and_3_1(self):
+        # The two versions use different modified-impact formulas and rounding, so some vectors score differently.
+        differing = 0
+        generator = _load_generator()
+        for text30 in generator.environmental_vectors("3.0", 3000):
+            text31 = text30.replace("CVSS:3.0/", "CVSS:3.1/")
+            a, b = self.score(text30), self.score(text31)
+            differing += (a is not None and a != b)
+        self.assertGreater(differing, 0)
+
+
 class VerificationToolTests(unittest.TestCase):
     """The developer tool downloads reference code, so its pins must stay complete and well-formed (offline check)."""
 

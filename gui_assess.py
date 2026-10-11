@@ -30,8 +30,10 @@ STACK_BELOW = 900
 STACK_MARGIN = 40  # a scrollbar appearing changes the width by about 20 px; the margin stops the layout flip-flopping
 SCORE_HINT = "Enter a base score from 0.0 to 10.0, or paste a vector above"
 VECTOR_HELP = ("Paste a CVSS 3.0, 3.1 or 4.0 vector such as CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H. The "
-               "base score is worked out for you and filled in below. Temporal, threat and environmental metrics are "
-               "accepted but do not change the base score. CVSS 2 vectors are not supported.")
+               "base score is worked out for you and filled in below. Temporal and threat metrics are accepted but do "
+               "not change it. If the vector sets environmental metrics (security requirements or modified base "
+               "metrics), the environmental score is shown next to the base score for comparison; the priority always "
+               "uses the base score. CVSS 2 vectors are not supported.")
 VECTOR_DELAY_MS = 400
 EXPOSURE_HELP = ("Low means no routable path from IT or the internet, verified by testing, not assumed from a "
                  "firewall's existence. If you are unsure, choose Medium.")
@@ -181,6 +183,9 @@ class AssessView:
                                   fg=t.muted, anchor="w")
         wrap_to_width(self.cvss_hint)
         self.cvss_hint.pack(fill=tk.X, pady=(4, 0))
+        self.cvss_env = tk.Label(vuln, text="", font=s.font(9, "bold"), bg=t.card, fg=t.muted, anchor="w",
+                                 justify="left")
+        wrap_to_width(self.cvss_env)
 
         field_label(vuln, s, "Threat", THREAT_HELP)
         self.threat_control = Segmented(vuln, s, _options(Threat), state.threat, self._threat_clicked)
@@ -457,6 +462,22 @@ class AssessView:
         info = self.state.vector_info
         self.cvss_band.configure(text=f"{label}  \u00b7  {info.label}" if info else label,
                                  fg=self.style.direction(direction))
+        self._update_environmental(info)
+
+    @staticmethod
+    def _environmental_text(info):
+        """One sentence giving the environmental score and saying plainly that the priority does not use it."""
+        score = info.environmental_score
+        return (f"Environmental score: {score:.1f} ({explain.cvss_band(score)[0]}), shown for comparison; "
+                "the priority uses the base score.")
+
+    def _update_environmental(self, info):
+        """Show the environmental score under the base score while a vector that sets such metrics is in use."""
+        if info is not None and info.environmental_score is not None:
+            self.cvss_env.configure(text=self._environmental_text(info))
+            self.cvss_env.pack(fill=tk.X, pady=(2, 0), after=self.cvss_hint)
+        else:
+            self.cvss_env.pack_forget()
 
     def _idle(self, headline, sub, error=False):
         t = self.style.theme
@@ -559,7 +580,11 @@ class AssessView:
         info = self.state.vector_info
         if info is None:
             return []
-        return [f"CVSS vector: {info.normalized}", f"CVSS version: {info.version} (base score {info.score:.1f})"]
+        lines = [f"CVSS vector: {info.normalized}", f"CVSS version: {info.version} (base score {info.score:.1f})"]
+        if info.environmental_score is not None:
+            lines.append(f"CVSS environmental score: {info.environmental_score:.1f} (shown for comparison; the "
+                         "priority uses the base score)")
+        return lines
 
     def _vector_too_long(self):
         """Explain that a paste was refused because it is far longer than any CVSS vector."""

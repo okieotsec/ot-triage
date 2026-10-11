@@ -690,5 +690,22 @@ class BatchInventoryTests(BatchViewTestCase):
         self.assertEqual(str(view.inventory_button.cget("state")), "normal")
 
 
+class BatchEnvironmentalTests(BatchViewTestCase):
+    def test_the_details_show_the_environmental_score_for_comparison(self):
+        view = self.build()
+        text = ("id,cvss_vector,threat,asset,exposure\n"
+                "E1,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/CR:L/IR:L/AR:L/MAV:A/MAC:H,none,important,medium\n"
+                "E2,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H,none,important,medium\n")
+        self.load(self.write_csv("env.csv", text))
+        for item_id, expected in (("E1", True), ("E2", False)):
+            row = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[1] == item_id)
+            view.tree.selection_set(row)
+            self.pump(0.2)
+            shown = "Environmental score: 5.7, shown for comparison; the priority uses the base score." in \
+                view.detail_text.cget("text")
+            self.assertEqual(shown, expected, item_id)
+        self.assertEqual({v[1]: v[5] for v in self.rows()}["E1"], {v[1]: v[5] for v in self.rows()}["E2"])
+
+
 if __name__ == "__main__":
     unittest.main()

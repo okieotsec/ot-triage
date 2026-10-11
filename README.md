@@ -94,7 +94,7 @@ Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [
 
 ## Batch CSV
 
-Required columns: `cvss` (or `cvss_vector`), `asset`, `exposure`, and `threat` (or `cve`). A `cvss_vector` column (CVSS 3.0, 3.1 or 4.0) supplies the score; see [docs/CVSS.md](docs/CVSS.md).
+Required columns: `cvss` (or `cvss_vector`), `asset`, `exposure`, and `threat` (or `cve`). A `cvss_vector` column (CVSS 3.0, 3.1 or 4.0) supplies the score, and if it sets environmental metrics the environmental score is shown next to it for comparison (the priority uses the base score); see [docs/CVSS.md](docs/CVSS.md).
 Optional columns: `id`, `name`, `patch` (default available), `controls` (default none).
 An optional `asset_id` column links a row to an **asset inventory** (a second CSV, loaded with **Load inventory...**) that fills in `asset`, `exposure` and `controls`, so those columns can be left out; see [docs/INVENTORY.md](docs/INVENTORY.md).
 An optional `cve` column looks the CVE up in local KEV and EPSS data (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)); with it, `threat` can be left blank.
@@ -129,6 +129,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP3 | Settings files, the new GUI, background work; later the CVSS vector parser | [reports/cp3](reports/cp3/claude.md), [CVSS addendum](reports/cp3/claude-addendum-cvss.md) |
 | CP4 | Release candidate: full regression and release gate | [reports/cp4](reports/cp4/claude.md) |
 | CP5 | Asset inventory import: a new file the tool parses | [reports/cp5-inventory](reports/cp5-inventory/claude.md) |
+| CP6 | Environmental CVSS scores, checked against FIRST's calculators | [reports/cp6-environmental-cvss](reports/cp6-environmental-cvss/claude.md) |
 
 Across the checkpoints 25 findings were recorded (3 Medium, 6 Low, 16 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
