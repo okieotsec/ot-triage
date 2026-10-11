@@ -4,8 +4,10 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import batch
+import inventory
 import malicious_cases
 import settings
 import threatdata
@@ -177,6 +179,73 @@ class MaliciousThreatDataTests(unittest.TestCase):
         results = threatdata.import_from_files(cases["kev_formula_text"][1], None, self.store)
         entry = threatdata.ThreatData.load(self.store).kev.entries["CVE-2024-0001"]
         self.assertEqual(entry.required_action, "=1+1")
+
+
+class MaliciousInventoryTests(unittest.TestCase):
+    """Every hostile asset inventory is either loaded safely (bad rows skipped) or refused with a ValueError."""
+
+    HEAD = b"asset_id,name,criticality,exposure,controls\n"
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.dir = folder.name
+
+    def path(self, name, data):
+        return malicious_cases._write(self.dir, name + ".csv", data)
+
+    def cases(self):
+        row = b"A-%d,Pump,crown,high,none\n"
+        return {
+            "empty": b"",
+            "header_only": self.HEAD,
+            "utf16": (self.HEAD + b"A-1,Pump,crown,high,none\n").decode().encode("utf-16"),
+            "latin1": self.HEAD + b"A-1,Caf\xe9,crown,high,none\n",
+            "binary_garbage": bytes(range(256)) * 40,
+            "nul_bytes": self.HEAD + b"A-1\x00,Pump,crown,high,none\n",
+            "unterminated_quote": self.HEAD + b'A-1,"never closed,crown,high,none\n',
+            "old_mac_line_endings": self.HEAD.replace(b"\n", b"\r") + b"A-1,Pump,crown,high,none\r",
+            "huge_cell": self.HEAD + b"A-1," + b"x" * 300_000 + b",crown,high,none\n",
+            "huge_id": self.HEAD + b"x" * 300_000 + b",Pump,crown,high,none\n",
+            "formula_cells": self.HEAD + b'"=HYPERLINK(""http://x"")",=cmd|x,crown,high,none\n',
+            "control_characters": self.HEAD + b"A\x1b[2J-1,Pu\x07mp,crown,high,none\n",
+            "bidi_and_invisible": self.HEAD + "A-\u202e1,Pu\u200bmp,crown,high,none\n".encode(),
+            "one_asset_a_thousand_times": self.HEAD + b"A-1,Pump,crown,high,none\n" * 1000,
+            "thousands_of_duplicate_pairs": self.HEAD + b"".join(row % (i // 2) for i in range(4000)),
+            "thousands_of_bad_rows": self.HEAD + b"A-1,Pump,nonsense,high,none\n" * 5000,
+            "ragged_rows": self.HEAD + b"A\nB,x\nC,x,crown,high,none,extra,extra\n",
+        }
+
+    def test_every_hostile_inventory_is_loaded_safely_or_refused_cleanly(self):
+        for name, data in self.cases().items():
+            with self.subTest(case=name):
+                try:
+                    inv = inventory.load(self.path(name, data))
+                except ValueError:
+                    continue
+                self.assertLessEqual(len(inv.problems), inventory.MAX_PROBLEMS)
+                for record in inv.records.values():
+                    self.assertTrue(record.asset_id.isprintable() and record.name.isprintable())
+                    self.assertLessEqual(len(record.asset_id), inventory.MAX_KEY_CHARS)
+                inv.summary()
+
+    def test_a_file_over_the_size_limit_is_refused_without_being_read(self):
+        path = self.path("toobig", self.HEAD + b"A,B,crown,high,none\n" * 300_000)
+        with mock.patch.object(inventory, "MAX_FILE_BYTES", 1024 * 1024), mock.patch("builtins.open") as opened, \
+                self.assertRaisesRegex(ValueError, "larger than"):
+            inventory.load(path)
+        opened.assert_not_called()
+
+    def test_a_hostile_inventory_cannot_inject_into_the_exported_results(self):
+        inv = inventory.load(self.path("f", self.cases()["formula_cells"]))
+        findings = self.path("find", b"id,asset_id,cvss,threat\nF1,=cmd|x,5,none\n")
+        items = batch.process_file(findings, inventory=inv)
+        out = os.path.join(self.dir, "out.csv")
+        batch.write_results(out, items)
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            for row in csv.DictReader(fh):
+                for value in row.values():
+                    self.assertFalse(value[:1] in ("=", "+", "-", "@"), value)
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ The application works **fully offline**. It connects to the internet only when y
 
 ## What the application reads and writes
 
-- **Files you choose:** the CSV you open and the export you save. Cells that could run as spreadsheet formulas are neutralised on export.
+- **Files you choose:** the CSV you open, an optional asset inventory CSV, and the export you save. The inventory is size-limited and validated like the findings file, and its path is not remembered. Cells that could run as spreadsheet formulas are neutralised on export.
 - **Settings:** `settings.json` and `ui.json` in your user configuration folder; threat data and its metadata in your user data folder (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md) and [docs/SETTINGS.md](docs/SETTINGS.md) for the locations). They are written atomically with user-only permissions, size-limited, and ignored (with a warning) if invalid.
 - **Clipboard:** only when you press a copy button.
 - **Text boxes** refuse typed or pasted text beyond 2,000 characters, so a hostile or accidental huge paste cannot freeze the window.

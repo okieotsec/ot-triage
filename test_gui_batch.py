@@ -10,6 +10,7 @@ from unittest import mock
 import batch
 import gui_batch
 import gui_widgets
+import inventory
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
@@ -569,6 +570,124 @@ class BatchReferenceTests(BatchViewTestCase):
         self.pump(0.2)
         toolbar_slaves = view.toolbar.pack_slaves()
         self.assertLess(toolbar_slaves.index(view.search_entry), toolbar_slaves.index(view.file_label))
+
+
+INVENTORY = ("asset_id,name,criticality,exposure,controls\n"
+             "GW-01,Edge gateway,crown jewel,high,none\n"
+             "PLC-01,Packaging PLC,standard,low,partial\n")
+FINDINGS = "id,asset_id,cvss,threat\nF1,GW-01,8.8,active\nF2,PLC-01,5.0,none\nF3,NOPE-9,7.0,none\n"
+
+
+class BatchInventoryTests(BatchViewTestCase):
+    def pick_inventory(self, text):
+        path = self.write_csv("inventory.csv", text)
+        self.ctx.open_file = mock.Mock(return_value=path)
+        self.view.load_inventory()
+        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+        self.pump(0.1)
+
+    def by_id(self):
+        return {values[1]: values for values in self.rows()}
+
+    def test_the_inventory_fills_in_the_findings_and_the_label_says_what_was_loaded(self):
+        view = self.build()
+        self.pick_inventory(INVENTORY)
+        self.assertIn("inventory.csv", view.inventory_label.cget("text"))
+        self.assertIn("2 assets", view.inventory_label.cget("text"))
+        self.assertEqual(str(view.inventory_clear_button.cget("state")), "normal")
+        self.load(self.write_csv("findings.csv", FINDINGS))
+        rows = self.by_id()
+        self.assertTrue(rows["F1"][4].endswith("NOW"))
+        self.assertTrue(rows["F2"][4].endswith("NEVER"))
+        self.assertTrue(rows["F3"][4].startswith("! ERROR"))
+        self.assertIn("is not in the inventory", rows["F3"][7])
+
+    def test_loading_an_inventory_after_the_findings_scores_them_again_and_clearing_undoes_it(self):
+        view = self.build()
+        self.load(self.write_csv("findings.csv", FINDINGS))
+        self.assertTrue(all(v[4].startswith("! ERROR") for v in self.rows()))
+        self.assertIn("no inventory is loaded", self.by_id()["F1"][7])
+        self.pick_inventory(INVENTORY)
+        self.assertTrue(self.by_id()["F1"][4].endswith("NOW"))
+        self.assertEqual(self.counter_numbers()["ERROR"], "1")
+        view.clear_inventory()
+        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+        self.pump(0.2)
+        self.assertEqual(self.counter_numbers()["ERROR"], "3")
+        self.assertIsNone(self.ctx.batch_state.inventory)
+        self.assertIn("No inventory loaded", view.inventory_label.cget("text"))
+        self.assertEqual(str(view.inventory_clear_button.cget("state")), "disabled")
+
+    def test_rows_that_cannot_be_used_are_reported_once_and_the_rest_still_load(self):
+        self.build()
+        self.pick_inventory("asset_id,exposure\nA,low\nB,sideways\nC,high\nC,low\n")
+        self.ctx.warn.assert_called_once()
+        message = self.ctx.warn.call_args[0][1]
+        self.assertIn("line 3", message)
+        self.assertIn("appears 2 times", message)
+        self.assertIn("1 row skipped", self.view.inventory_label.cget("text"))
+
+    def test_an_unusable_inventory_is_refused_with_a_message_and_changes_nothing(self):
+        view = self.build()
+        self.pick_inventory(INVENTORY)
+        before = view.inventory_label.cget("text")
+        self.pick_inventory("name,exposure\nA,low\n")
+        self.assertTrue(self.ctx.error.called)
+        self.assertIn("asset_id", self.ctx.error.call_args[0][1])
+        self.assertEqual(view.inventory_label.cget("text"), before)
+        self.assertEqual(len(self.ctx.batch_state.inventory), 2)
+
+    def test_a_cancelled_file_dialog_does_nothing(self):
+        view = self.build()
+        self.ctx.open_file = mock.Mock(return_value="")
+        view.load_inventory()
+        self.pump(0.2)
+        self.assertFalse(self.ctx.worker.running)
+        self.assertIsNone(self.ctx.batch_state.inventory)
+
+    def test_the_details_say_which_values_came_from_the_inventory_and_search_finds_asset_ids(self):
+        view = self.build()
+        self.pick_inventory(INVENTORY)
+        self.load(self.write_csv("findings.csv", FINDINGS))
+        first = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[1] == "F1")
+        view.tree.selection_set(first)
+        self.pump(0.2)
+        self.assertIn("Asset GW-01: asset, exposure, controls filled in from the inventory",
+                      view.detail_text.cget("text"))
+        self.assertTrue(any("From inventory: GW-01" in c.cget("text") for c in view.detail_chips.items))
+        view.search_var.set("plc-01")
+        self.pump(0.6)
+        self.assertEqual([v[1] for v in self.rows()], ["F2"])
+
+    def test_the_inventory_survives_a_rebuild_of_the_window(self):
+        view = self.build()
+        self.pick_inventory(INVENTORY)
+        text = view.inventory_label.cget("text")
+        view.frame.destroy()
+        rebuilt = self.build()
+        self.assertEqual(rebuilt.inventory_label.cget("text"), text)
+        self.assertEqual(str(rebuilt.inventory_clear_button.cget("state")), "normal")
+
+    def test_the_inventory_buttons_are_disabled_while_a_load_is_running(self):
+        view = self.build()
+        release = threading.Event()
+        real = inventory.load
+
+        def slow(*args, **kwargs):
+            release.wait(5)
+            return real(*args, **kwargs)
+
+        path = self.write_csv("inventory.csv", INVENTORY)
+        self.ctx.open_file = mock.Mock(return_value=path)
+        with mock.patch("gui_batch.inventory.load", side_effect=slow):
+            view.load_inventory()
+            self.pump(0.2)
+            self.assertEqual(str(view.inventory_button.cget("state")), "disabled")
+            self.assertEqual(str(view.open_button.cget("state")), "disabled")
+            release.set()
+            self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+        self.pump(0.2)
+        self.assertEqual(str(view.inventory_button.cget("state")), "normal")
 
 
 if __name__ == "__main__":

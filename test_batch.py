@@ -442,7 +442,7 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh)
                 rows = list(reader)
-        self.assertEqual(reader.fieldnames[-2:], ["references", "forensic_triage"])
+        self.assertEqual(reader.fieldnames[-4:], ["references", "forensic_triage", "asset_id", "from_inventory"])
         by_cve = {r["cve"]: r for r in rows}
         kev_row = by_cve["CVE-2024-0001"]
         self.assertEqual(kev_row["forensic_triage"], "Yes")

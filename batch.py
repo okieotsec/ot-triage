@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import cvss
 from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Result, Threat, parse_cvss, prioritize
-from references import describe
+from references import clean, describe
 from settings import DEFAULT_SETTINGS
 from threatdata import apply_threat_context, derive_threat, normalize_cve
 
@@ -13,6 +13,7 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_ROWS = 50_000
 REQUIRED = ["asset", "exposure"]
 MAX_ERROR_VECTOR_CHARS = 200
+MAX_ASSET_ID_CHARS = 100
 SCORE_TOLERANCE = 0.001
 DEFAULTS = {"patch": Patch.AVAILABLE, "controls": Controls.NONE}
 FIELD_ENUMS = {"threat": Threat, "asset": Asset, "exposure": Exposure, "patch": Patch, "controls": Controls}
@@ -26,6 +27,7 @@ _HEADER_ALIASES = {
     "patch_status": "patch",
     "compensating_controls": "controls", "mitigations": "controls",
     "vulnerability": "name",
+    "assetid": "asset_id", "asset_tag": "asset_id",
 }
 
 _VALUE_ALIASES = {
@@ -82,6 +84,8 @@ class BatchItem:
     threat_sources: str = ""
     references: tuple = ()
     forensic_triage: bool = False
+    asset_id: str = ""
+    from_inventory: tuple = ()     # the fields (asset, exposure, controls) that came from the inventory
     cvss_raw: str = ""
     inputs: dict = field(default_factory=dict)   # field -> enum member, for successfully parsed cells
     cvss: float = None
@@ -117,7 +121,8 @@ def read_rows(path):
             missing.append("cvss (or cvss_vector)")
         if "threat" not in columns and "cve" not in columns:
             missing.append("threat (or cve)")
-        missing += [c for c in REQUIRED if c not in columns]
+        # With an asset_id column the asset's criticality and exposure can come from an inventory instead of the file.
+        missing += [c for c in REQUIRED if c not in columns and "asset_id" not in columns]
         if missing:
             raise ValueError(f"Missing required column(s): {', '.join(missing)}. "
                              f"Found: {', '.join(h.strip() for h in header)}")
@@ -169,10 +174,32 @@ def _read_cvss(item, vector_text, errors):
     item.cvss = score
 
 
-def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None):
-    """Parse one normalized row and score it, recording any errors on the item."""
+def _inventory_hint(item, field_name, text, status, record):
+    """Explain why an empty cell could not be filled from the inventory (nothing when no asset_id was given)."""
+    if text.strip() or not item.asset_id:
+        return ""
+    who = f"asset_id {item.asset_id[:40]!r}"
+    if status == "no inventory":
+        return f" ({who} was given but no inventory is loaded)"
+    if status == "duplicate":
+        return f" ({who} appears more than once in the inventory, so it is not used)"
+    if status == "missing":
+        return f" ({who} is not in the inventory)"
+    return f" (the inventory has no {field_name} for {who})" if record is not None else ""
+
+
+def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None, inventory=None):
+    """Parse one normalized row and score it, recording any errors on the item.
+
+    An asset_id column links the row to an inventory. A cell the row leaves blank is filled in from the inventory; a
+    cell the row fills in always wins, because it is a deliberate entry.
+    """
     item = BatchItem(line=line, id=row.get("id", ""), name=row.get("name", ""), cvss_raw=row.get("cvss", ""))
     errors, info, cve_valid = [], None, False
+    status, record = None, None
+    if row.get("asset_id"):
+        item.asset_id = clean(row["asset_id"])[:MAX_ASSET_ID_CHARS]
+        status, record = inventory.lookup(item.asset_id) if inventory is not None else ("no inventory", None)
     if row.get("cve"):
         try:
             item.cve = normalize_cve(row["cve"])
@@ -193,13 +220,20 @@ def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None):
     elif info is None:
         hint = " (no threat data loaded for the cve column)" if cve_valid else ""
         errors.append(f"threat: value is required{hint}")
+    filled = []
     for field_name in FIELD_ENUMS:
         if field_name == "threat":
             continue
+        text = row.get(field_name, "")
+        if not text.strip() and record is not None and field_name in record.values:
+            item.inputs[field_name] = record.values[field_name]
+            filled.append(field_name)
+            continue
         try:
-            item.inputs[field_name] = _parse_enum(field_name, row.get(field_name, ""))
+            item.inputs[field_name] = _parse_enum(field_name, text)
         except ValueError as e:
-            errors.append(str(e))
+            errors.append(str(e) + _inventory_hint(item, field_name, text, status, record))
+    item.from_inventory = tuple(filled)
     if errors:
         item.error = "; ".join(errors)
         return item
@@ -233,9 +267,9 @@ def sort_items(items):
     return ok + bad
 
 
-def process_file(path, settings=DEFAULT_SETTINGS, threatdata=None):
+def process_file(path, settings=DEFAULT_SETTINGS, threatdata=None, inventory=None):
     """Read a CSV file and return its scored rows in ranked order."""
-    return sort_items([score_row(line, row, settings, threatdata) for line, row in read_rows(path)])
+    return sort_items([score_row(line, row, settings, threatdata, inventory) for line, row in read_rows(path)])
 
 
 def summarize(items):
@@ -255,7 +289,8 @@ def _safe(text):
 OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cvss", "cvss_version", "cvss_vector",
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
-                  "scoring_settings", "error", "source_line", "references", "forensic_triage"]
+                  "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
+                  "from_inventory"]
 
 
 def write_results(path, items, threatdata=None):
@@ -270,7 +305,8 @@ def write_results(path, items, threatdata=None):
                    "priority": item.priority, "source_line": item.line, "cvss_version": item.cvss_version,
                    "cvss_vector": _safe(item.cvss_vector),
                    "references": _safe(" ; ".join(describe(r) for r in item.references)),
-                   "forensic_triage": "Yes" if item.forensic_triage else ""}
+                   "forensic_triage": "Yes" if item.forensic_triage else "",
+                   "asset_id": _safe(item.asset_id), "from_inventory": "; ".join(item.from_inventory)}
             if item.result:
                 rank += 1
                 row.update(
