@@ -39,7 +39,7 @@ class Reference:
 def clean(text):
     """Remove control, invisible, private-use and unassigned characters and collapse white space."""
     kept = "".join(" " if ch.isspace() else ch for ch in text
-                   if unicodedata.category(ch) not in ("Cc", "Cf", "Cs", "Co", "Cn"))
+                   if ch.isspace() or unicodedata.category(ch) not in ("Cc", "Cf", "Cs", "Co", "Cn"))
     return " ".join(kept.split())
 
 

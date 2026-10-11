@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Asset inventory import:** in Batch, **Load inventory...** reads a CSV of assets (`asset_id`, criticality, exposure, controls) and fills those values into findings that carry an `asset_id`, so they no longer need typing on every row. A value on the finding row always wins; an unknown or duplicated asset is an error, never a guess. The open file is scored again whenever the inventory changes. The export gains `asset_id` and `from_inventory` columns. No rule changes. Sample files and docs in [docs/INVENTORY.md](docs/INVENTORY.md).
+- **Fixed:** the shared text cleaner turned line breaks and tabs into nothing, which could glue two words together (for example in a CISA note); they now become spaces.
+
 ## 0.4.0 (2026-10-09)
 
 - **Software bill of materials:** `sbom/sbom.cdx.json` now describes OT Triage itself (version, license, project links) with no third-party components, and is generated reproducibly by `tools/make_sbom.py`; a test keeps it in step with the version.

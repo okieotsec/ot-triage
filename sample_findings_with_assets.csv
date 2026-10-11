@@ -1,0 +1,8 @@
+id,asset_id,name,cve,cvss,threat,patch
+V-01,GW-EDGE-01,Remote code execution in a logging library,CVE-2021-44228,10.0,,available
+V-02,HMI-LINE-01,SMB remote code execution,CVE-2017-0144,8.1,,pending
+V-03,PLC-PKG-01,Firmware web interface flaw,,6.5,none,eol
+V-04,RTU-TANK-07,Default credentials on the remote unit,,9.8,public,pending
+V-05,HIST-01,SQL injection in the historian web client,,7.2,none,available
+V-06,SW-ACC-03,Denial of service in the switch,,5.3,none,available
+V-07,UNKNOWN-99,A finding for an asset that is not in the inventory,,7.0,none,available

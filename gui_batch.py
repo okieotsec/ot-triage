@@ -5,6 +5,7 @@ from tkinter import ttk
 
 import batch
 import explain
+import inventory
 import threatdata
 from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
@@ -35,13 +36,14 @@ class BatchState:
 
     def __init__(self):
         self.path, self.items, self.data = "", [], None
+        self.inventory = None
         self.sort_key, self.sort_desc = "rank", False
         self.filter, self.search = "all", ""
         self.ranks = {}
 
 
 def _text(item):
-    return f"{item.id} {item.name} {item.cve} {item.error} {item.threat_sources}".lower()
+    return f"{item.id} {item.name} {item.cve} {item.asset_id} {item.error} {item.threat_sources}".lower()
 
 
 class BatchView:
@@ -83,6 +85,15 @@ class BatchView:
         tk.Label(bar, text="Search", font=s.font(9), bg=t.bg, fg=t.muted).pack(side=tk.RIGHT)
         # Packed last, so a long file description is clipped instead of squeezing the search box out.
         self.file_label.pack(side=tk.LEFT, padx=12, fill=tk.X, expand=True)
+        self.inventory_row = tk.Frame(self.body, bg=t.bg)
+        self.inventory_row.pack(fill=tk.X, pady=(8, 0))
+        self.inventory_button = button(self.inventory_row, s, "Load inventory\u2026", self.load_inventory, "secondary")
+        self.inventory_button.pack(side=tk.LEFT)
+        self.inventory_clear_button = button(self.inventory_row, s, "Clear", self.clear_inventory, "secondary")
+        self.inventory_clear_button.pack(side=tk.RIGHT)
+        self.inventory_label = tk.Label(self.inventory_row, text="", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
+        self.inventory_label.pack(side=tk.LEFT, padx=12, fill=tk.X, expand=True)
+        self._update_inventory_label()
         self.progress_row = tk.Frame(self.body, bg=t.bg)
         self.progress_label = tk.Label(self.progress_row, text="", font=s.font(9), bg=t.bg, fg=t.muted)
         self.progress_label.pack(side=tk.LEFT)
@@ -166,22 +177,49 @@ class BatchView:
 
     def load(self, path):
         """Score a CSV file in the background and show the results."""
+        self._run(path)
+
+    def load_inventory(self):
+        """Ask for an asset inventory CSV, load it, and score the open findings file again with it."""
+        path = self.ctx.open_file("Select an asset inventory CSV", [("CSV files", "*.csv"), ("All files", "*.*")])
+        if path:
+            self._run(self.state.path or None, inventory_path=path)
+
+    def clear_inventory(self):
+        """Stop using the inventory and score the open findings file again without it."""
+        if self.state.inventory is not None:
+            self._run(self.state.path or None, clear_inventory=True)
+
+    def _run(self, path, inventory_path=None, clear_inventory=False):
+        """Do the background work for opening a file, loading an inventory, or clearing it (all in one job)."""
         ctx, settings, data_dir = self.ctx, self.ctx.settings, self.ctx.data_dir
-        known = ctx.threat_data
+        known, current = ctx.threat_data, self.state.inventory
+        changed = bool(inventory_path) or clear_inventory
 
         def job(_cancel, report):
+            inv = current
+            if inventory_path:
+                report("Reading the inventory...")
+                inv = inventory.load(inventory_path)
+            elif clear_inventory:
+                inv = None
+            if path is None:
+                return [], None, inv
             report("Reading the file...")
             data = known
             if batch.has_cve_column(path) and data is None:
                 report("Loading threat data...")
                 data = threatdata.ThreatData.load(data_dir)
             report("Scoring...")
-            return batch.process_file(path, settings, data if batch.has_cve_column(path) else None), data
+            items = batch.process_file(path, settings, data if batch.has_cve_column(path) else None, inv)
+            return items, data, inv
 
-        if not ctx.worker.start(job, lambda result, error: self._loaded(path, result, error), self._progress):
+        done = lambda result, error: self._loaded(path, result, error, changed, bool(inventory_path))  # noqa: E731
+        if not ctx.worker.start(job, done, self._progress):
             ctx.info("Batch import", "Another task is still running. Wait for it to finish or cancel it.")
             return
-        set_enabled(self.open_button, False)
+        for control in (self.open_button, self.inventory_button, self.inventory_clear_button):
+            set_enabled(control, False)
         self.progress_row.pack(fill=tk.X, pady=(8, 0), after=self.toolbar)
         self.progress_bar.start(12)
 
@@ -189,18 +227,28 @@ class BatchView:
         if self.frame.winfo_exists():
             self.progress_label.configure(text=message)
 
-    def _loaded(self, path, result, error):
+    def _loaded(self, path, result, error, inventory_changed=False, inventory_fresh=False):
         alive = self.frame.winfo_exists()
         if alive:
             self.progress_bar.stop()
             self.progress_row.pack_forget()
             set_enabled(self.open_button, True)
+            set_enabled(self.inventory_button, True)
+            self._update_inventory_label()
         if self.ctx.worker.cancel_event.is_set():
             return
         if error:
             self.ctx.error("Batch import failed", error)
             return
-        items, data = result
+        items, data, inv = result
+        if inventory_changed:
+            self.state.inventory = inv
+            if alive:
+                self._update_inventory_label()
+            if inventory_fresh and inv.problems:
+                self._warn_about_inventory(inv)
+        if path is None:
+            return
         if data is not None and self.ctx.threat_data is None:
             self.ctx.threat_data = data
             if data.warnings:
@@ -215,6 +263,20 @@ class BatchView:
         self.ctx.status_changed()
         if alive:
             self.refresh()
+
+    def _update_inventory_label(self):
+        inv = self.state.inventory
+        self.inventory_label.configure(text=inv.summary() if inv is not None else
+                                       "No inventory loaded (optional: fills in asset criticality, exposure and "
+                                       "controls from an asset_id column)")
+        set_enabled(self.inventory_clear_button, inv is not None)
+
+    def _warn_about_inventory(self, inv):
+        """Tell the person about inventory rows that could not be used; they are never guessed at."""
+        shown = inv.problems[:8]
+        more = f"\n...and {inv.skipped + len(inv.duplicates) - len(shown)} more" if len(inv.problems) > 8 else ""
+        listing = "\n".join(f"\u2022 {p}" for p in shown)
+        self.ctx.warn("Asset inventory", f"Some inventory rows were not used:\n\n{listing}{more}")
 
     # ---- filtering, sorting, display ----
     def set_filter(self, key):
@@ -304,7 +366,7 @@ class BatchView:
     def _clear_details(self):
         self.detail_title.configure(text="Select a row to see why." if self.state.items else
                                     "Open a CSV file to score it. Required columns: cvss (or cvss_vector), asset, "
-                                    "exposure, and threat (or cve).")
+                                    "exposure (or asset_id with an inventory), and threat (or cve).")
         self.detail_chips.set_items([])
         self.detail_text.configure(text="")
         self._show_references(())
@@ -317,11 +379,18 @@ class BatchView:
         label = " · ".join(part for part in (item.id, item.cve, item.name) if part) or f"Line {item.line}"
         self.detail_title.configure(text=f"{label}  (source line {item.line})")
         if item.result:
-            self.detail_chips.set_items([chip(self.detail_chips, self.style, f.label, f.direction)
-                                         for f in explain.sorted_factors(item.result.factors)])
+            chips = [chip(self.detail_chips, self.style, f.label, f.direction)
+                     for f in explain.sorted_factors(item.result.factors)]
+            if item.from_inventory:
+                chips.append(chip(self.detail_chips, self.style, f"From inventory: {item.asset_id[:24]}", "neutral"))
+            self.detail_chips.set_items(chips)
             lines = [f"Action: {item.result.action}", ""] + [f"• {r}" for r in item.result.reasons]
             if item.cvss_version:
                 lines += ["", f"CVSS vector: {item.cvss_vector} (CVSS {item.cvss_version}, base score {item.cvss:.1f})"]
+            if item.asset_id:
+                taken = ", ".join(item.from_inventory) or "nothing"
+                lines += ["", f"Asset {item.asset_id}: {taken} filled in from the inventory"
+                              + ("; the other values are from the file." if item.from_inventory else ".")]
             lines += ["", f"Scoring settings: {item.result.profile}"]
         else:
             self.detail_chips.set_items([chip(self.detail_chips, self.style, "Not scored", "error")])

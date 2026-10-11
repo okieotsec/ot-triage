@@ -15,6 +15,7 @@ DOCUMENTS = [("README.md", "How to run the tool, the rules as implemented, and t
              ("docs/CVSS.md", "Pasting CVSS vectors, supported versions and how the scores were verified"),
              ("docs/POLICY.md", "The prioritization decisions and why they were made"),
              ("docs/THREAT_DATA.md", "KEV and EPSS data, offline updates and the safety checks"),
+             ("docs/INVENTORY.md", "The asset inventory: fill in asset criticality, exposure and controls from a file"),
              ("docs/SETTINGS.md", "The adjustable scoring settings, their defaults and limits"),
              ("SECURITY_TEST_PLAN.md", "How the tool is security tested, with reports under reports/")]
 

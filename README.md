@@ -96,6 +96,7 @@ Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [
 
 Required columns: `cvss` (or `cvss_vector`), `asset`, `exposure`, and `threat` (or `cve`). A `cvss_vector` column (CVSS 3.0, 3.1 or 4.0) supplies the score; see [docs/CVSS.md](docs/CVSS.md).
 Optional columns: `id`, `name`, `patch` (default available), `controls` (default none).
+An optional `asset_id` column links a row to an **asset inventory** (a second CSV, loaded with **Load inventory...**) that fills in `asset`, `exposure` and `controls`, so those columns can be left out; see [docs/INVENTORY.md](docs/INVENTORY.md).
 An optional `cve` column looks the CVE up in local KEV and EPSS data (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)); with it, `threat` can be left blank.
 Other columns are ignored. Header names accept common aliases, and enum cells accept short aliases or the full dropdown labels.
 
@@ -106,6 +107,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
 - [docs/CVSS.md](docs/CVSS.md): pasting CVSS vectors, supported versions and how the scores were verified
 - [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV and EPSS threat data, offline updates and safety checks
+- [docs/INVENTORY.md](docs/INVENTORY.md): the asset inventory, which fills in asset criticality, exposure and controls
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned work, order and design decisions
@@ -126,8 +128,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP2 | Network downloads and file parsing (the highest-risk area) | [reports/cp2](reports/cp2/claude.md) |
 | CP3 | Settings files, the new GUI, background work; later the CVSS vector parser | [reports/cp3](reports/cp3/claude.md), [CVSS addendum](reports/cp3/claude-addendum-cvss.md) |
 | CP4 | Release candidate: full regression and release gate | [reports/cp4](reports/cp4/claude.md) |
+| CP5 | Asset inventory import: a new file the tool parses | [reports/cp5-inventory](reports/cp5-inventory/claude.md) |
 
-Across the checkpoints 23 findings were recorded (3 Medium, 5 Low, 15 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 25 findings were recorded (3 Medium, 6 Low, 16 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 

@@ -90,6 +90,11 @@ class ParsingTests(unittest.TestCase):
                 self.assertTrue(ch.isprintable(), repr(ch))
         self.assertEqual(links(notes), ["https://a.example.com/page"])
 
+    def test_line_breaks_and_tabs_become_spaces_so_words_are_never_glued_together(self):
+        self.assertEqual(refs.clean("see\nthe\tvendor\r\npage"), "see the vendor page")
+        found = refs.parse_references("Read the\nadvisory:\nhttps://a.example.com/x")
+        self.assertEqual((found[0].label, found[0].url), ("Read the advisory", "https://a.example.com/x"))
+
     def test_long_labels_and_text_are_cut_short(self):
         found = refs.parse_references("x" * 5000 + ": https://a.example.com/ ; " + "y" * 5000)
         self.assertTrue(all(len(r.label) <= refs.MAX_TEXT_CHARS and len(r.text) <= refs.MAX_TEXT_CHARS for r in found))
