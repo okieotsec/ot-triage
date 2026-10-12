@@ -111,6 +111,9 @@ class CveInfo:
     percentile: float = None
     kev_loaded: bool = False
     epss_loaded: bool = False
+    advisories: tuple = ()          # CISA ICS advisories that name this CVE, newest first (icsadvisories.IcsAdvisory)
+    advisory_count: int = 0         # how many there are in all; advisories holds only the newest few
+    ics_loaded: bool = False
 
 
 @dataclass(frozen=True)
@@ -146,7 +149,7 @@ class Freshness:
 def normalize_cve(text):
     """Return an upper-case CVE ID, or raise ValueError if the text is not one."""
     cve = str(text).strip().upper()
-    if not CVE_RE.match(cve):
+    if not CVE_RE.fullmatch(cve):
         raise ValueError("not a valid CVE ID (expected a form like CVE-2024-12345)")
     return cve
 
@@ -172,7 +175,7 @@ def _text(entry, key, where):
 
 
 def _valid_date(text):
-    if not DATE_RE.match(text):
+    if not DATE_RE.fullmatch(text):
         return False
     try:
         datetime.date.fromisoformat(text)
@@ -192,7 +195,7 @@ def parse_kev(data):
     if not isinstance(doc, dict):
         raise ThreatDataError("KEV file must be a JSON object")
     version = doc.get("catalogVersion")
-    if not isinstance(version, str) or not VERSION_RE.match(version):
+    if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
         raise ThreatDataError("KEV file has no valid catalogVersion")
     released = doc.get("dateReleased")
     if not isinstance(released, str) or not _valid_date(released[:10]):
@@ -210,7 +213,7 @@ def parse_kev(data):
         if not isinstance(item, dict):
             raise ThreatDataError(f"{where}: must be an object")
         cve = item.get("cveID")
-        if not isinstance(cve, str) or not CVE_RE.match(cve):
+        if not isinstance(cve, str) or not CVE_RE.fullmatch(cve):
             raise ThreatDataError(f"{where}: invalid cveID")
         where = f"KEV entry {cve}"
         if cve in entries:
@@ -287,7 +290,7 @@ def parse_epss(data):
                 continue
             if len(scores) >= EPSS_MAX_ROWS:
                 raise ThreatDataError(f"EPSS file has more than {EPSS_MAX_ROWS:,} rows")
-            if len(row) != 3 or not CVE_RE.match(row[0]):
+            if len(row) != 3 or not CVE_RE.fullmatch(row[0]):
                 raise ThreatDataError(f"EPSS file line {reader.line_num + 1}: invalid row")
             try:
                 epss, percentile = float(row[1]), float(row[2])
@@ -513,8 +516,9 @@ def import_from_files(kev_path=None, epss_path=None, data_dir=None, now=None):
 class ThreatData:
     """The stored KEV and EPSS data, re-validated on load."""
 
-    def __init__(self, kev=None, epss=None, meta=None, warnings=()):
+    def __init__(self, kev=None, epss=None, meta=None, warnings=(), ics=None):
         self.kev, self.epss, self.meta, self.warnings = kev, epss, meta or {}, list(warnings)
+        self.ics = ics      # icsadvisories.IcsData, or None when not loaded
 
     @classmethod
     def load(cls, data_dir=None):
@@ -530,20 +534,25 @@ class ThreatData:
                 found[name] = parse(_read_capped(path, cap))
             except (OSError, ThreatDataError) as error:
                 warnings.append(f"Stored {name.upper()} data could not be used ({error}). Update or import it again.")
-        return cls(found.get("kev"), found.get("epss"), _read_meta(data_dir), warnings)
+        import icsadvisories  # imported here because that module itself builds on this one
+        ics, ics_warnings = icsadvisories.load(data_dir)
+        return cls(found.get("kev"), found.get("epss"), _read_meta(data_dir), warnings + ics_warnings, ics)
 
     def lookup(self, cve):
         """Return the local KEV and EPSS facts for a CVE ID."""
         cve = normalize_cve(cve)
         score = self.epss.scores.get(cve) if self.epss else None
+        advisories, count = self.ics.lookup(cve) if self.ics else ((), 0)
         return CveInfo(cve, self.kev.entries.get(cve) if self.kev else None, score[0] if score else None,
-                       score[1] if score else None, self.kev is not None, self.epss is not None)
+                       score[1] if score else None, self.kev is not None, self.epss is not None, advisories, count,
+                       self.ics is not None)
 
     def versions(self):
         """Return a one-line description of the KEV and EPSS versions in use, for summaries and exports."""
         kev = f"KEV {self.kev.catalog_version} ({self.kev.date_released})" if self.kev else "KEV not loaded"
         epss = f"EPSS {self.epss.model_version} ({self.epss.score_date})" if self.epss else "EPSS not loaded"
-        return f"{kev}; {epss}"
+        ics = f"; ICS advisories {self.ics.feed_date}" if self.ics else ""
+        return f"{kev}; {epss}{ics}"
 
     def freshness(self, stale_days, now=None):
         """Return the age and stale status of each source."""
@@ -585,8 +594,8 @@ class SourceStatus:
     @property
     def version_text(self):
         """Return the version and date as one phrase."""
-        word = "released" if self.name == "kev" else "scored"
-        return f"{self.version}, {word} {self.date}"
+        word = {"kev": "released", "epss": "scored"}.get(self.name, "updated")
+        return f"{self.version}, {word} {self.date}" if self.version else f"{word} {self.date}"
 
     def freshness(self, stale_days, now=None):
         """Return the age and stale status of this source."""
@@ -689,6 +698,10 @@ def apply_threat_context(result, decision, info):
         if entry.ransomware:
             score = min(10.0, round(score + RANSOMWARE_SCORE_BONUS, 2))
             reasons.append("Known ransomware campaign use: ranked higher within the bucket; the bucket is unchanged")
+    if info is not None and info.advisories:
+        newest = info.advisories[0]
+        more = f" and {info.advisory_count - 1} more" if info.advisory_count > 1 else ""
+        reasons.append(f"CISA ICS advisory {newest.id}{more} names this CVE (context only; does not change the bucket)")
     threat_factors = [_source_factor(source, info) for source in decision.sources
                       if not source.startswith("No KEV or elevated EPSS")]
     generic = {"Actively exploited", "Public or likely exploit"}
@@ -700,6 +713,10 @@ def apply_threat_context(result, decision, info):
         factors.insert(position + len(threat_factors) if threat_factors else 1, Factor("Ransomware use", "raise"))
     if info is not None and info.kev is not None and info.kev.forensic_triage:
         factors.append(Factor("Forensic triage advised", "neutral"))
+    if info is not None and info.advisories:
+        count = info.advisory_count
+        factors.append(Factor("In a CISA ICS advisory" if count == 1 else f"In {count} CISA ICS advisories",
+                              "neutral"))
     return dataclasses.replace(result, reasons=reasons, action=action, score=score, factors=factors)
 
 

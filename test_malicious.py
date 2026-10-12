@@ -1,5 +1,9 @@
 import csv
+import gzip
+import io
+import json
 import os
+import tarfile
 import tempfile
 import time
 import unittest
@@ -7,10 +11,12 @@ from pathlib import Path
 from unittest import mock
 
 import batch
+import icsadvisories
 import inventory
 import malicious_cases
 import settings
 import threatdata
+from test_icsadvisories import ROOT, advisory, good, member_path
 
 ALLOWED_ERRORS = (ValueError, OSError, UnicodeDecodeError, csv.Error)
 TIME_LIMIT_SECONDS = 30
@@ -251,6 +257,136 @@ class MaliciousInventoryTests(unittest.TestCase):
             for row in csv.DictReader(fh):
                 for value in row.values():
                     self.assertFalse(value[:1] in ("=", "+", "-", "@"), value)
+
+
+class MaliciousAdvisoryArchiveTests(unittest.TestCase):
+    """Hostile CISA advisory archives, at their real limits: each is refused or read safely, quickly, and a refused
+    file never replaces the advisories already stored."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.TemporaryDirectory()
+        cls.base = Path(cls.dir.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def setUp(self):
+        self.store = self.base / "store"
+        self.good = self.base / "good.tar.gz"
+        self.good.write_bytes(good(advisory()))
+        self.assertTrue(icsadvisories.import_from_file(self.good, self.store).ok)
+        self.before = (self.store / icsadvisories.ICS_FILE).read_bytes()
+
+    def tar_gz_file(self, name, write):
+        path = self.base / name
+        with gzip.open(path, "wb", compresslevel=1) as raw, tarfile.open(fileobj=raw, mode="w|") as tar:
+            write(tar)
+        return path
+
+    def run_case(self, path):
+        start = time.monotonic()
+        result = icsadvisories.import_from_file(path, self.store)
+        self.assertLess(time.monotonic() - start, TIME_LIMIT_SECONDS, path.name)
+        return result
+
+    def assert_refused_and_kept(self, path):
+        result = self.run_case(path)
+        self.assertFalse(result.ok, result.message)
+        self.assertEqual((self.store / icsadvisories.ICS_FILE).read_bytes(), self.before)
+        return result
+
+    def test_a_gzip_bomb_that_expands_past_the_limit_is_stopped_while_reading(self):
+        def write(tar):
+            info = tarfile.TarInfo(f"{ROOT}/../padding.bin")
+            info.size = icsadvisories.ICS_MAX_STREAM + 50 * 1024 * 1024
+            tar.addfile(info, _Zeros(info.size))
+        path = self.tar_gz_file("bomb.tar.gz", write)
+        self.assertLess(path.stat().st_size, 20 * 1024 * 1024, "the bomb should be small on disk")
+        self.assertIn("expands to more than", self.assert_refused_and_kept(path).message)
+
+    def test_a_flood_of_empty_entries_is_stopped(self):
+        def write(tar):
+            for n in range(icsadvisories.ICS_MAX_MEMBERS + 100):
+                tar.addfile(tarfile.TarInfo(f"CSAF-develop/e{n}"))
+        self.assertIn("entries", self.assert_refused_and_kept(self.tar_gz_file("flood.tar.gz", write)).message)
+
+    def test_hostile_entry_names_and_types_are_never_used(self):
+        evil = advisory("ICSA-26-099-01", cves=("CVE-2026-9999",))
+        raw = json.dumps(evil).encode()
+
+        def write(tar):
+            good_info = tarfile.TarInfo(member_path("ICSA-26-006-01"))
+            body = json.dumps(advisory()).encode()
+            good_info.size = len(body)
+            tar.addfile(good_info, io.BytesIO(body))
+            names = ["../../../../tmp/icsa-26-099-01.json", "/etc/icsa-26-099-01.json",
+                     f"{ROOT}/2026/../../../../x/icsa-26-099-01.json", f"{ROOT}\\2026\\icsa-26-099-01.json",
+                     "CSAF-develop/csaf_files/IT/white/2026/icsa-26-099-01.json",
+                     f"{ROOT}/2026/icsa-26-099-01.json.asc",
+                     f"{ROOT}/2026/ICSA-26-099-01.json", f"{ROOT}/2026/icsa-26-099-01.json\n",
+                     f"{ROOT}/2026/icsa-26-099-01.json.png"]
+            for name in names:
+                info = tarfile.TarInfo(name)
+                info.size = len(raw)
+                tar.addfile(info, io.BytesIO(raw))
+            for kind in (tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.CHRTYPE, tarfile.BLKTYPE, tarfile.FIFOTYPE):
+                info = tarfile.TarInfo(member_path("ICSA-26-098-01"))
+                info.type, info.linkname = kind, "/etc/passwd"
+                tar.addfile(info)
+        path = self.tar_gz_file("names.tar.gz", write)
+        self.assertTrue(self.run_case(path).ok)
+        data, _warnings = icsadvisories.load(self.store)
+        self.assertEqual(set(data.advisories), {"ICSA-26-006-01"})
+        self.assertEqual(data.lookup("CVE-2026-9999"), ((), 0))
+        self.assertFalse((Path(tempfile.gettempdir()) / "icsa-26-099-01.json").exists())
+
+    def test_a_header_that_claims_a_huge_file_is_refused_without_reading_it(self):
+        def write(tar):
+            info = tarfile.TarInfo(member_path("ICSA-26-006-01"))
+            info.size = 3 * 1024 ** 3
+            tar.addfile(info, _Zeros(info.size))
+        # A smaller stream limit keeps this quick; the full-size limit is exercised by the gzip bomb test above
+        with mock.patch.object(icsadvisories, "ICS_MAX_STREAM", 20 * 1024 * 1024):
+            self.assert_refused_and_kept(self.tar_gz_file("claims.tar.gz", write))
+
+    def test_hostile_advisory_content_is_neutralised(self):
+        title = "=HYPERLINK(\"http://evil.example\") \x1b[31m\u202e\u200b"
+        hostile = advisory("ICSA-26-006-01", title, ("CVE-2025-61939",), "<script>alert(1)</script>\x00")
+        hostile["document"]["references"] = [{"category": "self", "url": "javascript:alert(1)"}]
+        path = self.base / "hostile.tar.gz"
+        path.write_bytes(good(hostile))
+        self.assertTrue(self.run_case(path).ok)
+        data, _warnings = icsadvisories.load(self.store)
+        found = data.lookup("CVE-2025-61939")[0][0]
+        for text in (found.title, *found.vendors):
+            self.assertTrue(text.isprintable(), repr(text))
+            self.assertNotIn("\u202e", text)
+        self.assertEqual(found.url, "https://www.cisa.gov/news-events/ics-advisories/icsa-26-006-01")
+
+    def test_random_garbage_wrapped_in_gzip_and_tar_framing_is_refused(self):
+        for name, payload in (("g1", b"\0" * 512 * 3), ("g2", os.urandom(4096)), ("g3", b"ustar" * 200)):
+            with self.subTest(name):
+                path = self.base / f"{name}.tar.gz"
+                path.write_bytes(gzip.compress(payload))
+                self.assert_refused_and_kept(path)
+
+
+class _Zeros(io.RawIOBase):
+    """A file-like object of a given size that is all zeros, produced as it is read (no memory used)."""
+
+    def __init__(self, size):
+        self.left = size
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        count = min(len(buffer), self.left)
+        buffer[:count] = bytes(count)
+        self.left -= count
+        return count
 
 
 if __name__ == "__main__":

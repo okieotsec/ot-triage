@@ -1,14 +1,20 @@
-"""The Threat data view: freshness of KEV and EPSS, user-started updates and offline import."""
+"""The Threat data view: freshness of KEV, EPSS and the ICS advisories, user-started updates and offline import."""
 import tkinter as tk
 from tkinter import ttk
 
+import icsadvisories
 import threatdata
 from gui_round import round_corners
 from gui_widgets import ScrollFrame, button, card, chip, set_enabled, wrap_to_width
 
-HOSTS = ("www.cisa.gov", "epss.empiricalsecurity.com")
-CONFIRM_TEXT = ("This will download two public files over HTTPS from:\n\n" + "\n".join(f"  • {h}" for h in HOSTS)
+HOSTS = ("www.cisa.gov", "epss.empiricalsecurity.com", "codeload.github.com")
+CONFIRM_TEXT = ("This will download three public files over HTTPS from:\n\n" + "\n".join(f"  • {h}" for h in HOSTS)
+                + "\n\nThe last one is CISA's public advisories repository on GitHub (about 12 MB)."
                 + "\n\nNothing else is sent or contacted. Continue?")
+# what each source card says: the label before the version, the words for its items, and what its date means
+CARD_WORDS = {"kev": ("Catalog ", ("entry", "entries"), "Released"),
+              "epss": ("Model ", ("score", "scores"), "Scored"),
+              "ics": ("", ("advisory", "advisories"), "Newest advisory update")}
 
 
 class ThreatUpdater:
@@ -40,19 +46,25 @@ class ThreatUpdater:
         data_dir = self.ctx.data_dir
 
         def job(cancel, report):
-            return threatdata.update_from_network(data_dir, fetcher=threatdata.fetch, cancel=cancel, progress=report)
+            results = threatdata.update_from_network(data_dir, fetcher=threatdata.fetch, cancel=cancel, progress=report)
+            results.append(icsadvisories.update_from_network(data_dir, fetcher=threatdata.fetch, cancel=cancel,
+                                                             progress=report))
+            return results
 
         return self._start(job)
 
-    def import_files(self, kev_path, epss_path):
-        """Import KEV and/or EPSS files chosen by the user."""
-        if self.busy or not (kev_path or epss_path):
+    def import_files(self, kev_path, epss_path, ics_path=""):
+        """Import KEV, EPSS and/or ICS advisories files chosen by the user."""
+        if self.busy or not (kev_path or epss_path or ics_path):
             return False
         data_dir = self.ctx.data_dir
 
         def job(_cancel, report):
             report("Checking the files...")
-            return threatdata.import_from_files(kev_path or None, epss_path or None, data_dir)
+            results = threatdata.import_from_files(kev_path or None, epss_path or None, data_dir)
+            if ics_path:
+                results.append(icsadvisories.import_from_file(ics_path, data_dir))
+            return results
 
         return self._start(job)
 
@@ -106,12 +118,13 @@ class ThreatView:
         s, t = self.style, self.style.theme
         row = tk.Frame(self.body, bg=t.bg)
         row.pack(fill=tk.X)
-        row.columnconfigure((0, 1), weight=1, uniform="cards")
+        row.columnconfigure((0, 1, 2), weight=1, uniform="cards")
         self.cards = {}
-        for column, (name, title, host) in enumerate((("kev", "CISA KEV", HOSTS[0]), ("epss", "EPSS", HOSTS[1]))):
+        for column, (name, title, host) in enumerate((("kev", "CISA KEV", HOSTS[0]), ("epss", "EPSS", HOSTS[1]),
+                                                      ("ics", "CISA ICS advisories", HOSTS[2]))):
             outer = tk.Frame(row, bg=t.card, highlightthickness=1, highlightbackground=t.border,
                              highlightcolor=t.border)
-            outer.grid(row=0, column=column, sticky="nsew", padx=(0, 14) if column == 0 else 0)
+            outer.grid(row=0, column=column, sticky="nsew", padx=(0, 14) if column < 2 else 0)
             tk.Label(outer, text=title.upper(), font=s.font(9, "bold"), bg=t.card, fg=t.accent).pack(
                 anchor="w", padx=16, pady=(12, 4))
             top = tk.Frame(outer, bg=t.card)
@@ -120,7 +133,10 @@ class ThreatView:
             state_slot.pack(side=tk.LEFT)
             version = tk.Label(top, text="", font=s.font(11, "bold"), bg=t.card, fg=t.text)
             version.pack(side=tk.LEFT, padx=10)
-            detail = tk.Label(outer, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
+            # A small fixed requested width (not the width of the wrapped text) keeps the cards from feeding their
+            # own size back into the layout: with three cards squeezed side by side that flickered forever.
+            detail = tk.Label(outer, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left",
+                              width=10)
             detail.pack(fill=tk.X, padx=16, pady=(8, 2))
             wrap_to_width(detail)
             tk.Label(outer, text=f"Source: {host}", font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
@@ -151,11 +167,12 @@ class ThreatView:
         self.results_box.pack(fill=tk.X)
 
         offline = card(self.body, s, "Offline use")
-        text = tk.Label(offline, text=("The tool works fully offline. Download the two files on another computer, copy "
-                                       "them here, and use Import from files. They get the same checks as a "
-                                       "download, and a bad file never replaces good data. Files are stored in your "
-                                       "per-user data folder."), font=s.font(10), bg=t.card, fg=t.muted, anchor="w",
-                        justify="left")
+        text = tk.Label(offline, text=("The tool works fully offline. Download the files on another computer, copy "
+                                       "them here, and use Import from files. The ICS advisories file is the .tar.gz "
+                                       "you get by opening " + icsadvisories.ICS_URL + " in a browser. They get the "
+                                       "same checks as a download, and a bad file never replaces good data. Files "
+                                       "are stored in your per-user data folder."), font=s.font(10), bg=t.card,
+                        fg=t.muted, anchor="w", justify="left")
         text.pack(fill=tk.X)
         wrap_to_width(text)
 
@@ -165,12 +182,14 @@ class ThreatView:
         self.updater.update()
 
     def import_files(self):
-        """Ask for a KEV file and an EPSS file (either may be skipped) and import them."""
+        """Ask for a KEV file, an EPSS file and an ICS advisories archive (any may be skipped) and import them."""
         kev = self.ctx.open_file("Choose the KEV JSON file (cancel to skip)",
                                  [("JSON files", "*.json"), ("All files", "*.*")])
         epss = self.ctx.open_file("Choose the EPSS CSV file (cancel to skip)",
                                   [("EPSS files", "*.csv *.gz"), ("All files", "*.*")])
-        self.updater.import_files(kev, epss)
+        ics = self.ctx.open_file("Choose the CISA CSAF repository archive, a .tar.gz (cancel to skip)",
+                                 [("Archives", "*.tar.gz *.tgz"), ("All files", "*.*")])
+        self.updater.import_files(kev, epss, ics)
 
     def refresh(self):
         """Redraw the source cards, the progress line and the last result."""
@@ -193,11 +212,11 @@ class ThreatView:
                 label, direction = "Fresh", "ok"
             chip(slot, s, label, direction).pack()
             if status.loaded:
-                version.configure(text=("Catalog " if status.name == "kev" else "Model ") + status.version)
-                noun = ("entry", "entries") if status.name == "kev" else ("score", "scores")
+                prefix, noun, word = CARD_WORDS[status.name]
+                version.configure(text=prefix + status.version if status.version else "OT advisories (CSAF)")
                 count = f"{status.count:,} {noun[status.count != 1]}" if status.count else ""
                 lines = [fresh.text.split(": ", 1)[-1].capitalize()]
-                lines.insert(0, f"{'Released' if status.name == 'kev' else 'Scored'} {status.date}")
+                lines.insert(0, f"{word} {status.date}")
                 if count:
                     lines.insert(1, count)
                 detail.configure(text="  ·  ".join(lines))

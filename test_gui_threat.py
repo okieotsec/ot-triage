@@ -7,10 +7,12 @@ from pathlib import Path
 from unittest import mock
 
 import gui_threat
+import icsadvisories
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
 from settings import DEFAULT_SETTINGS, Settings
+from test_icsadvisories import advisory, good
 from test_threatdata import epss_bytes, kev_bytes
 from uiprefs import DEFAULT_PREFS
 
@@ -39,11 +41,13 @@ class ThreatViewTestCase(DisplayTestCase):
         self.pump()
         return self.view
 
-    def fake_network(self, kev=None, epss=None, block=None):
+    def fake_network(self, kev=None, epss=None, block=None, ics=None):
+        ics = good(advisory()) if ics is None else ics
+
         def fetch(url, max_bytes, hosts, cancel=None, **_kwargs):
             if block:
                 block.wait(5)
-            result = kev if url == td.KEV_URL else epss
+            result = {td.KEV_URL: kev, icsadvisories.ICS_URL: ics}.get(url, epss)
             if isinstance(result, Exception):
                 raise result
             return result
@@ -110,9 +114,26 @@ class ThreatViewTests(ThreatViewTestCase):
         self.assertIn("1 entry", detail)
         self.assertEqual(self.card_text("epss")[1], "Model v2026.06.15")
         self.assertIn("2 scores", self.card_text("epss")[2])
-        self.assertEqual(self.results_text(), ["✓ OK  KEV updated.", "✓ OK  EPSS updated."])
+        self.assertEqual(self.results_text(), ["✓ OK  KEV updated.", "✓ OK  EPSS updated.",
+                                               "✓ OK  ICS advisories updated: 1 advisories naming 1 CVEs."])
+        self.assertEqual(self.card_text("ics")[0], ["✓ Fresh"])
+        self.assertEqual(self.card_text("ics")[1], "OT advisories (CSAF)")
+        self.assertIn("1 advisory", self.card_text("ics")[2])
         self.assertEqual(str(view.update_button.cget("state")), "normal")
         self.assertFalse(view.progress_row.winfo_ismapped())
+
+    def test_the_three_cards_settle_instead_of_flickering_when_they_are_squeezed(self):
+        # In the real window the three cards share about 990 px: they used to flip between two sizes forever
+        self.holder.geometry("990x800+0+0")
+        with self.fake_network(kev_bytes(), epss_bytes()):
+            self.build()
+            self.view.update()
+            self.wait_idle()
+        self.pump(1.0)
+        changes = []
+        self.view.body.bind("<Configure>", lambda e: changes.append((e.width, e.height)), add="+")
+        self.pump(1.0)
+        self.assertLessEqual(len(changes), 2, changes)
 
     def test_failures_are_listed_and_the_previous_copy_is_kept(self):
         view = self.build()
@@ -120,7 +141,8 @@ class ThreatViewTests(ThreatViewTestCase):
             view.update()
             self.wait_idle()
         before = (self.ctx.data_dir / td.KEV_FILE).read_bytes()
-        with self.fake_network(td.FetchError("the connection timed out"), b"not an epss file"):
+        with self.fake_network(td.FetchError("the connection timed out"), b"not an epss file",
+                               ics=b"not an archive"):
             view.update()
             self.pump(10, until=lambda: all(not r.ok for r in self.ctx.updater.results) and not self.ctx.worker.running)
             self.pump(0.1)
@@ -175,20 +197,23 @@ class ThreatViewTests(ThreatViewTestCase):
         view = self.build()
         (self.work / "kev.json").write_bytes(kev_bytes())
         (self.work / "epss.csv.gz").write_bytes(epss_bytes())
-        self.ctx.open_file = mock.Mock(side_effect=["", ""])
+        self.ctx.open_file = mock.Mock(side_effect=["", "", ""])
         view.import_files()
         self.pump(0.2)
         self.assertEqual(self.ctx.updater.results, [])
-        self.ctx.open_file = mock.Mock(side_effect=[str(self.work / "kev.json"), str(self.work / "epss.csv.gz")])
+        (self.work / "csaf.tar.gz").write_bytes(good(advisory()))
+        self.ctx.open_file = mock.Mock(side_effect=[str(self.work / "kev.json"), str(self.work / "epss.csv.gz"),
+                                                    str(self.work / "csaf.tar.gz")])
         view.import_files()
         self.wait_idle()
-        self.assertEqual([r.ok for r in self.ctx.updater.results], [True, True])
+        self.assertEqual([r.ok for r in self.ctx.updater.results], [True, True, True])
         self.assertEqual(self.card_text("epss")[0], ["✓ Fresh"])
+        self.assertEqual(self.card_text("ics")[0], ["✓ Fresh"])
 
     def test_importing_only_one_file_and_a_bad_file(self):
         view = self.build()
         (self.work / "bad.json").write_bytes(b"nope")
-        self.ctx.open_file = mock.Mock(side_effect=[str(self.work / "bad.json"), ""])
+        self.ctx.open_file = mock.Mock(side_effect=[str(self.work / "bad.json"), "", ""])
         view.import_files()
         self.wait_idle()
         self.assertEqual(len(self.ctx.updater.results), 1)
@@ -211,7 +236,7 @@ class ThreatViewTests(ThreatViewTestCase):
         view.frame.destroy()
         self.assertEqual(self.ctx.updater.listeners, [])
         rebuilt = self.build()
-        self.assertEqual(len(self.results_text()), 2)
+        self.assertEqual(len(self.results_text()), 3)
         self.assertEqual(self.ctx.updater.listeners, [rebuilt.refresh])
 
     def test_a_job_finishing_after_the_view_is_gone_does_not_crash(self):
@@ -223,7 +248,7 @@ class ThreatViewTests(ThreatViewTestCase):
             view.frame.destroy()
             release.set()
             self.pump(10, until=lambda: not self.ctx.worker.running and bool(self.ctx.updater.results))
-        self.assertEqual([r.ok for r in self.ctx.updater.results], [True, True])
+        self.assertEqual([r.ok for r in self.ctx.updater.results], [True, True, True])
 
     def test_updater_is_usable_without_any_view(self):
         updater = gui_threat.ThreatUpdater(self.ctx)

@@ -254,7 +254,7 @@ class App:
             else:
                 direction = "warn" if fresh.stale else "ok"
                 age = fresh.text.rsplit("retrieved ", 1)[-1].replace(" ago", "") if "retrieved" in fresh.text else "?"
-                text = f"{status.label} {status.version} · {age}" + (" (stale)" if fresh.stale else "")
+                text = f"{status.label} {status.version}".strip() + f" · {age}" + (" (stale)" if fresh.stale else "")
             widget = chip(self.status_bar, s, text, direction, bg=t.header)
             widget.pack(side=tk.LEFT, padx=(12, 0), pady=6)
             widget.bind("<Button-1>", lambda _e: self.show_view("threat"))

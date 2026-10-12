@@ -1,15 +1,16 @@
-# Threat data (CISA KEV and EPSS)
+# Threat data (CISA KEV, EPSS and CISA ICS advisories)
 
-The tool can look up a CVE in two public data sets and use what it finds as the **threat** input. It works fully offline. Internet access is needed only when you choose to update the data.
+The tool can look up a CVE in three public data sets. KEV and EPSS decide the **threat** input; the CISA ICS advisories are shown as context only and never change the threat level, the bucket or the ordering score. It works fully offline. Internet access is needed only when you choose to update the data.
 
 Decisions confirmed by the project lead on 2026-10-07: the EPSS cutoff defaults to 0.95, the comparison is "at or above", and data is stored in the per-user data folder.
 
-## The two sources
+## The sources
 
 | Source | What it tells you | Where it comes from |
 | --- | --- | --- |
 | **CISA KEV** (Known Exploited Vulnerabilities) | The CVE is being exploited in real attacks right now. | `https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json` |
 | **EPSS** (Exploit Prediction Scoring System) | How likely the CVE is to see exploitation activity soon, as a probability and a percentile. | `https://epss.empiricalsecurity.com/epss_scores-current.csv.gz` |
+| **CISA ICS advisories** | Which published CISA advisory for industrial control systems (ICSA) or medical devices (ICSMA) names the CVE: the advisory number, its title, the vendor and when it was last updated. | `https://codeload.github.com/cisagov/CSAF/tar.gz/refs/heads/develop` (CISA's public CSAF repository, about 12 MB) |
 
 ## How the threat level is decided
 
@@ -37,10 +38,10 @@ KEV also adds context that never changes the bucket:
 
 Nothing is downloaded unless you start an update. Two ways to update:
 
-- **Download:** fetches both files over HTTPS.
-- **Import from file:** for networks with no internet. Download the two files elsewhere, move them over, and import them. They go through exactly the same checks as a download.
+- **Download:** fetches the three files over HTTPS.
+- **Import from file:** for networks with no internet. Download the files elsewhere, move them over, and import them. They go through exactly the same checks as a download. For the ICS advisories the file is the `.tar.gz` you get by opening the address in the table above in a browser.
 
-Each source is handled on its own: if one fails, the other can still update, and the failed one **keeps its previous copy**. Data is checked in memory first and only written to disk if it passes.
+Each source is handled on its own: if one fails, the others can still update, and the failed one **keeps its previous copy**. Data is checked in memory first and only written to disk if it passes.
 
 ## What is checked
 
@@ -54,6 +55,30 @@ Each source is handled on its own: if one fails, the other can still update, and
 | Odd content | Control characters in text are replaced with spaces; unknown extra fields are ignored | Not a number (`nan`, `inf`) is rejected |
 
 Stored files are checked again every time they are loaded, so a file changed on disk cannot slip through.
+
+## ICS advisories
+
+CISA publishes every ICS advisory as a machine-readable CSAF file in its public repository. The tool downloads the repository as one archive, reads only the OT advisory files inside it, and keeps a small index (advisory number, title, up to five vendor names, the dates, and the CVEs each advisory names; about 0.9 MB for all 3,959 advisories). The advisory files themselves are not kept.
+
+- **Where it shows:** after you look up a CVE, the Assess view shows an **ICS advisories from CISA** card under the KEV references, and a chip ("In a CISA ICS advisory", "In 3 CISA ICS advisories" or "Not in a CISA ICS advisory"). The newest five advisories are listed, with a note when more name the CVE. In Batch, the Details box lists them for the selected row.
+- **Links:** the advisory number is a link to its page on cisa.gov. The address is built from the advisory number after it has been checked, never copied from the downloaded file, so a hostile file cannot point you somewhere else. Nothing is opened until you click.
+- **Context only:** a line in the reasoning and a neutral chip say the CVE is named in an advisory. The bucket and the ordering score never change. "Not in a CISA ICS advisory" only means CISA has not published one that names this CVE, not that the CVE is harmless.
+- **Not loaded:** if the advisories have not been downloaded, the chip says "ICS advisories not loaded" so an empty result is never mistaken for "no advisory".
+- **Copy summary and Copy as Markdown** list the advisories with their addresses. The **CSV export** adds an `ics_advisories` column (each advisory as `number: address`, separated by ` ; `, with "and N more" if some are left out), and `threat_data` names the advisories' date.
+- **Freshness:** CISA adds advisories continuously, so the status bar shows how old your copy is and flags it stale after the configured number of days, like the other sources.
+
+What is checked in the archive:
+
+| Check | Limit |
+| --- | --- |
+| Download size | 60 MB (about 12 MB today) |
+| Bytes read out of the archive, whatever its entries claim | 600 MB (a "gzip bomb" is stopped while it is being read) |
+| Entries in the archive | 100,000 |
+| Advisories | 20,000 (3,959 today); each file up to 8 MB; a product tree up to 20,000 nodes and 12 levels deep; up to 2,000 CVEs per advisory |
+| Which entries are read | only regular files named like `.../csaf_files/OT/white/<year>/icsa-YY-DDD-NN.json` (an optional revision letter is allowed); links, devices, other folders and odd names are ignored, and nothing is ever extracted to disk |
+| Each advisory | valid JSON without duplicate keys or `NaN`; its own id must match its file name; a title; valid dates; CVE ids must match exactly |
+| Unreadable advisories | one is skipped and counted; more than 10 (or 5% of them) means the format has probably changed and the whole update is refused |
+| Stored index | checked again every time it is loaded, and checked to read back correctly before it replaces the old one |
 
 ## References from the KEV notes
 
@@ -73,11 +98,12 @@ CISA's feed marks some entries `forensicTriage: Yes`. Those are entries where th
 
 ## Download safety
 
-- HTTPS only, and only to the two expected hosts. TLS certificates are always verified, and nothing in the app or its settings can turn that off.
+- HTTPS only, and only to the three expected hosts (`www.cisa.gov`, `epss.empiricalsecurity.com` and `codeload.github.com`). TLS certificates are always verified, and nothing in the app or its settings can turn that off.
 - Redirects are allowed only to HTTPS on the same expected host, and at most 3. (The EPSS "current" address does redirect to a dated file on the same host.)
 - Time limits: 20 seconds to connect or wait for data, and 2 minutes overall. A server that sends data very slowly is cut off at the overall limit.
 - Size limits are enforced while downloading, not only at the end.
 - The app's own proxy settings follow your system settings (`HTTPS_PROXY` and similar).
+- **What the ICS advisories download is trusted on:** HTTPS to GitHub's servers, the same level of trust as the other two sources. CISA signs each advisory file with PGP, but the archive as a whole is not signed, and the Python standard library cannot check PGP signatures, so the tool does not verify them. The content is therefore treated as untrusted and checked as described above.
 
 ## Troubleshooting: "unable to get local issuer certificate" on Windows
 
@@ -106,7 +132,7 @@ Then restart the app and update again. If it still fails, repeat with `AmazonRoo
 | macOS | `~/Library/Application Support/ot-triage/data/` |
 | Windows | `%LOCALAPPDATA%\ot-triage\data\` |
 
-Files: `kev.json`, `epss.csv.gz` and `meta.json` (where and when each was retrieved, plus a checksum). Files are written with user-only permissions, using a temporary file that replaces the old copy only once the new one is complete.
+Files: `kev.json`, `epss.csv.gz` and `meta.json` (where and when each was retrieved, plus a checksum), and `ics_advisories.json` with `ics_meta.json` for the ICS advisories. Files are written with user-only permissions, using a temporary file that replaces the old copy only once the new one is complete.
 
 ## Freshness
 
@@ -119,11 +145,11 @@ Add an optional `cve` column. Then:
 - With data loaded, the `threat` cell can be left blank and the level comes from KEV and EPSS.
 - A `threat` value can still be given. It can raise the level but never lower what the data says.
 - With no data loaded and a blank `threat` cell, the row is reported as an error that says so. It is **not** scored as "no known exploitation".
-- The export adds `cve`, `threat_source` (why the level was chosen) and `threat_data` (the KEV and EPSS versions used) columns, so results can be reproduced. It also adds `references` and `forensic_triage` (see above).
+- The export adds `cve`, `threat_source` (why the level was chosen) and `threat_data` (the KEV and EPSS versions used) columns, so results can be reproduced. It also adds `references` and `forensic_triage`, and `ics_advisories` (see above).
 
 ## In the GUI
 
-- The **Threat data** view shows each source's version, dates, entry count and freshness, with **Update threat data** and **Import from files…** buttons. The first update shows exactly which two hosts will be contacted and asks for confirmation. Updates run in the background with a Cancel button.
+- The **Threat data** view shows each source's version, dates, entry count and freshness, with **Update threat data** and **Import from files…** buttons. The first update shows exactly which three hosts will be contacted and asks for confirmation. Updates run in the background with a Cancel button.
 - The **Assess** view has a CVE field. Press Enter or **Look up** to check the local data. The threat level is filled in with its source shown. Two checkboxes can only raise it, and changing it by hand asks for a written reason that appears in every summary.
 - The **status bar** shows freshness at all times.
 - **Settings** has an optional "Update threat data when the app starts" checkbox, off by default.

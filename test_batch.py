@@ -5,8 +5,10 @@ import time
 import unittest
 
 import batch
+import icsadvisories as ics
 import threatdata as td
 from prioritizer import Asset, Controls, Exposure, Patch, Threat
+from test_icsadvisories import advisory, good
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAMPLE = os.path.join(HERE, "sample_vulns.csv")
@@ -442,8 +444,8 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh)
                 rows = list(reader)
-        self.assertEqual(reader.fieldnames[-5:], ["references", "forensic_triage", "asset_id", "from_inventory",
-                                                  "cvss_environmental"])
+        self.assertEqual(reader.fieldnames[-6:], ["references", "forensic_triage", "asset_id", "from_inventory",
+                                                  "cvss_environmental", "ics_advisories"])
         by_cve = {r["cve"]: r for r in rows}
         kev_row = by_cve["CVE-2024-0001"]
         self.assertEqual(kev_row["forensic_triage"], "Yes")
@@ -497,6 +499,74 @@ class EnvironmentalScoreTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 values = sorted(row["cvss_environmental"] for row in csvmodule.DictReader(fh))
         self.assertEqual(values, ["", "5.7"])
+
+
+class IcsAdvisoryBatchTests(unittest.TestCase):
+    ROW = {"cvss": "8.0", "asset": "standard", "exposure": "high", "cve": "CVE-2024-0001"}
+
+    def data(self, with_ics=True, many=0):
+        entry = td.KevEntry("CVE-2024-0001", "Acme", "Widget", "Flaw", "2024-01-02", "Apply.", "2024-01-23", False)
+        docs = [advisory("ICSA-26-006-01", "Acme Widget Controller", ("CVE-2024-0001",), "Acme")]
+        docs += [advisory(f"ICSA-26-{n:03d}-01", f"Other {n}", ("CVE-2024-0001",), updated=f"2026-02-{n:02d}T00:00:00Z")
+                 for n in range(10, 10 + many)]
+        return td.ThreatData(td.KevData("2026.10.04", "2026-10-04", {entry.cve: entry}),
+                             td.EpssData("v2026.06.15", "2026-10-07", {}),
+                             ics=ics.parse_archive(good(*docs)) if with_ics else None)
+
+    def test_a_row_carries_the_advisories_that_name_its_cve(self):
+        item = batch.score_row(2, self.ROW, threatdata=self.data())
+        self.assertEqual([a.id for a in item.advisories], ["ICSA-26-006-01"])
+        self.assertEqual(item.advisory_count, 1)
+
+    def test_rows_without_a_matching_advisory_or_without_the_data_have_none(self):
+        other = batch.score_row(2, {**self.ROW, "cve": "CVE-2030-0001"}, threatdata=self.data())
+        unloaded = batch.score_row(3, self.ROW, threatdata=self.data(with_ics=False))
+        manual = batch.score_row(4, {**self.ROW, "cve": "", "threat": "none"}, threatdata=self.data())
+        for item in (other, unloaded, manual):
+            self.assertEqual((item.advisories, item.advisory_count), ((), 0))
+
+    def test_advisories_never_change_the_bucket_or_the_score(self):
+        with_ics = batch.score_row(2, self.ROW, threatdata=self.data())
+        without = batch.score_row(2, self.ROW, threatdata=self.data(with_ics=False))
+        self.assertEqual((with_ics.priority, with_ics.result.score), (without.priority, without.result.score))
+
+    def test_the_context_note_and_neutral_chip_appear_only_with_an_advisory(self):
+        with_ics = batch.score_row(2, self.ROW, threatdata=self.data()).result
+        without = batch.score_row(2, self.ROW, threatdata=self.data(with_ics=False)).result
+        self.assertTrue(any("ICS advisory ICSA-26-006-01 names this CVE (context only" in r for r in with_ics.reasons))
+        self.assertFalse(any("ICS advisory" in r for r in without.reasons))
+        chips = [(f.label, f.direction) for f in with_ics.factors if "ICS" in f.label]
+        self.assertEqual(chips, [("In a CISA ICS advisory", "neutral")])
+
+    def test_several_advisories_are_counted_and_the_newest_is_named(self):
+        item = batch.score_row(2, self.ROW, threatdata=self.data(many=7))
+        self.assertEqual(item.advisory_count, 8)
+        self.assertEqual(len(item.advisories), ics.MAX_LISTED)
+        self.assertTrue(any("ICSA-26-016-01 and 7 more names this CVE" in r for r in item.result.reasons))
+        self.assertIn("In 8 CISA ICS advisories", [f.label for f in item.result.factors])
+
+    def test_the_export_lists_them_in_a_column_and_says_when_some_are_left_out(self):
+        for many, expected in ((0, "ICSA-26-006-01: https://www.cisa.gov/news-events/ics-advisories/icsa-26-006-01"),
+                               (7, " ; and 3 more")):
+            with self.subTest(many=many), tempfile.TemporaryDirectory() as folder:
+                data = self.data(many=many)
+                path = os.path.join(folder, "out.csv")
+                batch.write_results(path, [batch.score_row(2, self.ROW, threatdata=data)], data)
+                with open(path, newline="", encoding="utf-8-sig") as fh:
+                    row = next(csv.DictReader(fh))
+                self.assertIn(expected, row["ics_advisories"])
+                self.assertIn("ICS advisories 2026-", row["threat_data"])
+
+    def test_the_export_column_is_empty_without_advisories_and_formula_safe(self):
+        with tempfile.TemporaryDirectory() as folder:
+            data = self.data(with_ics=False)
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, [batch.score_row(2, self.ROW, threatdata=data)], data)
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                self.assertEqual(next(csv.DictReader(fh))["ics_advisories"], "")
+        item = batch.BatchItem(2, advisories=(ics.IcsAdvisory("ICSA-26-006-01", "t", "2026-01-01", "2026-01-01"),),
+                               advisory_count=1)
+        self.assertFalse(batch._advisory_cell(item).startswith(("=", "+", "-", "@")))
 
 
 if __name__ == "__main__":

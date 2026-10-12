@@ -8,7 +8,7 @@
 Give it a CVSS score or vector, a CVE, how critical and how exposed the asset is, and what protections exist. It
 answers **NOW**, **NEXT** or **NEVER**, shows *why* in plain language, and shows what single change would move the
 answer. It pulls in CISA's Known Exploited Vulnerabilities (KEV) catalog and EPSS scores, including CISA's own
-advisory links, and ranks whole spreadsheets of findings in one go.
+advisory links, shows which CISA ICS advisories name a CVE, and ranks whole spreadsheets of findings in one go.
 
 ![The Assess view: a crown-jewel asset with an actively exploited CVE is NOW, with the reasons, CISA's required action and its reference links](docs/images/assess-dark.png)
 
@@ -41,13 +41,13 @@ property-based tests.
 
 | View | What it does |
 | --- | --- |
-| **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV and EPSS data to fill in the threat level. Shows the bucket, why-chips, the recommended action, the reference links CISA lists for a KEV entry, and what single change would move the result. |
+| **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV, EPSS and CISA ICS advisory data to fill in the threat level. Shows the bucket, why-chips, the recommended action, the reference links CISA lists for a KEV entry, the ICS advisories that name the CVE, and what single change would move the result. |
 | **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. |
-| **Threat data** | See how fresh the KEV and EPSS data is. Update it (after a confirmation) or import files for offline use. |
+| **Threat data** | See how fresh the KEV, EPSS and ICS advisory data is. Update it (after a confirmation) or import files for offline use. |
 | **Settings** | Change the four scoring settings with live validation, and choose the theme and text size. |
 | **About** | Version, the exposure definition, where the categories come from, and the documentation. |
 
-The status bar always shows how fresh the KEV and EPSS data is, and a **Custom scoring** badge appears whenever the
+The status bar always shows how fresh the KEV, EPSS and ICS advisory data is, and a **Custom scoring** badge appears whenever the
 scoring settings differ from the defaults.
 
 | Shortcut | Action |
@@ -98,7 +98,7 @@ Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [
 Required columns: `cvss` (or `cvss_vector`), `asset`, `exposure`, and `threat` (or `cve`). A `cvss_vector` column (CVSS 3.0, 3.1 or 4.0) supplies the score, and if it sets environmental metrics the environmental score is shown next to it for comparison (the priority uses the base score); see [docs/CVSS.md](docs/CVSS.md).
 Optional columns: `id`, `name`, `patch` (default available), `controls` (default none).
 An optional `asset_id` column links a row to an **asset inventory** (a second CSV, loaded with **Load inventory...**) that fills in `asset`, `exposure` and `controls` (and optionally the CVSS security requirements), so those columns can be left out; see [docs/INVENTORY.md](docs/INVENTORY.md).
-An optional `cve` column looks the CVE up in local KEV and EPSS data (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)); with it, `threat` can be left blank.
+An optional `cve` column looks the CVE up in local KEV, EPSS and ICS advisory data (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)); with it, `threat` can be left blank.
 Other columns are ignored. Header names accept common aliases, and enum cells accept short aliases or the full dropdown labels.
 
 Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are rejected. Exported CSVs prefix text cells that start with `=`, `+`, `-`, `@`, tab or carriage return with `'` so spreadsheets do not run them as formulas.
@@ -107,7 +107,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
 - [docs/CVSS.md](docs/CVSS.md): pasting CVSS vectors, supported versions and how the scores were verified
-- [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV and EPSS threat data, offline updates and safety checks
+- [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV, EPSS and ICS advisory data, offline updates and safety checks
 - [docs/INVENTORY.md](docs/INVENTORY.md): the asset inventory, which fills in asset criticality, exposure and controls
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
@@ -115,7 +115,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 
 ## Security
 
-- **[SECURITY.md](SECURITY.md)** explains how to report a vulnerability, which two public files the app can download (and that it works fully offline otherwise), and what it reads and writes.
+- **[SECURITY.md](SECURITY.md)** explains how to report a vulnerability, which three public files the app can download (and that it works fully offline otherwise), and what it reads and writes.
 - **[SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md)** is the test plan. Each checkpoint's evidence is archived in `reports/`.
 - **Software bill of materials:** [sbom/sbom.cdx.json](sbom/sbom.cdx.json) (CycloneDX). The application uses only the Python standard library, so the SBOM lists the application itself and no third-party components. It is generated from a brand-new empty environment by `tools/make_sbom.py`, and a test fails if it goes out of date.
 - **Third-party material:** the CVSS 4.0 scoring tables come from FIRST's calculator (BSD-2-Clause); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
@@ -132,8 +132,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP5 | Asset inventory import: a new file the tool parses | [reports/cp5-inventory](reports/cp5-inventory/claude.md) |
 | CP6 | Environmental CVSS scores, checked against FIRST's calculators | [reports/cp6-environmental-cvss](reports/cp6-environmental-cvss/claude.md) |
 | CP7 | Security requirements for the environmental score | [reports/cp7-security-requirements](reports/cp7-security-requirements/claude.md) |
+| CP8 | CISA ICS advisories: a new downloaded archive that is parsed | [reports/cp8-ics-advisories](reports/cp8-ics-advisories/claude.md) |
 
-Across the checkpoints 26 findings were recorded (3 Medium, 6 Low, 17 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 29 findings were recorded (3 Medium, 7 Low, 19 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 

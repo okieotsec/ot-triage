@@ -68,6 +68,7 @@ NEVER does not mean "safe". It means "not worth a scheduled fix under today's co
 ## Things that deliberately do not decide a bucket
 
 - **The CVSS environmental score** (see [CVSS.md](CVSS.md)). It is shown next to the base score, but the bucket uses the base score only. The asset criticality, exposure and controls inputs already say the same things about your environment, and counting them twice would change the rules (approved 2026-10-11: show alongside, do not change the bucket). To make it drive the bucket, that has to be a deliberate policy change with its own rule and tests.
+- **CISA ICS advisories** (see [THREAT_DATA.md](THREAT_DATA.md)). A CVE that a published CISA advisory names gets a neutral chip, a line in the reasoning and the advisory's link, but the bucket and the ordering score are unchanged. An advisory says a vendor and product are affected and what to do; it does not say the flaw is being exploited, so it adds context rather than urgency. KEV and EPSS already carry the exploitation signal. This was stated to the project owner before the feature was built; making advisories drive the bucket would be a deliberate policy change with its own rule and tests.
 
 ## Examples
 
@@ -94,6 +95,7 @@ Generated from the current rules.
 - **Partial controls never change a bucket** for any combination of the other inputs.
 - **Better controls never rank higher:** for every combination of the other inputs, the ordering score with no controls is at least the score with partial controls, which is at least the score with strong controls.
 - **The CVSS environmental score never changes a priority or an ordering score**: vectors with and without environmental metrics give identical results.
+- **CISA ICS advisories never change a priority or an ordering score**: the same item with and without the advisories loaded gives identical results.
 - **Boundaries** sit exactly where documented: 4.0, 7.0 and 9.0 use "greater than or equal to".
 
 ## When to revisit

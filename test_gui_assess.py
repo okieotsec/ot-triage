@@ -11,12 +11,14 @@ import explain
 import gui_assess
 import gui_theme
 import gui_widgets
+import icsadvisories
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
 from gui_theme import LIGHT, Style
 from prioritizer import Asset, Controls, Exposure, Patch, Threat, prioritize
 from settings import DEFAULT_SETTINGS, Settings
+from test_icsadvisories import advisory, good
 from test_threatdata import epss_bytes, epss_text, kev_bytes, kev_entry
 from uiprefs import DEFAULT_PREFS
 
@@ -874,6 +876,144 @@ class AssessRequirementTests(AssessTestCase):
         self.assertTrue(rebuilt.requirements_box.is_open)
         self.assertEqual(self.ctx.assess_state.requirements["AR"].get(), "H")
         self.assertIn("Environmental score", rebuilt.cvss_env.cget("text"))
+
+
+ICS_ONLY_CVE = "CVE-2026-1234"
+
+
+class AssessAdvisoryTests(AssessTestCase):
+    def load_ics(self, *docs):
+        docs = docs or (advisory("ICSA-26-006-01", "Acme Widget Controller", (KEV_CVE, ICS_ONLY_CVE), "Acme"),)
+        path = self._write("csaf.tar.gz", good(*docs))
+        self.assertTrue(icsadvisories.import_from_file(path, self.data_dir).ok)
+
+    def walk(self, widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from self.walk(child)
+
+    def links(self, view):
+        return [w for w in self.walk(view.advisories_body) if isinstance(w, gui_widgets.LinkLabel)]
+
+    def has_chip(self, flow, text):
+        return any(chip.endswith(text) for chip in self.chip_texts(flow))
+
+    def texts(self, view):
+        return [w.cget("text") for w in self.walk(view.advisories_body) if isinstance(w, tk.Label)]
+
+    def test_a_cve_named_in_an_advisory_shows_a_card_with_a_link_title_vendor_and_date(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        self.assertEqual(view.advisories_card.winfo_manager(), "")
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertEqual(view.advisories_card.winfo_manager(), "pack")
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-006-01"])
+        self.assertIn("Acme Widget Controller · Acme · updated 2026-01-06", self.texts(view))
+        self.assertTrue(self.has_chip(view.cve_chips, "In a CISA ICS advisory"))
+        self.assertTrue(self.has_chip(view.chips, "In a CISA ICS advisory"))
+
+    def test_a_cve_in_no_advisory_hides_the_card_and_says_so(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.lookup(EPSS_CVE)
+        self.assertEqual((view.advisories, view.advisories_card.winfo_manager()), ((), ""))
+        self.assertTrue(self.has_chip(view.cve_chips, "Not in a CISA ICS advisory"))
+
+    def test_without_the_advisories_loaded_the_chip_says_not_loaded_and_there_is_no_card(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertTrue(self.has_chip(view.cve_chips, "ICS advisories not loaded"))
+        self.assertEqual(view.advisories_card.winfo_manager(), "")
+
+    def test_the_advisories_alone_still_work_without_kev_or_epss(self):
+        self.load_ics()
+        view = self.build()
+        self.fill("8.0", Threat.PUBLIC)
+        self.lookup(ICS_ONLY_CVE)
+        self.assertEqual(view.advisories_card.winfo_manager(), "pack")
+        self.assertTrue(self.has_chip(view.cve_chips, "KEV not loaded"))
+        self.assertNotIn("No threat data is loaded", view.cve_message.cget("text"))
+
+    def test_they_never_change_the_priority_or_the_score(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        before = (view.badge.cget("text"), view.score_label.cget("text"))
+        self.load_ics()
+        self.ctx.reload_threat_data()
+        self.lookup(KEV_CVE)
+        self.assertEqual((view.badge.cget("text"), view.score_label.cget("text")), before)
+        self.assertIn("context only; does not change the bucket", view.reasoning_text.cget("text"))
+
+    def test_clicking_the_advisory_opens_the_address_built_from_its_number_only(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
+            self.fill("8.0", Threat.NONE)
+            self.lookup(KEV_CVE)
+            opener.assert_not_called()
+            self.links(view)[0].event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://www.cisa.gov/news-events/ics-advisories/icsa-26-006-01")
+
+    def test_a_hostile_title_is_shown_as_plain_text_and_escaped_in_the_markdown_summary(self):
+        self.load_data()
+        self.load_ics(advisory("ICSA-26-006-01", "Evil [click](https://evil.example) *title*\x07", (KEV_CVE,), "Acme"))
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-006-01"])
+        view.copy_markdown()
+        markdown = self.ctx.copy.call_args[0][0]
+        self.assertIn(r"\[click\]\(https://evil.example\)", markdown)
+        self.assertNotIn("\x07", markdown)
+        self.assertNotIn("](https://evil.example)", markdown)
+
+    def test_the_copied_summaries_list_the_advisories_with_their_addresses(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        view.copy_summary()
+        plain = self.ctx.copy.call_args[0][0]
+        self.assertIn("CISA ICS advisories that name this CVE:", plain)
+        self.assertIn("- ICSA-26-006-01: Acme Widget Controller (https://www.cisa.gov/news-events/ics-advisories/"
+                      "icsa-26-006-01)", plain)
+        view.copy_markdown()
+        self.assertIn("[ICSA-26-006-01: Acme Widget Controller](https://www.cisa.gov/news-events/"
+                      "ics-advisories/icsa-26-006-01)", self.ctx.copy.call_args[0][0])
+
+    def test_more_than_the_listed_few_say_how_many_there_are(self):
+        self.load_data()
+        docs = [advisory(f"ICSA-26-{n:03d}-01", f"Product {n}", (KEV_CVE,), updated=f"2026-02-{n:02d}T00:00:00Z")
+                for n in range(1, 9)]
+        self.load_ics(*docs)
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertEqual(len(self.links(view)), icsadvisories.MAX_LISTED)
+        self.assertIn("and 3 more advisories name this CVE (see cisa.gov)", self.texts(view))
+        self.assertTrue(self.has_chip(view.chips, "In 8 CISA ICS advisories"))
+
+    def test_clearing_the_cve_hides_the_card(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.ctx.assess_state.cve.set("")
+        self.pump()
+        self.assertEqual((view.advisories, view.advisories_card.winfo_manager()), ((), ""))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 import webbrowser
 from tkinter import filedialog, messagebox
 
+import icsadvisories
 import threatdata
 from gui_widgets import Worker
 
@@ -37,7 +38,7 @@ class Context:
 
     def status(self):
         """Return the cheaply read status of each stored threat data source."""
-        return threatdata.read_status(self.data_dir)
+        return [*threatdata.read_status(self.data_dir), icsadvisories.status(self.data_dir)]
 
     def versions(self):
         """Return the loaded KEV and EPSS versions, or an empty string if no data has been loaded."""

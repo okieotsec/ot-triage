@@ -689,5 +689,68 @@ class FetchTests(unittest.TestCase):
         self.assertFalse(data_dir.exists() and any(data_dir.iterdir()))
 
 
+class ExactMatchTests(unittest.TestCase):
+    """Text from a downloaded file must match exactly: a trailing new line does not get past the checks."""
+
+    def test_a_cve_id_with_a_trailing_new_line_is_refused_in_both_files(self):
+        entry = kev_entry("CVE-2024-0001")
+        entry["cveID"] = "CVE-2024-0001\n"
+        with self.assertRaisesRegex(td.ThreatDataError, "invalid cveID"):
+            td.parse_kev(kev_bytes([entry]))
+        with self.assertRaisesRegex(td.ThreatDataError, "invalid row"):
+            td.parse_epss(epss_bytes(epss_text(['"CVE-2024-0001\n",0.5,0.9'])))
+
+    def test_a_catalog_version_with_a_trailing_new_line_is_refused(self):
+        doc = json.loads(kev_bytes())
+        doc["catalogVersion"] = "2026.10.04\n"
+        with self.assertRaisesRegex(td.ThreatDataError, "catalogVersion"):
+            td.parse_kev(json.dumps(doc).encode())
+
+
+class IcsLookupTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def store(self, *docs):
+        import icsadvisories
+        from test_icsadvisories import good
+        path = self.dir / "csaf.tar.gz"
+        path.write_bytes(good(*docs))
+        self.assertTrue(icsadvisories.import_from_file(path, self.dir).ok)
+
+    def test_load_reads_the_stored_advisories_and_lookup_uses_them(self):
+        from test_icsadvisories import advisory
+        self.store(advisory())
+        info = td.ThreatData.load(self.dir).lookup("CVE-2025-61939")
+        self.assertTrue(info.ics_loaded)
+        self.assertEqual(([a.id for a in info.advisories], info.advisory_count), (["ICSA-26-006-01"], 1))
+        self.assertFalse(info.kev_loaded or info.epss_loaded)
+
+    def test_a_cve_in_no_advisory_and_missing_data_are_told_apart(self):
+        from test_icsadvisories import advisory
+        self.store(advisory())
+        known = td.ThreatData.load(self.dir).lookup("CVE-2020-0001")
+        self.assertEqual((known.ics_loaded, known.advisories, known.advisory_count), (True, (), 0))
+        empty = td.ThreatData().lookup("CVE-2020-0001")
+        self.assertEqual((empty.ics_loaded, empty.advisories, empty.advisory_count), (False, (), 0))
+
+    def test_versions_name_the_advisories_only_when_they_are_loaded(self):
+        from test_icsadvisories import advisory
+        self.assertNotIn("ICS", td.ThreatData().versions())
+        self.store(advisory())
+        self.assertTrue(td.ThreatData.load(self.dir).versions().endswith("; ICS advisories 2026-01-06"))
+
+    def test_a_damaged_stored_index_is_a_warning_and_the_rest_still_loads(self):
+        from test_icsadvisories import advisory
+        self.store(advisory())
+        (self.dir / "ics_advisories.json").write_bytes(b"{broken")
+        data = td.ThreatData.load(self.dir)
+        self.assertIsNone(data.ics)
+        self.assertTrue(any("ICS advisories could not be used" in w for w in data.warnings))
+        self.assertFalse(data.lookup("CVE-2025-61939").ics_loaded)
+
+
 if __name__ == "__main__":
     unittest.main()

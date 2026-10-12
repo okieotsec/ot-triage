@@ -11,11 +11,13 @@ from unittest import mock
 import batch
 import gui_batch
 import gui_widgets
+import icsadvisories
 import inventory
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
 from settings import DEFAULT_SETTINGS, Settings
+from test_icsadvisories import advisory, good
 from test_threatdata import epss_bytes, epss_text, kev_bytes, kev_entry
 from uiprefs import DEFAULT_PREFS
 
@@ -798,6 +800,80 @@ class BatchTableFitTests(BatchViewTestCase):
         self.pump(0.5)
         self.assertLess(int(view.tree.column("name", "width")), wide)
         self.assertGreaterEqual(int(view.tree.column("name", "width")), gui_batch.MIN_FLEXIBLE["name"])
+
+
+class BatchAdvisoryTests(BatchViewTestCase):
+    load_data = BatchThreatDataTests.load_data
+    CSV = BatchThreatDataTests.CSV
+
+    def load_ics(self):
+        path = self.work / "csaf.tar.gz"
+        path.write_bytes(good(advisory("ICSA-26-006-01", "Acme Widget Controller", ("CVE-2024-0001",), "Acme")))
+        self.assertTrue(icsadvisories.import_from_file(path, self.ctx.data_dir).ok)
+
+    def select(self, view, item_id):
+        iid = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[COL["id"]] == item_id)
+        view.tree.selection_set(iid)
+        view.tree.focus(iid)
+        self.pump(0.1)
+
+    def walk(self, widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from self.walk(child)
+
+    def links(self, view):
+        return [w for w in self.walk(view.detail_adv) if isinstance(w, gui_widgets.LinkLabel)]
+
+    def test_the_details_of_a_row_list_the_advisories_that_name_its_cve_and_other_rows_show_none(self):
+        self.load_data()
+        self.load_ics()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        self.assertEqual((view.detail_adv.winfo_manager(), view.detail_adv_title.winfo_manager()), ("pack", "pack"))
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-006-01"])
+        self.assertTrue(any("Acme Widget Controller" in w.cget("text") for w in self.walk(view.detail_adv)
+                            if isinstance(w, tk.Label)))
+        self.assertIn("ICS advisory ICSA-26-006-01 names this CVE", view.detail_text.cget("text"))
+        for other in ("B", "C", "D"):
+            self.select(view, other)
+            self.assertEqual((view.detail_adv.winfo_manager(), view.detail_adv_title.winfo_manager()), ("", ""))
+
+    def test_clicking_an_advisory_opens_the_address_built_from_its_number(self):
+        self.load_data()
+        self.load_ics()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
+            self.links(view)[0].event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://www.cisa.gov/news-events/ics-advisories/icsa-26-006-01")
+
+    def test_the_ranking_is_the_same_with_and_without_the_advisories(self):
+        self.load_data()
+        without = [(r[COL["id"]], r[COL["priority"]], r[COL["score"]])
+                   for r in self.rows(self.load(self.write_csv("cves.csv", self.CSV)))]
+        self.load_ics()
+        self.ctx.reload_threat_data()
+        self.view.load(self.write_csv("cves2.csv", self.CSV))
+        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+        self.pump(0.2)
+        with_ics = [(r[COL["id"]], r[COL["priority"]], r[COL["score"]]) for r in self.rows()]
+        self.assertEqual(with_ics, without)
+
+    def test_the_export_has_the_advisories_column(self):
+        self.load_data()
+        self.load_ics()
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        target = self.work / "out.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export()
+        self.pump(0.3)
+        with open(target, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["id"]: r for r in csv.DictReader(fh)}
+        self.assertIn("ICSA-26-006-01: https://www.cisa.gov/news-events/ics-advisories/icsa-26-006-01",
+                      rows["A"]["ics_advisories"])
+        self.assertEqual(rows["B"]["ics_advisories"], "")
 
 
 if __name__ == "__main__":

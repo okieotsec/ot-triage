@@ -9,12 +9,14 @@ from unittest import mock
 
 import gui_brand
 import gui_testing
+import icsadvisories
 import ot_triage_gui as app_module
 import settings as scoring
 import threatdata as td
 import uiprefs
 from gui_theme import DARK, LIGHT
 from settings import DEFAULT_SETTINGS, Settings
+from test_icsadvisories import advisory, good
 from test_threatdata import epss_bytes, kev_bytes
 from uiprefs import UiPrefs
 
@@ -521,6 +523,17 @@ class StatusBarTests(AppTestCase):
         chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
         self.assertTrue(any(c.startswith("⚠ KEV") and c.endswith("(stale)") for c in chips), chips)
 
+    def test_the_ics_advisories_get_their_own_chip_with_tidy_text(self):
+        self.make()
+        chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
+        self.assertIn("⚠ ICS advisories not loaded", chips)
+        (self.work / "csaf.tar.gz").write_bytes(good(advisory()))
+        self.assertTrue(icsadvisories.import_from_file(self.work / "csaf.tar.gz", self.data_dir).ok)
+        self.app.refresh_status()
+        chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
+        self.assertIn("✓ ICS advisories · 0 days", chips)
+        self.assertFalse(any("  " in c for c in chips), chips)
+
     def test_the_status_bar_never_draws_a_black_focus_border(self):
         app = self.make()
         self.assertEqual(str(app.status_bar.cget("highlightcolor")), str(app.status_bar.cget("highlightbackground")))
@@ -573,6 +586,8 @@ class StatusBarTests(AppTestCase):
 
         def fake(url, max_bytes, hosts, **_kw):
             calls.append(url)
+            if url == icsadvisories.ICS_URL:
+                return good(advisory())
             return kev_bytes() if url == td.KEV_URL else epss_bytes()
 
         with mock.patch("threatdata.fetch", fake):
@@ -586,7 +601,7 @@ class StatusBarTests(AppTestCase):
                 app = self.make()
                 self.pump(10, until=lambda: bool(app.ctx.updater.results) and not app.ctx.worker.running)
                 self.pump(0.2)
-        self.assertEqual(sorted(calls), sorted([td.KEV_URL, td.EPSS_URL]))
+        self.assertEqual(sorted(calls), sorted([td.KEV_URL, td.EPSS_URL, icsadvisories.ICS_URL]))
         self.assertFalse(self.mocks["askokcancel"].called)
         self.assertTrue(all(r.ok for r in app.ctx.updater.results))
 
