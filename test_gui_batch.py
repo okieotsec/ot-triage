@@ -1,4 +1,5 @@
 import csv
+import os
 import tempfile
 import threading
 import time
@@ -719,6 +720,13 @@ class BatchAssetColumnTests(BatchViewTestCase):
     def shown_columns(self, view):
         return list(view.tree.cget("displaycolumns"))
 
+    def reload(self, path):
+        """Load a findings file and wait until that file (not an earlier one) is what is shown."""
+        self.view.load(path)
+        self.assertTrue(self.pump(15, until=lambda: not self.ctx.worker.running
+                                  and os.path.samefile(self.ctx.batch_state.path, path)))
+        self.pump(0.2)
+
     def load_with_inventory(self, findings):
         view = self.build()
         path = self.write_csv("inventory.csv", INVENTORY)
@@ -744,7 +752,7 @@ class BatchAssetColumnTests(BatchViewTestCase):
     def test_the_column_appears_and_disappears_with_the_data(self):
         view = self.load_with_inventory(self.MANY)
         self.assertIn("asset", self.shown_columns(view))
-        self.load(SAMPLE)
+        self.reload(SAMPLE)
         self.assertNotIn("asset", self.shown_columns(view))
 
     def test_clicking_the_asset_heading_sorts_by_asset_and_clicking_again_reverses_it(self):
@@ -771,10 +779,10 @@ class BatchTableFitTests(BatchViewTestCase):
     def test_the_columns_always_fit_inside_the_table_at_any_window_width(self):
         view = self.build()
         self.root.deiconify()
+        self.load(SAMPLE)
         for width in (1300, 1100, 900):
             self.holder.geometry(f"{width}x700+0+0")
-            self.load(SAMPLE)
-            self.pump(0.4)
+            self.pump(0.5)
             shown = view.tree.cget("displaycolumns")
             total = sum(int(view.tree.column(key, "width")) for key in shown)
             self.assertLessEqual(total, view.tree.winfo_width() + 2, (width, total, view.tree.winfo_width()))
