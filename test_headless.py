@@ -42,6 +42,7 @@ class GuardTests(unittest.TestCase):
         out, _err = self.run_probe({})
         self.assertEqual(out, f"{UNREACHABLE} wayland-unreachable")
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "only Linux chooses its display from environment variables")
     def test_with_the_guard_a_window_cannot_even_be_attempted(self):
         env = {**{k: v for k, v in os.environ.items() if not k.startswith("OT_TRIAGE_")},
                "OT_TRIAGE_REQUIRE_PRIVATE_DISPLAY": "1", "DISPLAY": UNREACHABLE}

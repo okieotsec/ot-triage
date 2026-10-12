@@ -6,7 +6,7 @@ Run everything with `python3 tools/headless_tests.py`. On Linux it starts a priv
 
 `python3 -m unittest` also works (about 3 minutes), but it opens real windows on your display. Tests that need a display skip themselves when none is available.
 
-To make sure a machine never opens test windows on its real display, set `OT_TRIAGE_REQUIRE_PRIVATE_DISPLAY=1` in its environment: the GUI tests then skip unless they run on a private display (`tools/headless_tests.py` provides one). A test checks that this guard works.
+On Linux, to make sure a machine never opens test windows on its real display (the guard works by hiding the `DISPLAY` and `WAYLAND_DISPLAY` variables, so it does nothing on Windows or macOS), set `OT_TRIAGE_REQUIRE_PRIVATE_DISPLAY=1` in its environment: the GUI tests then skip unless they run on a private display (`tools/headless_tests.py` provides one). A test checks that this guard works.
 
 | Area | File | What it checks |
 | --- | --- | --- |
