@@ -83,11 +83,11 @@ class WidgetTests(DisplayTestCase):
         seg = gw.Segmented(frame, self.style, [("a", "Alpha"), ("b", "Beta")], var)
         seg.pack()
         t = self.style.theme
-        self.assertEqual(str(seg.buttons["a"].cget("bg")), t.accent)
+        self.assertEqual(str(seg.buttons["a"].cget("bg")), t.primary)
         self.assertEqual(str(seg.buttons["b"].cget("bg")), t.field)
         var.set("b")
-        self.assertEqual(str(seg.buttons["b"].cget("bg")), t.accent)
-        self.assertEqual(str(seg.buttons["b"].cget("fg")), t.on_accent)
+        self.assertEqual(str(seg.buttons["b"].cget("bg")), t.primary)
+        self.assertEqual(str(seg.buttons["b"].cget("fg")), t.on_primary)
 
     def test_disabled_segmented_control_ignores_input(self):
         frame = self.make_frame()
@@ -381,12 +381,12 @@ class RoundedLookTests(DisplayTestCase):
         rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
         tl, tr = seg.corner_labels[0].image, seg.corner_labels[1].image
         radius = tl.width()
-        self.assertEqual(tl.get(radius - 1, radius - 1), rgb(t.accent))
+        self.assertEqual(tl.get(radius - 1, radius - 1), rgb(t.primary))
         self.assertEqual(tr.get(0, radius - 1), rgb(t.field))
         var.set("c")
         self.root.update()
         self.assertEqual(seg.corner_labels[0].image.get(radius - 1, radius - 1), rgb(t.field))
-        self.assertEqual(seg.corner_labels[1].image.get(0, radius - 1), rgb(t.accent))
+        self.assertEqual(seg.corner_labels[1].image.get(0, radius - 1), rgb(t.primary))
         seg._ring(t.accent)
         self.assertEqual(seg.corner_labels[0].image.get(radius - 1, 0), rgb(t.accent))
         seg._ring(t.border)

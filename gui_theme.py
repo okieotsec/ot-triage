@@ -18,6 +18,9 @@ class Theme:
     muted: str
     accent: str
     on_accent: str
+    primary: str
+    on_primary: str
+    copper: str
     error: str
     now: str
     on_now: str
@@ -32,17 +35,28 @@ class Theme:
     warn: str
 
 
-DARK = Theme("dark", bg="#0f172a", header="#111c33", card="#1e293b", field="#0f172a", border="#334155",
-             text="#e2e8f0", muted="#94a3b8", accent="#38bdf8", on_accent="#0f172a", error="#f87171",
-             now="#dc2626", on_now="#ffffff", next="#f59e0b", on_next="#0f172a", never="#22c55e", on_never="#0f172a",
-             raise_="#f87171", lower="#4ade80", neutral="#94a3b8", ok="#4ade80", warn="#fbbf24")
-LIGHT = Theme("light", bg="#f4efe2", header="#fffdf8", card="#fffdf8", field="#faf6ea", border="#cfc6ad",
-              text="#111c2e", muted="#4a4a42", accent="#0369a1", on_accent="#ffffff", error="#b91c1c",
-              now="#dc2626", on_now="#ffffff", next="#f59e0b", on_next="#0f172a", never="#22c55e", on_never="#0f172a",
-              raise_="#b91c1c", lower="#166534", neutral="#4a4a42", ok="#166534", warn="#92400e")
+# The OkieOTSec brand guide (v1.1): Oklahoma blue #2E6CB5, navy #14365C, sky #6BB0EC, copper #C56A33 (on dark
+# #E08A4E), cream #FAF4E8, ink #13202E, dark surface #0D1520. Risk colours are not brand colours: NOW #D7263D,
+# NEXT #E9A23B, NEVER #6B7682. Blue means navigation and action, copper is decoration only, and buttons are blue
+# with white text.
+DARK = Theme("dark", bg="#0d1520", header="#14365c", card="#13202e", field="#0d1520", border="#2c4258",
+             text="#faf4e8", muted="#a9b8c9", accent="#6bb0ec", on_accent="#0d1520", primary="#2e6cb5",
+             on_primary="#ffffff", copper="#e08a4e", error="#ff8b8b",
+             now="#d7263d", on_now="#ffffff", next="#e9a23b", on_next="#13202e", never="#6b7682", on_never="#ffffff",
+             raise_="#ff8b8b", lower="#4ade80", neutral="#a9b8c9", ok="#4ade80", warn="#fbbf24")
+LIGHT = Theme("light", bg="#faf4e8", header="#ffffff", card="#ffffff", field="#fbf7ee", border="#d6c9ae",
+              text="#13202e", muted="#4a5868", accent="#2e6cb5", on_accent="#ffffff", primary="#2e6cb5",
+              on_primary="#ffffff", copper="#c56a33", error="#b91c1c",
+              now="#d7263d", on_now="#ffffff", next="#e9a23b", on_next="#13202e", never="#6b7682", on_never="#ffffff",
+              raise_="#b91c1c", lower="#166534", neutral="#4a5868", ok="#166534", warn="#92400e")
 THEMES = {"dark": DARK, "light": LIGHT}
 
-PREFERRED_FONTS = ("Inter", "Adwaita Sans", "Cantarell", "Noto Sans", "Segoe UI", "SF Pro Text", "Helvetica Neue")
+# Body text: the brand's IBM Plex Sans when it is installed, then a good system font. Titles use Space Grotesk and
+# values and identifiers use IBM Plex Mono, each with fallbacks (the guide's own fallbacks are Arial and Consolas).
+PREFERRED_FONTS = ("IBM Plex Sans", "Inter", "Adwaita Sans", "Cantarell", "Noto Sans", "Segoe UI", "SF Pro Text",
+                   "Helvetica Neue")
+TITLE_FONTS = ("Space Grotesk",)
+MONO_FONTS = ("IBM Plex Mono", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "Menlo", "Liberation Mono")
 FONT_BOOST = 1.1
 
 SYMBOLS = {"raise": "▲", "lower": "▼", "neutral": "▬", "ok": "✓", "warn": "⚠",
@@ -51,7 +65,8 @@ PRIORITY_SYMBOLS = {"NOW": "▲", "NEXT": "▬", "NEVER": "▼", "ERROR": "!"}
 
 # (foreground, background) pairs that carry text, used by the contrast test
 TEXT_PAIRS = [("text", "bg"), ("text", "card"), ("text", "field"), ("text", "header"), ("muted", "bg"),
-              ("muted", "card"), ("muted", "field"), ("accent", "card"), ("accent", "bg"), ("on_accent", "accent"),
+              ("muted", "card"), ("muted", "field"), ("muted", "header"), ("accent", "card"), ("accent", "bg"),
+              ("accent", "header"), ("on_accent", "accent"), ("on_primary", "primary"),
               ("on_now", "now"), ("on_next", "next"), ("on_never", "never"), ("raise_", "card"), ("lower", "card"),
               ("neutral", "card"), ("ok", "card"), ("warn", "card"), ("error", "card"), ("raise_", "bg"),
               ("warn", "header"), ("ok", "header")]
@@ -69,10 +84,10 @@ def contrast(foreground, background):
     return (high + 0.05) / (low + 0.05)
 
 
-def choose_family(root):
-    """Return the nicest installed UI font, falling back to the system default."""
+def choose_family(root, preferred=PREFERRED_FONTS):
+    """Return the nicest installed font from a list, falling back to the system default."""
     available = set(tkfont.families(root))
-    for family in PREFERRED_FONTS:
+    for family in preferred:
         if family in available:
             return family
     return tkfont.nametofont("TkDefaultFont", root=root).actual("family")
@@ -83,11 +98,12 @@ class Style:
 
     def __init__(self, theme, scale=1.0):
         self.theme, self.scale = theme, scale
-        self.family = "TkDefaultFont"
+        self.family = self.title_family = self.mono_family = "TkDefaultFont"
 
-    def font(self, size, weight="normal"):
-        """Return a Tk font tuple scaled by the text size preference."""
-        return (self.family, max(7, round(size * FONT_BOOST * self.scale)), weight)
+    def font(self, size, weight="normal", kind="body"):
+        """Return a Tk font tuple scaled by the text size preference; kind is body, title or mono."""
+        family = {"title": self.title_family, "mono": self.mono_family}.get(kind, self.family)
+        return (family, max(7, round(size * FONT_BOOST * self.scale)), weight)
 
     def bucket(self, priority):
         """Return (background, foreground) colours for a priority badge."""
@@ -103,7 +119,7 @@ class Style:
 
     def priority_text_color(self, priority):
         """Return the colour for priority text on a card."""
-        return {"NOW": self.theme.raise_, "NEXT": self.theme.warn, "NEVER": self.theme.ok,
+        return {"NOW": self.theme.raise_, "NEXT": self.theme.warn, "NEVER": self.theme.neutral,
                 "ERROR": self.theme.error}.get(priority, self.theme.text)
 
 
@@ -111,13 +127,15 @@ def apply_ttk_styles(root, style):
     """Configure the ttk widgets (table, scrollbar, progress bar) for the theme."""
     t, s = style.theme, ttk.Style(root)
     style.family = choose_family(root)
+    style.title_family = choose_family(root, TITLE_FONTS + (style.family,))
+    style.mono_family = choose_family(root, MONO_FONTS)
     s.theme_use("clam")
     s.configure("Treeview", background=t.card, fieldbackground=t.card, foreground=t.text, borderwidth=0,
                 rowheight=round(28 * style.scale), font=style.font(10), bordercolor=t.card, lightcolor=t.card,
                 darkcolor=t.card)
     s.configure("Treeview.Heading", background=t.border, foreground=t.text, relief="flat", padding=6,
                 font=style.font(9, "bold"), bordercolor=t.border, lightcolor=t.border, darkcolor=t.border)
-    s.map("Treeview", background=[("selected", t.accent)], foreground=[("selected", t.on_accent)])
+    s.map("Treeview", background=[("selected", t.primary)], foreground=[("selected", t.on_primary)])
     s.map("Treeview.Heading", background=[("active", t.border)])
     s.configure("Vertical.TScrollbar", background=t.border, troughcolor=t.card, bordercolor=t.card,
                 arrowcolor=t.text, lightcolor=t.border, darkcolor=t.border)

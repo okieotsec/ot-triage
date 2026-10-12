@@ -123,7 +123,7 @@ def button(parent, style, text, command, kind="primary", **options):
     """Create a rounded button; kind is primary or secondary. Use set_enabled to enable or disable it."""
     t = style.theme
     outside = parent.cget("bg")
-    fill, fg = (t.accent, t.on_accent) if kind == "primary" else (t.field, t.text)
+    fill, fg = (t.primary, t.on_primary) if kind == "primary" else (t.field, t.text)
     ring = None if kind == "primary" else t.border
     font = style.font(10, "bold" if kind == "primary" else "normal")
     text_w, text_h = text_size(parent, font, text)
@@ -401,8 +401,8 @@ class Segmented(tk.Frame):
         t, selected = self.style.theme, self.variable.get()
         for value, label in self.buttons.items():
             on = value == selected
-            fg = (t.on_accent if on else t.muted) if self.enabled else t.muted
-            label.configure(bg=t.accent if on and self.enabled else (t.border if on else t.field), fg=fg,
+            fg = (t.on_primary if on else t.muted) if self.enabled else t.muted
+            label.configure(bg=t.primary if on and self.enabled else (t.border if on else t.field), fg=fg,
                             font=self.style.font(10, "bold" if on else "normal"))
         self._paint_corners()
 
@@ -556,7 +556,7 @@ class PriorityBadge(tk.Label):
     def __init__(self, parent, style):
         font = style.font(30, "bold")
         text_w, text_h = text_size(parent, font, "NEVER")
-        self.size = (text_w + 64, text_h + 28)
+        self.size = (text_w + 44, text_h + 28)
         super().__init__(parent, font=font, bg=parent.cget("bg"), compound="center", bd=0, highlightthickness=0,
                          padx=0, pady=0)
         self.fill = parent.cget("bg")

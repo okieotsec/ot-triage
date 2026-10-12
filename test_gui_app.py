@@ -115,7 +115,9 @@ class ShellTests(AppTestCase):
         self.assertEqual(list(app.nav_buttons), ["assess", "batch", "threat", "settings", "about"])
         self.assertEqual([b.cget("text") for b in app.nav_buttons.values()], ["Assess", "Batch", "Threat data",
                                                                                 "Settings", "About"])
-        self.assertEqual([h.cget("text") for h in app.nav_hints.values()], [f"Ctrl+{i}" for i in range(1, 6)])
+        shown = [w.cget("text") for item in app.nav_items.values() for w in item.winfo_children()
+                 if isinstance(w, tk.Label)]
+        self.assertFalse(any("Ctrl" in text for text in shown), shown)   # shortcuts work but are not drawn on the tabs
         self.assertEqual(list(app.views), ["assess"])
         self.assertEqual(app.current, "assess")
 
@@ -241,7 +243,7 @@ class ShellTests(AppTestCase):
         self.assertTrue(resize(880, 906, 939))
         self.assertFalse(resize(941, 906, 880))
 
-    def test_the_header_accent_line_spans_the_whole_width(self):
+    def test_the_header_copper_rule_spans_the_whole_width(self):
         app = self.make()
         self.root.deiconify()
         self.root.geometry("1100x800+0+0")
@@ -249,20 +251,18 @@ class ShellTests(AppTestCase):
         accent = [w for w in app.header.winfo_children() if isinstance(w, tk.Frame) and w.winfo_reqheight() == 3]
         self.assertEqual(len(accent), 1)
         self.assertGreaterEqual(accent[0].winfo_width(), app.header.winfo_width() - 2)
-        self.assertEqual(str(accent[0].cget("bg")), app.style.theme.accent)
+        self.assertEqual(str(accent[0].cget("bg")), app.style.theme.copper)
 
-    def test_the_narrow_tab_strip_hides_shortcut_hints_and_fits_the_minimum_width_at_every_text_size(self):
+    def test_the_narrow_tab_strip_fits_the_minimum_width_at_every_text_size(self):
         for percent in (90, 100, 115, 130):
             with self.subTest(text_percent=percent):
                 uiprefs.save(UiPrefs(text_percent=percent), self.prefs_path)
                 app = self.make()
                 app._layout(True)
                 self.root.update_idletasks()
-                self.assertTrue(all(not h.winfo_manager() for h in app.nav_hints.values()))
                 total = sum(i.winfo_reqwidth() + 4 for i in app.nav_items.values())
                 self.assertLessEqual(total, 700, f"{total}px of tabs at {percent}% text")
                 app._layout(False)
-                self.assertTrue(all(h.winfo_manager() for h in app.nav_hints.values()))
                 for child in self.root.winfo_children():
                     child.destroy()
                 gc.collect()
