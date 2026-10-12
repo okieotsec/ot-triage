@@ -1,0 +1,9 @@
+id,asset_id,name,cvss_vector,threat
+E-01,GW-EDGE-01,Remote code execution in the gateway OS,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H,public
+E-02,GW-EDGE-01,Information leak on the gateway management page,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N,none
+E-03,HIST-01,SQL injection that exposes stored process data,CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N,none
+E-04,HIST-01,Denial of service in the historian web client,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H,none
+E-05,PLC-PKG-01,Unauthenticated write to the controller,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H,public
+E-06,RTU-TANK-07,Default credentials on the remote unit,CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N,public
+E-07,SW-ACC-03,Management interface crash,CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H,none
+E-08,HMI-LINE-01,Local privilege escalation on the HMI,CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H,none

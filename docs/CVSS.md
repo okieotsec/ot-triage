@@ -29,8 +29,16 @@ A metric left as `X` (not defined) keeps its base value, and the 4.0 defaults (`
 
 **Why the priority does not use it.** The priority already has its own inputs for the same context: how critical the asset is, how exposed it is, and what controls protect it. Feeding an environmental score into the bucket as well would count the same facts twice, and it would be a policy change. So the environmental score is shown for comparison and nothing more. That decision can be revisited (see [POLICY.md](POLICY.md)).
 
-To build an environmental vector, use FIRST's calculators (the CVSS 3.1 and 4.0 calculators at first.org) and paste the resulting vector string here.
+You can write the environmental metrics into the vector yourself (for example with FIRST's calculators at first.org), or let the tool apply the three most useful ones for you:
 
+### Security requirements without building a vector
+
+The **security requirements** (`CR`, `IR`, `AR`) say how much confidentiality, integrity and availability matter for an asset. For OT, integrity and availability are often the important ones.
+
+- **In Assess:** open **Security requirements for the environmental score** (under Asset & environment) and choose Low, Medium or High for each. They are applied to the CVSS vector you pasted. Anything the vector sets itself is kept, because it was written deliberately. Without a vector there is nothing to adjust, and the tool says so.
+- **In the asset inventory:** add optional `confidentiality`, `integrity` and `availability` columns (also accepted as `CR`, `IR`, `AR`). Every finding with a vector on that asset then gets its environmental score automatically. See [INVENTORY.md](INVENTORY.md).
+- Only these three can be set this way. The modified base metrics (such as how the attacker reaches the device) stay vector-only.
+- The score is still shown for comparison and **never changes the priority**. It can be higher than the base score as well as lower: a historian whose confidentiality requirement is High can go from 6.5 to 8.3, while the same flaw on an asset where availability barely matters can drop from 7.5 to 5.7. `sample_findings_environmental.csv` and `sample_inventory.csv` show both.
 ## Why a vector is better than a typed score
 
 - **The version is part of the vector.** The same CVE often has different scores under 3.1 and 4.0, and different organisations (the CNA, NVD, a vendor) may score it differently. A vector says which one you used, and the tool records it.

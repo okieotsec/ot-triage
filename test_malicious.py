@@ -214,6 +214,11 @@ class MaliciousInventoryTests(unittest.TestCase):
             "thousands_of_duplicate_pairs": self.HEAD + b"".join(row % (i // 2) for i in range(4000)),
             "thousands_of_bad_rows": self.HEAD + b"A-1,Pump,nonsense,high,none\n" * 5000,
             "ragged_rows": self.HEAD + b"A\nB,x\nC,x,crown,high,none,extra,extra\n",
+            "requirement_values_hostile": b"asset_id,confidentiality,integrity,availability\n"
+                                          b"A,=cmd|x,\x1b[2J,\xe2\x80\xaehigh\nB," + b"x" * 300_000 + b",low,low\n",
+            "requirement_values_valid_and_odd": (b"asset_id,CR,IR,AR\nA,HIGH,low,M\nB,not defined,x,\n"
+                                                 b"C,Low ,\tmedium,H\n"),
+            "requirement_columns_only": b"asset_id,availability\n" + b"A-1,high\n" * 500,
         }
 
     def test_every_hostile_inventory_is_loaded_safely_or_refused_cleanly(self):

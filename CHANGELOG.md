@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Security requirements for the environmental score:** an optional section in Assess (Low, Medium or High for confidentiality, integrity and availability) and optional `confidentiality`, `integrity` and `availability` columns in the asset inventory now apply the CVSS security requirements to a CVSS vector, so an environmental score no longer needs a hand-built vector. Anything the vector sets itself is kept. The score is still shown for comparison only; the priority is unchanged. Samples: `sample_inventory.csv` (now with requirement columns) and `sample_findings_environmental.csv`.
+
 ## 0.5.0 (2026-10-11)
 
 - **Environmental CVSS scores:** a CVSS 3.0, 3.1 or 4.0 vector that sets environmental metrics (security requirements, modified base metrics; for 4.0 including the Safety value) now also gets an environmental score, shown next to the base score in Assess, the copied summaries, Batch details and a new `cvss_environmental` export column. The priority still uses only the base score (decided with the project owner; see docs/POLICY.md). Checked against FIRST's official calculators on about 180,000 generated vectors (every score identical); the 60,000 vectors per version are rebuilt and re-checked by the offline tests.

@@ -12,7 +12,7 @@ Install it with:  sudo pacman -S xorg-server-xvfb   (Arch)   or   sudo apt insta
 """
 import os
 import shutil
-import subprocess  # nosec B404 - runs this project's own test runner
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -20,9 +20,19 @@ RUNNER = Path(__file__).resolve().parent / "ci_run_tests.py"
 SCREEN = "-screen 0 1280x1024x24"
 
 
+def stall_limit(extra_args):
+    """Return the optional stall limit in seconds as a clean number; anything else is refused."""
+    if not extra_args:
+        return []
+    if (len(extra_args) != 1 or not extra_args[0].isascii() or not extra_args[0].isdecimal()
+            or not 0 < int(extra_args[0]) <= 86_400):
+        raise SystemExit("usage: python3 tools/headless_tests.py [stall limit in seconds, 1 to 86400]")
+    return [str(int(extra_args[0]))]
+
+
 def plan(platform, xvfb, environ, extra_args):
     """Decide how to run the tests; return (command, environment, message to show or None). Nothing is run here."""
-    args = [sys.executable, "-X", "dev", "-W", "error::ResourceWarning", str(RUNNER), *extra_args]
+    args = [sys.executable, "-X", "dev", "-W", "error::ResourceWarning", str(RUNNER), *stall_limit(extra_args)]
     env = dict(environ)
     if platform != "linux":
         return args, env, None
@@ -40,7 +50,8 @@ def main():
     command, env, message = plan(sys.platform, shutil.which("xvfb-run"), os.environ, sys.argv[1:])
     if message:
         print(message, file=sys.stderr)
-    return subprocess.run(command, env=env, check=False).returncode  # noqa: S603  # nosec B603
+    # The only user input in `command` is the stall limit, which stall_limit() reduces to a number; no shell is used.
+    return subprocess.run(command, env=env, check=False).returncode  # noqa: S603  # nosec B603  # nosemgrep
 
 
 if __name__ == "__main__":

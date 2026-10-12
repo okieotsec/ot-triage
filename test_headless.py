@@ -75,6 +75,13 @@ class RunnerPlanTests(unittest.TestCase):
         self.assertIn("xorg-server-xvfb", message)
         self.assertTrue(command[-1].endswith("ci_run_tests.py"))
 
+    def test_only_a_plain_number_of_seconds_is_accepted_as_the_stall_limit(self):
+        self.assertEqual(self.runner.stall_limit([]), [])
+        self.assertEqual(self.runner.stall_limit(["0900"]), ["900"])
+        for bad in (["abc"], ["-5"], ["0"], ["99999999"], ["1", "2"], ["; rm -rf /"], ["1e3"], [" 5"], ["\u0663"]):
+            with self.subTest(args=bad), self.assertRaises(SystemExit):
+                self.runner.stall_limit(bad)
+
     def test_on_other_systems_the_suite_just_runs(self):
         command, env, message = self.runner.plan("win32", None, {"A": "1"}, [])
         self.assertEqual((env, message), ({"A": "1"}, None))
