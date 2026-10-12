@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest import mock
 
 import batch
+import cvss
 import inventory
 from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure
 
@@ -208,7 +209,8 @@ class InventoryFuzzTests(unittest.TestCase):
         def test_any_text_as_an_inventory_loads_or_is_refused_cleanly(self, text):
             with tempfile.TemporaryDirectory() as folder:
                 path = Path(folder) / "i.csv"
-                path.write_text("asset_id,exposure,controls,name\n" + text, encoding="utf-8", errors="replace")
+                path.write_text("asset_id,exposure,controls,name,confidentiality,integrity,availability\n" + text,
+                                encoding="utf-8", errors="replace")
                 try:
                     inv = inventory.load(path)
                 except ValueError:
@@ -219,6 +221,78 @@ class InventoryFuzzTests(unittest.TestCase):
                     self.assertLessEqual(len(record.asset_id), inventory.MAX_KEY_CHARS)
                 inv.lookup(text)
                 inv.summary()
+
+
+class SecurityRequirementTests(InventoryCase):
+    VECTOR = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    INVENTORY = ("asset_id,exposure,confidentiality,integrity,availability\n"
+                 "PLC-01,low,low,high,high\nHMI-01,low,medium,,\nNONE-01,low,,,\n")
+
+    def score(self, vector_cell, asset="PLC-01", text=None):
+        inv = self.load(text or self.INVENTORY)
+        path = self.write("f.csv", f"id,asset_id,cvss_vector,threat,asset\nF1,{asset},{vector_cell},none,standard\n")
+        return batch.process_file(path, inventory=inv)[0]
+
+    def test_the_requirement_columns_and_their_aliases_are_read(self):
+        inv = self.load("asset_id,CR,Integrity Requirement,AR\nA,Low,HIGH,m\n")
+        self.assertEqual(inv.lookup("A")[1].requirements, {"CR": "L", "IR": "H", "AR": "M"})
+
+    def test_every_accepted_word_means_the_right_level(self):
+        words = {"low": "L", "l": "L", "LOW": "L", "medium": "M", "med": "M", "m": "M", " Medium ": "M", "high": "H",
+                 "h": "H", "HIGH": "H"}
+        for word, letter in words.items():
+            inv = self.load(f'asset_id,availability\nA,"{word}"\n')
+            self.assertEqual(inv.lookup("A")[1].requirements, {"AR": letter}, repr(word))
+
+    def test_blank_and_not_set_values_are_left_out_and_others_are_refused_by_row(self):
+        inv = self.load("asset_id,confidentiality,integrity\nA,not defined,\nB,medium,whatever\nC,x,high\n")
+        self.assertEqual(inv.lookup("A")[1].requirements, {})
+        self.assertEqual(inv.lookup("B")[0], "missing")
+        self.assertIn("integrity: unrecognized value 'whatever'", inv.problems[0])
+        self.assertEqual(inv.lookup("C")[1].requirements, {"IR": "H"})
+
+    def test_an_inventory_with_only_requirement_columns_is_accepted(self):
+        self.assertEqual(len(self.load("asset_id,availability\nA,high\nB,low\n")), 2)
+
+    def test_the_environmental_score_uses_the_assets_requirements_without_changing_anything_else(self):
+        with_inventory = self.score(self.VECTOR)
+        plain = batch.process_file(self.write("p.csv", f"id,cvss_vector,threat,asset,exposure\nF1,{self.VECTOR},none,"
+                                                      "standard,low\n"))[0]
+        written = cvss.parse_vector(self.VECTOR + "/CR:L/IR:H/AR:H").environmental_score
+        self.assertEqual(with_inventory.cvss_environmental, written)
+        self.assertIsNone(plain.cvss_environmental)
+        self.assertIn("security requirements", with_inventory.from_inventory)
+        self.assertEqual((with_inventory.priority, with_inventory.result.score, with_inventory.cvss),
+                         (plain.priority, plain.result.score, plain.cvss))
+
+    def test_a_requirement_written_in_the_vector_wins_over_the_inventory(self):
+        item = self.score(self.VECTOR + "/CR:H/IR:H/AR:H")
+        self.assertEqual(item.cvss_environmental,
+                         cvss.parse_vector(self.VECTOR + "/CR:H/IR:H/AR:H").environmental_score)
+        self.assertFalse(item.requirements_from_inventory)
+
+    def test_only_the_missing_requirements_are_filled_in(self):
+        item = self.score(self.VECTOR + "/CR:H", asset="HMI-01")
+        # CR comes from the vector (H, not the inventory's M); IR and AR are not stated anywhere, so stay undefined
+        self.assertEqual(item.cvss_environmental, cvss.parse_vector(self.VECTOR + "/CR:H").environmental_score)
+
+    def test_an_asset_without_requirements_or_a_finding_without_a_vector_gets_no_environmental_score(self):
+        self.assertIsNone(self.score(self.VECTOR, asset="NONE-01").cvss_environmental)
+        inv = self.load(self.INVENTORY)
+        path = self.write("n.csv", "id,asset_id,cvss,threat\nF1,PLC-01,9.8,none\n")
+        item = batch.process_file(path, inventory=inv)[0]
+        self.assertIsNone(item.cvss_environmental)
+        self.assertNotIn("security requirements", item.from_inventory)
+
+    def test_the_export_carries_the_environmental_score_and_says_the_requirements_came_from_the_inventory(self):
+        import csv as csvmodule
+        item = self.score(self.VECTOR)
+        out = self.dir / "out.csv"
+        batch.write_results(out, [item])
+        with open(out, newline="", encoding="utf-8-sig") as fh:
+            row = next(csvmodule.DictReader(fh))
+        self.assertIn("security requirements", row["from_inventory"])
+        self.assertNotEqual(row["cvss_environmental"], "")
 
 
 if __name__ == "__main__":

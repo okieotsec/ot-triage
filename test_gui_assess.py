@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import cvss
 import explain
 import gui_assess
 import gui_theme
@@ -777,6 +778,81 @@ class AssessReferenceTests(AssessTestCase):
         self.fill("8.0", Threat.NONE)
         view.copy_summary()
         self.assertNotIn("References", self.ctx.copy.call_args[0][0])
+
+
+class AssessRequirementTests(AssessTestCase):
+    def setUp(self):
+        super().setUp()
+        self.view = self.build()
+        self.state = self.ctx.assess_state
+        self.state.threat.set("PUBLIC")
+
+    def use(self, vector):
+        self.state.vector.set(vector)
+        self.view.apply_vector()
+        self.pump(0.2)
+
+    def choose(self, **chosen):
+        for metric, value in chosen.items():
+            self.state.requirements[metric].set(value)
+        self.pump(0.3)
+
+    def test_the_section_is_there_but_collapsed_with_three_selectors_defaulting_to_not_set(self):
+        self.assertFalse(self.view.requirements_box.is_open)
+        self.assertEqual(set(self.view.requirement_controls), {"CR", "IR", "AR"})
+        self.assertEqual({m: v.get() for m, v in self.state.requirements.items()}, {"CR": "X", "IR": "X", "AR": "X"})
+
+    def test_choosing_requirements_gives_an_environmental_score_and_never_changes_the_priority(self):
+        self.use(V31)
+        before = self.view.badge.cget("text")
+        score_before = self.view.score_label.cget("text")
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "")
+        self.choose(CR="L", IR="H", AR="H")
+        expected = cvss.parse_vector(V31 + "/CR:L/IR:H/AR:H").environmental_score
+        self.assertIn(f"Environmental score: {expected:.1f}", self.view.cvss_env.cget("text"))
+        self.assertEqual((self.view.badge.cget("text"), self.view.score_label.cget("text")), (before, score_before))
+        self.assertEqual(self.state.cvss.get(), "9.8")
+
+    def test_setting_the_selectors_back_to_not_set_removes_the_score(self):
+        self.use(V31)
+        self.choose(CR="L")
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "pack")
+        self.choose(CR="X")
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "")
+
+    def test_without_a_vector_the_note_says_a_vector_is_needed(self):
+        self.state.cvss.set("8.0")
+        self.choose(AR="H")
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "pack")
+        self.assertIn("needs a CVSS vector", self.view.cvss_env.cget("text"))
+        self.choose(AR="X")
+        self.assertEqual(self.view.cvss_env.winfo_manager(), "")
+
+    def test_a_requirement_written_in_the_vector_wins_over_the_selector(self):
+        self.use(V31 + "/CR:H")
+        self.choose(CR="L")
+        expected = cvss.parse_vector(V31 + "/CR:H").environmental_score
+        self.assertIn(f"Environmental score: {expected:.1f}", self.view.cvss_env.cget("text"))
+        self.assertNotIn("Security requirements applied", "\n".join(self.view.vector_lines()))
+
+    def test_the_summaries_list_the_requirements_that_were_applied(self):
+        self.use(V31)
+        self.choose(IR="H", AR="M")
+        text = "\n".join(self.view.vector_lines())
+        self.assertIn("Security requirements applied: integrity high, availability medium", text)
+        self.assertIn("CVSS environmental score:", text)
+        self.view.copy_summary()
+        self.assertIn("Security requirements applied", self.ctx.copy.call_args[0][0])
+
+    def test_the_choices_survive_a_rebuild_and_the_section_can_be_opened(self):
+        self.use(V31)
+        self.choose(AR="H")
+        self.view.requirements_box.toggle()
+        self.assertTrue(self.view.requirements_box.is_open)
+        self.view.frame.destroy()
+        rebuilt = self.build()
+        self.assertEqual(self.ctx.assess_state.requirements["AR"].get(), "H")
+        self.assertIn("Environmental score", rebuilt.cvss_env.cget("text"))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,14 @@ MAX_KEY_CHARS = 100
 MAX_NAME_CHARS = 200
 MAX_PROBLEMS = 20
 FIELDS = ("asset", "exposure", "controls")
-_KEY_ALIASES = {"assetid": "asset_id", "asset_tag": "asset_id", "id": "asset_id", "asset_name": "name"}
+# Optional per-asset security requirements (used only for the CVSS environmental score): column -> CVSS metric.
+REQUIREMENT_COLUMNS = {"confidentiality": "CR", "integrity": "IR", "availability": "AR"}
+_REQUIREMENT_WORDS = {"l": "L", "low": "L", "m": "M", "med": "M", "medium": "M", "h": "H", "high": "H"}
+_NOT_SET = {"", "x", "not defined", "n/a", "na", "unset", "not set"}
+_KEY_ALIASES = {"assetid": "asset_id", "asset_tag": "asset_id", "id": "asset_id", "asset_name": "name",
+                "cr": "confidentiality", "confidentiality_requirement": "confidentiality",
+                "ir": "integrity", "integrity_requirement": "integrity",
+                "ar": "availability", "availability_requirement": "availability"}
 
 
 def normalize_key(text):
@@ -38,6 +45,7 @@ class AssetRecord:
     name: str
     values: dict
     line: int
+    requirements: dict = field(default_factory=dict)     # {"CR": "H", ...} the CVSS security requirements stated
 
 
 @dataclass
@@ -96,9 +104,10 @@ def _load(path):
         repeated = sorted({c for c in columns if c and columns.count(c) > 1})
         if repeated:
             raise ValueError(f"Duplicate column(s) in the inventory: {', '.join(repeated)}")
-        if "asset_id" not in columns or not any(f in columns for f in FIELDS):
+        if "asset_id" not in columns or not any(f in columns for f in (*FIELDS, *REQUIREMENT_COLUMNS)):
             raise ValueError("The inventory needs an asset_id column and at least one of: asset (or criticality), "
-                             f"exposure, controls. Found: {', '.join(clean(h) for h in header)[:200]}")
+                             "exposure, controls, confidentiality, integrity, availability. "
+                             f"Found: {', '.join(clean(h) for h in header)[:200]}")
         seen = {}
         count = 0
         for cells in reader:
@@ -143,6 +152,17 @@ def _add_row(inventory, seen, line, row):
         except ValueError as error:
             _problem(inventory, f"line {line}: {str(error)[:160]}, so the row was skipped")
             return
+    requirements = {}
+    for column, metric in REQUIREMENT_COLUMNS.items():
+        text = batch._norm(row.get(column, ""))
+        if text in _NOT_SET:
+            continue
+        if text not in _REQUIREMENT_WORDS:
+            _problem(inventory, f"line {line}: {column}: unrecognized value {clean(row.get(column, ''))[:30]!r} "
+                                "(use low, medium or high), so the row was skipped")
+            return
+        requirements[metric] = _REQUIREMENT_WORDS[text]
     key = normalize_key(asset_id)
     seen.setdefault(key, []).append(line)
-    inventory.records[key] = AssetRecord(asset_id, clean(row.get("name", ""))[:MAX_NAME_CHARS], values, line)
+    inventory.records[key] = AssetRecord(asset_id, clean(row.get("name", ""))[:MAX_NAME_CHARS], values, line,
+                                         requirements)

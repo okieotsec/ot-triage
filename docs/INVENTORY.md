@@ -31,8 +31,13 @@ When the file has asset ids, the Batch table shows an **Asset** column. Click it
 | `criticality` | `crown jewel` / `important` / `standard` | `criticality`, `asset_criticality`, `asset` |
 | `exposure` | `high` / `medium` / `low` | `exposure`, `network_exposure` |
 | `controls` | `none` / `partial` / `strong` | `controls`, `compensating_controls`, `mitigations` |
+| `confidentiality`, `integrity`, `availability` | How much each matters for the asset: `low` / `medium` / `high` (blank = not stated) | the same names, `*_requirement`, or `CR`, `IR`, `AR` |
 
-At least one of criticality, exposure or controls is needed. Values accept the same short names as the findings file. A blank cell means "the inventory does not say", and nothing is guessed.
+At least one of criticality, exposure, controls or the three requirement columns is needed. Values accept the same short names as the findings file. A blank cell means "the inventory does not say", and nothing is guessed.
+
+## Security requirements (optional)
+
+The three requirement columns feed only the **CVSS environmental score** (see [CVSS.md](CVSS.md)). For a finding that has a `cvss_vector`, the asset's requirements are applied to the vector wherever the vector does not set them itself, and the environmental score is worked out from the result. They never change the priority. A finding with only a plain `cvss` score has no vector to adjust, so it gets no environmental score. Try `sample_findings_environmental.csv` with `sample_inventory.csv`.
 
 ## Rules for matching
 

@@ -256,6 +256,61 @@ class EnvironmentalReferenceTests(unittest.TestCase):
             self.assertRegex(block["digest"], r"^[0-9a-f]{64}$")
 
 
+class SecurityRequirementTests(unittest.TestCase):
+    BASE = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+
+    def apply(self, text, **requirements):
+        return cvss.with_requirements(cvss.parse_vector(text), requirements)
+
+    def test_requirements_are_added_to_a_base_vector_and_give_an_environmental_score(self):
+        applied = self.apply(self.BASE, CR="L", IR="L", AR="L")
+        self.assertEqual(applied.normalized, self.BASE + "/CR:L/IR:L/AR:L")
+        self.assertEqual(applied.score, 9.8)
+        written = cvss.parse_vector(self.BASE + "/CR:L/IR:L/AR:L")
+        self.assertEqual(applied.environmental_score, written.environmental_score)
+        self.assertLess(applied.environmental_score, 9.8)
+
+    def test_a_requirement_the_vector_sets_itself_wins(self):
+        applied = self.apply(self.BASE + "/CR:H", CR="L", IR="M")
+        self.assertEqual(applied.metrics["CR"], "H")
+        self.assertEqual(applied.metrics["IR"], "M")
+
+    def test_a_requirement_written_as_not_defined_is_filled_in(self):
+        self.assertEqual(self.apply(self.BASE + "/CR:X", CR="M").metrics["CR"], "M")
+
+    def test_nothing_changes_for_empty_unknown_or_invalid_requirements(self):
+        parsed = cvss.parse_vector(self.BASE)
+        for requirements in ({}, {"CR": "X"}, {"CR": "Z"}, {"CR": ""}, {"MAV": "A"}, {"S": "C"}, {"CR": None}):
+            self.assertIs(cvss.with_requirements(parsed, requirements), parsed, requirements)
+
+    def test_it_works_for_every_version_and_never_changes_the_base_score(self):
+        for text in (self.BASE, "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", V40):
+            parsed = cvss.parse_vector(text)
+            applied = cvss.with_requirements(parsed, {"CR": "H", "IR": "M", "AR": "L"})
+            self.assertEqual(applied.score, parsed.score, text)
+            self.assertTrue(applied.has_environmental, text)
+            self.assertEqual(cvss.parse_vector(applied.normalized).normalized, applied.normalized)
+
+    def test_it_matches_the_official_scores_for_generated_vectors(self):
+        # Take vectors the official calculators scored, remove their security requirements, put them back with this
+        # function, and the score must be identical. This reuses the 180,000 checked vectors as a free proof.
+        generator = _load_generator()
+        checked = 0
+        for version in cvss.SUPPORTED_VERSIONS:
+            for text in generator.environmental_vectors(version, 6000):
+                original = cvss.parse_vector(text)
+                wanted = {name: original.metrics.get(name, "X") for name in cvss.REQUIREMENT_METRICS}
+                if original.environmental_score is None or all(v == "X" for v in wanted.values()):
+                    continue
+                stripped_metrics = {k: v for k, v in original.metrics.items() if k not in cvss.REQUIREMENT_METRICS}
+                stripped = cvss.CvssVector(version, stripped_metrics, "unused")
+                rebuilt = cvss.with_requirements(stripped, wanted)
+                if rebuilt.has_environmental:
+                    self.assertEqual(rebuilt.environmental_score, original.environmental_score, text)
+                    checked += 1
+        self.assertGreater(checked, 3000)
+
+
 class EnvironmentalScoreTests(unittest.TestCase):
     V31_BASE = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
 

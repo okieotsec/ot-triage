@@ -121,6 +121,30 @@ def base_score(vector):
     return _score_v3(vector.metrics, vector.version)
 
 
+REQUIREMENT_METRICS = ("CR", "IR", "AR")     # confidentiality, integrity and availability requirements
+REQUIREMENT_VALUES = ("L", "M", "H")
+
+
+def with_requirements(vector, requirements):
+    """Return the vector with security requirements applied: {"CR": "H", ...} using L, M or H.
+
+    A requirement the vector sets itself is kept, because it was written deliberately; a requirement the vector leaves
+    undefined (X) takes the given value, and anything else in `requirements` is ignored. The same vector is returned
+    when nothing changes.
+    """
+    metrics = dict(vector.metrics)
+    for name in REQUIREMENT_METRICS:
+        value = requirements.get(name)
+        if value in REQUIREMENT_VALUES and metrics.get(name, "X") == "X":
+            metrics[name] = value
+    if metrics == vector.metrics:
+        return vector
+    base, optional = _allowed(vector.version)
+    order = [*base, *optional]
+    normalized = "/".join([f"CVSS:{vector.version}", *[f"{name}:{metrics[name]}" for name in order if name in metrics]])
+    return CvssVector(vector.version, metrics, normalized)
+
+
 def environmental_score(vector):
     """Return the environmental score of a parsed vector (the base score if no environmental metric is set)."""
     if vector.version == "4.0":

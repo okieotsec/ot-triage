@@ -82,11 +82,12 @@ class BatchItem:
     cvss_vector: str = ""
     cvss_version: str = ""
     cvss_environmental: float = None   # shown for comparison only; the priority always uses the base score
+    requirements_from_inventory: bool = False
     threat_sources: str = ""
     references: tuple = ()
     forensic_triage: bool = False
     asset_id: str = ""
-    from_inventory: tuple = ()     # the fields (asset, exposure, controls) that came from the inventory
+    from_inventory: tuple = ()     # what came from the inventory: asset, exposure, controls, security requirements
     cvss_raw: str = ""
     inputs: dict = field(default_factory=dict)   # field -> enum member, for successfully parsed cells
     cvss: float = None
@@ -145,8 +146,11 @@ def has_cve_column(path):
     return "cve" in [_norm_header(h) for h in header]
 
 
-def _read_cvss(item, vector_text, errors):
-    """Set the item's CVSS score from the cvss column, the cvss_vector column, or both (which must agree)."""
+def _read_cvss(item, vector_text, errors, requirements=None):
+    """Set the item's CVSS score from the cvss column, the cvss_vector column, or both (which must agree).
+
+    `requirements` are the asset's security requirements from the inventory; they only feed the environmental score.
+    """
     vector_text = vector_text.strip()
     if not vector_text:
         try:
@@ -161,7 +165,9 @@ def _read_cvss(item, vector_text, errors):
         errors.append(f"cvss_vector: {e}")
         return
     item.cvss_vector, item.cvss_version, score = parsed.normalized, parsed.version, parsed.score
-    item.cvss_environmental = parsed.environmental_score
+    effective = cvss.with_requirements(parsed, requirements or {})
+    item.cvss_environmental = effective.environmental_score
+    item.requirements_from_inventory = effective is not parsed
     if item.cvss_raw.strip():
         try:
             typed = parse_cvss(item.cvss_raw)
@@ -212,7 +218,7 @@ def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None, inventory=N
             errors.append(f"cve: {e}")
     if info is not None and not (info.kev_loaded or info.epss_loaded):
         info = None
-    _read_cvss(item, row.get("cvss_vector", ""), errors)
+    _read_cvss(item, row.get("cvss_vector", ""), errors, record.requirements if record is not None else None)
     manual = None
     if row.get("threat", "").strip():
         try:
@@ -235,6 +241,8 @@ def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None, inventory=N
             item.inputs[field_name] = _parse_enum(field_name, text)
         except ValueError as e:
             errors.append(str(e) + _inventory_hint(item, field_name, text, status, record))
+    if item.requirements_from_inventory:
+        filled.append("security requirements")
     item.from_inventory = tuple(filled)
     if errors:
         item.error = "; ".join(errors)

@@ -34,6 +34,11 @@ VECTOR_HELP = ("Paste a CVSS 3.0, 3.1 or 4.0 vector such as CVSS:3.1/AV:N/AC:L/P
                "not change it. If the vector sets environmental metrics (security requirements or modified base "
                "metrics), the environmental score is shown next to the base score for comparison; the priority always "
                "uses the base score. CVSS 2 vectors are not supported.")
+REQUIREMENTS_HELP = ("How much confidentiality, integrity and availability matter for this asset. They adjust the "
+                     "CVSS environmental score shown next to the base score for comparison, and never change the "
+                     "priority. Needs a CVSS vector above; anything the vector sets itself is kept.")
+REQUIREMENT_LABELS = {"CR": "Confidentiality matters", "IR": "Integrity matters", "AR": "Availability matters"}
+REQUIREMENT_OPTIONS = [("X", "Not set"), ("L", "Low"), ("M", "Medium"), ("H", "High")]
 VECTOR_DELAY_MS = 400
 EXPOSURE_HELP = ("Low means no routable path from IT or the internet, verified by testing, not assumed from a "
                  "firewall's existence. If you are unsure, choose Medium.")
@@ -63,6 +68,8 @@ class AssessState:
         self.controls = tk.StringVar(root, Controls.NONE.name)
         self.analyst = tk.BooleanVar(root, False)
         self.public = tk.BooleanVar(root, False)
+        # Security requirements for the CVSS environmental score: X (not set), L, M or H
+        self.requirements = {metric: tk.StringVar(root, "X") for metric in cvss.REQUIREMENT_METRICS}
         self.info = None
         self.looked_up = ""
         self.override = None
@@ -101,7 +108,7 @@ class AssessView:
         self._build_results(self.right)
         self._traces = []
         for var in (self.state.cvss, self.state.asset, self.state.exposure, self.state.patch, self.state.controls,
-                    self.state.analyst, self.state.public):
+                    self.state.analyst, self.state.public, *self.state.requirements.values()):
             self._traces.append((var, var.trace_add("write", self.update)))
         self._traces.append((self.state.cve, self.state.cve.trace_add("write", self._cve_edited)))
         self._traces.append((self.state.vector, self.state.vector.trace_add("write", self._vector_typed)))
@@ -202,12 +209,29 @@ class AssessView:
         Segmented(env, s, _options(Asset), state.asset).pack(fill=tk.X)
         field_label(env, s, "Network exposure", EXPOSURE_HELP)
         Segmented(env, s, _options(Exposure), state.exposure).pack(fill=tk.X)
+        self._build_requirements(env)
 
         rem = card(parent, s, "Remediation & mitigation")
         field_label(rem, s, "Patch status", PATCH_HELP)
         Segmented(rem, s, _options(Patch), state.patch).pack(fill=tk.X)
         field_label(rem, s, "Compensating controls", CONTROLS_HELP)
         Segmented(rem, s, _options(Controls), state.controls).pack(fill=tk.X)
+
+    def _build_requirements(self, parent):
+        """An optional, collapsed section for the CVSS security requirements (they only feed the environmental)."""
+        s, t = self.style, self.style.theme
+        self.requirements_box = Expander(parent, s, "Security requirements for the environmental score (optional)")
+        self.requirements_box.pack(fill=tk.X, pady=(14, 0))
+        body = self.requirements_box.body
+        note = tk.Label(body, text=REQUIREMENTS_HELP, font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
+        note.pack(fill=tk.X, pady=(6, 0))
+        wrap_to_width(note)
+        self.requirement_controls = {}
+        for metric, label in REQUIREMENT_LABELS.items():
+            field_label(body, s, label)
+            control = Segmented(body, s, REQUIREMENT_OPTIONS, self.state.requirements[metric])
+            control.pack(fill=tk.X)
+            self.requirement_controls[metric] = control
 
     def _entry(self, parent, variable, width, size=11, bold=False, on_too_long=None):
         return rounded_entry(parent, self.style, variable, width, size, bold, on_too_long=on_too_long)
@@ -379,6 +403,7 @@ class AssessView:
         self._update_threat_controls()
         raw = state.cvss.get().strip()
         self._update_cvss_band(raw)
+        self._refresh_environmental()
         if not raw:
             self._idle("Waiting for input", "Enter a CVSS base score to calculate a priority.")
             return
@@ -462,7 +487,6 @@ class AssessView:
         info = self.state.vector_info
         self.cvss_band.configure(text=f"{label}  \u00b7  {info.label}" if info else label,
                                  fg=self.style.direction(direction))
-        self._update_environmental(info)
 
     @staticmethod
     def _environmental_text(info):
@@ -471,13 +495,28 @@ class AssessView:
         return (f"Environmental score: {score:.1f} ({explain.cvss_band(score)[0]}), shown for comparison; "
                 "the priority uses the base score.")
 
-    def _update_environmental(self, info):
-        """Show the environmental score under the base score while a vector that sets such metrics is in use."""
-        if info is not None and info.environmental_score is not None:
-            self.cvss_env.configure(text=self._environmental_text(info))
-            self.cvss_env.pack(fill=tk.X, pady=(2, 0), after=self.cvss_hint)
+    def _requirements(self):
+        """Return the security requirements chosen in the interface, as {"CR": "H", ...} (unset ones left out)."""
+        chosen = {metric: var.get() for metric, var in self.state.requirements.items()}
+        return {metric: value for metric, value in chosen.items() if value in cvss.REQUIREMENT_VALUES}
+
+    def _effective_vector(self):
+        """The vector in use with the chosen security requirements applied, or None when no vector is in use."""
+        info = self.state.vector_info
+        return None if info is None else cvss.with_requirements(info, self._requirements())
+
+    def _refresh_environmental(self):
+        """Show the environmental score under the base score, or say what is needed to get one."""
+        effective = self._effective_vector()
+        if effective is not None and effective.environmental_score is not None:
+            self.cvss_env.configure(text=self._environmental_text(effective), fg=self.style.theme.muted)
+        elif effective is None and self._requirements():
+            self.cvss_env.configure(text="Security requirements are set, but an environmental score needs a CVSS "
+                                         "vector: paste one above.", fg=self.style.theme.muted)
         else:
             self.cvss_env.pack_forget()
+            return
+        self.cvss_env.pack(fill=tk.X, pady=(2, 0), after=self.cvss_hint)
 
     def _idle(self, headline, sub, error=False):
         t = self.style.theme
@@ -581,8 +620,13 @@ class AssessView:
         if info is None:
             return []
         lines = [f"CVSS vector: {info.normalized}", f"CVSS version: {info.version} (base score {info.score:.1f})"]
-        if info.environmental_score is not None:
-            lines.append(f"CVSS environmental score: {info.environmental_score:.1f} (shown for comparison; the "
+        effective = self._effective_vector()
+        applied = [f"{REQUIREMENT_LABELS[m].split()[0].lower()} {dict(REQUIREMENT_OPTIONS)[v].lower()}"
+                   for m, v in self._requirements().items() if info.metrics.get(m, "X") == "X"]
+        if applied:
+            lines.append("Security requirements applied: " + ", ".join(applied))
+        if effective.environmental_score is not None:
+            lines.append(f"CVSS environmental score: {effective.environmental_score:.1f} (shown for comparison; the "
                          "priority uses the base score)")
         return lines
 

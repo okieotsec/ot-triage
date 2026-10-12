@@ -1,7 +1,7 @@
-asset_id,name,criticality,exposure,controls
-GW-EDGE-01,Plant edge gateway,crown jewel,high,none
-HMI-LINE-01,Line 1 operator HMI,important,medium,partial
-PLC-PKG-01,Packaging line PLC,standard,low,partial
-RTU-TANK-07,Remote tank RTU (cellular),crown jewel,high,strong
-HIST-01,Plant historian,important,medium,none
-SW-ACC-03,Access switch,standard,low,
+asset_id,name,criticality,exposure,controls,confidentiality,integrity,availability
+GW-EDGE-01,Plant edge gateway,crown jewel,high,none,medium,high,high
+HMI-LINE-01,Line 1 operator HMI,important,medium,partial,low,high,high
+PLC-PKG-01,Packaging line PLC,standard,low,partial,low,high,high
+RTU-TANK-07,Remote tank RTU (cellular),crown jewel,high,strong,low,high,high
+HIST-01,Plant historian,important,medium,none,high,medium,low
+SW-ACC-03,Access switch,standard,low,,low,low,medium
