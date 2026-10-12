@@ -149,7 +149,7 @@ class Freshness:
 def normalize_cve(text):
     """Return an upper-case CVE ID, or raise ValueError if the text is not one."""
     cve = str(text).strip().upper()
-    if not CVE_RE.match(cve):
+    if not CVE_RE.fullmatch(cve):
         raise ValueError("not a valid CVE ID (expected a form like CVE-2024-12345)")
     return cve
 
@@ -175,7 +175,7 @@ def _text(entry, key, where):
 
 
 def _valid_date(text):
-    if not DATE_RE.match(text):
+    if not DATE_RE.fullmatch(text):
         return False
     try:
         datetime.date.fromisoformat(text)
@@ -195,7 +195,7 @@ def parse_kev(data):
     if not isinstance(doc, dict):
         raise ThreatDataError("KEV file must be a JSON object")
     version = doc.get("catalogVersion")
-    if not isinstance(version, str) or not VERSION_RE.match(version):
+    if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
         raise ThreatDataError("KEV file has no valid catalogVersion")
     released = doc.get("dateReleased")
     if not isinstance(released, str) or not _valid_date(released[:10]):
@@ -213,7 +213,7 @@ def parse_kev(data):
         if not isinstance(item, dict):
             raise ThreatDataError(f"{where}: must be an object")
         cve = item.get("cveID")
-        if not isinstance(cve, str) or not CVE_RE.match(cve):
+        if not isinstance(cve, str) or not CVE_RE.fullmatch(cve):
             raise ThreatDataError(f"{where}: invalid cveID")
         where = f"KEV entry {cve}"
         if cve in entries:
@@ -290,7 +290,7 @@ def parse_epss(data):
                 continue
             if len(scores) >= EPSS_MAX_ROWS:
                 raise ThreatDataError(f"EPSS file has more than {EPSS_MAX_ROWS:,} rows")
-            if len(row) != 3 or not CVE_RE.match(row[0]):
+            if len(row) != 3 or not CVE_RE.fullmatch(row[0]):
                 raise ThreatDataError(f"EPSS file line {reader.line_num + 1}: invalid row")
             try:
                 epss, percentile = float(row[1]), float(row[2])

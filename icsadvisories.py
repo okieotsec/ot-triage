@@ -81,7 +81,7 @@ class IcsData:
 
 
 def _date(text, where):
-    if not isinstance(text, str) or not DATE_RE.match(text[:10]) or not threatdata._valid_date(text[:10]):
+    if not isinstance(text, str) or not DATE_RE.fullmatch(text[:10]) or not threatdata._valid_date(text[:10]):
         raise ValueError(f"{where} is not a valid date")
     return text[:10]
 
@@ -124,7 +124,7 @@ def _read_advisory(raw, stem):
     if not isinstance(tracking, dict):
         raise ValueError("no tracking section")
     ident = tracking.get("id")
-    if not isinstance(ident, str) or not ID_RE.match(ident.upper()) or ident.lower() != stem:
+    if not isinstance(ident, str) or not ID_RE.fullmatch(ident.upper()) or ident.lower() != stem:
         raise ValueError("its id does not match its file name")
     title = head.get("title")
     if not isinstance(title, str) or not _clean(title, MAX_TITLE_CHARS):
@@ -137,7 +137,7 @@ def _read_advisory(raw, stem):
     cves = []
     for item in items:
         cve = item.get("cve") if isinstance(item, dict) else None
-        if isinstance(cve, str) and CVE_RE.match(cve) and cve not in cves:
+        if isinstance(cve, str) and CVE_RE.fullmatch(cve) and cve not in cves:
             cves.append(cve)
             if len(cves) > ICS_MAX_CVES:
                 raise ValueError(f"it names more than {ICS_MAX_CVES:,} CVEs")
@@ -193,7 +193,7 @@ def parse_archive(data):
                 members += 1
                 if members > ICS_MAX_MEMBERS:
                     raise ThreatDataError(f"the ICS advisories archive has more than {ICS_MAX_MEMBERS:,} entries")
-                match = MEMBER_RE.match(member.name) if member.isfile() else None
+                match = MEMBER_RE.fullmatch(member.name) if member.isfile() else None
                 if not match:
                     continue
                 candidates += 1
@@ -255,7 +255,7 @@ def _index_row(row):
     if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "cves"}:
         raise ValueError("unexpected fields")
     ident, title, vendors, cves = row["id"], row["title"], row["vendors"], row["cves"]
-    if not isinstance(ident, str) or not ID_RE.match(ident):
+    if not isinstance(ident, str) or not ID_RE.fullmatch(ident):
         raise ValueError("bad id")
     if not isinstance(title, str) or not title or len(title) > MAX_TITLE_CHARS or title != references.clean(title):
         raise ValueError("bad title")
@@ -263,7 +263,7 @@ def _index_row(row):
             isinstance(v, str) and 0 < len(v) <= MAX_VENDOR_CHARS and v == references.clean(v) for v in vendors):
         raise ValueError("bad vendors")
     if not isinstance(cves, list) or not cves or len(cves) > ICS_MAX_CVES or not all(
-            isinstance(c, str) and CVE_RE.match(c) for c in cves) or len(set(cves)) != len(cves):
+            isinstance(c, str) and CVE_RE.fullmatch(c) for c in cves) or len(set(cves)) != len(cves):
         raise ValueError("bad CVE list")
     return IcsAdvisory(ident, title, _date(row["published"], "published"), _date(row["updated"], "updated"),
                        tuple(vendors)), cves

@@ -7,6 +7,14 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
+
+try:
+    from hypothesis import given
+    from hypothesis import settings as hyp_settings
+    from hypothesis import strategies as st
+except ImportError:  # hypothesis is an optional test dependency
+    st = None
 
 import icsadvisories as ics
 import threatdata as td
@@ -102,6 +110,15 @@ class ParseArchiveTests(unittest.TestCase):
         self.assertLessEqual(len(found.vendors[0]), ics.MAX_VENDOR_CHARS)
         self.assertNotIn("\x07", found.vendors[0])
 
+    def test_a_trailing_new_line_does_not_make_a_name_pass(self):
+        evil = advisory("ICSA-26-099-01", cves=("CVE-2026-9999",))
+        data = ics.parse_archive(archive([(member_path("ICSA-26-006-01"), advisory()),
+                                          (member_path("ICSA-26-099-01") + "\n", evil)]))
+        self.assertEqual(set(data.advisories), {"ICSA-26-006-01"})
+        padded = ics.parse_archive(good(advisory(ident="ICSA-26-007-01", cves=("CVE-2026-0002\n", "CVE-2026-0003"))))
+        self.assertEqual(padded.lookup("CVE-2026-0002")[1], 0)
+        self.assertEqual(padded.lookup("CVE-2026-0003")[1], 1)
+
     def test_files_outside_the_ot_advisory_folder_are_ignored(self):
         evil = advisory("ICSA-26-099-01", cves=("CVE-2026-9999",))
         files = [(member_path("ICSA-26-006-01"), advisory()),
@@ -185,9 +202,15 @@ class SkippedAdvisoryTests(unittest.TestCase):
         self.assertNotIn("ICSA-26-213-01", data.advisories)
 
     def test_an_oversized_advisory_file_is_skipped_without_being_read(self):
-        big = b" " * (ics.ICS_MAX_ADVISORY_BYTES + 1)
+        # Valid JSON, so the only reason to skip it is its size
+        big = json.dumps(advisory("ICSA-26-214-01", cves=("CVE-2026-9214",))).encode() + \
+            b" " * ics.ICS_MAX_ADVISORY_BYTES
         data = ics.parse_archive(self.archive_with([(member_path("ICSA-26-214-01"), big)]))
         self.assertEqual(len(data.advisories), 30)
+        self.assertNotIn("ICSA-26-214-01", data.advisories)
+        small = json.dumps(advisory("ICSA-26-215-01", cves=("CVE-2026-9215",))).encode() + b" " * 1000
+        self.assertIn("ICSA-26-215-01", ics.parse_archive(self.archive_with(
+            [(member_path("ICSA-26-215-01"), small)])).advisories)
 
     def test_invalid_cve_ids_are_ignored_and_duplicates_collapse(self):
         doc = advisory("ICSA-26-215-01", cves=("CVE-2026-1111", "cve-2026-1111", "CVE-2026-1111", "nope", "CVE-1-2"))
@@ -301,6 +324,8 @@ class IndexTests(unittest.TestCase):
             "missing field": mutate(lambda d: d["advisories"][0].pop("title")),
             "bad id": mutate(lambda d: d["advisories"][0].update(id="../x")),
             "bad cve": mutate(lambda d: d["advisories"][0].update(cves=["nope"])),
+            "cve with a trailing new line": mutate(lambda d: d["advisories"][0].update(cves=["CVE-2025-61939\n"])),
+            "id with a trailing new line": mutate(lambda d: d["advisories"][0].update(id="ICSA-26-006-01\n")),
             "empty cve list": mutate(lambda d: d["advisories"][0].update(cves=[])),
             "repeated cve": mutate(lambda d: d["advisories"][0].update(cves=["CVE-2025-61939"] * 2)),
             "bad date": mutate(lambda d: d["advisories"][0].update(updated="soon")),
@@ -325,6 +350,67 @@ class IndexTests(unittest.TestCase):
     def test_an_index_over_the_limit_is_refused(self):
         with self.assertRaisesRegex(td.ThreatDataError, "larger than"):
             ics.parse_index(b" " * (ics.ICS_MAX_INDEX_BYTES + 1))
+
+
+@unittest.skipIf(st is None, "hypothesis is not installed")
+class IcsFuzzTests(unittest.TestCase):
+    if st is not None:
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.binary(max_size=4000))
+        def test_any_bytes_as_a_download_are_refused_cleanly(self, raw):
+            try:
+                ics.parse_archive(raw)
+            except td.ThreatDataError:
+                pass
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.binary(max_size=4000))
+        def test_any_gzip_wrapped_bytes_are_refused_or_read_cleanly(self, raw):
+            try:
+                data = ics.parse_archive(gzip.compress(raw))
+            except td.ThreatDataError:
+                return
+            self.assertTrue(data.advisories)
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(st.binary(max_size=4000))
+        def test_any_bytes_as_a_stored_index_are_refused_cleanly(self, raw):
+            try:
+                ics.parse_index(raw)
+            except td.ThreatDataError:
+                pass
+
+        json_values = st.recursive(
+            st.none() | st.booleans() | st.integers() | st.text(max_size=40),
+            lambda children: st.lists(children, max_size=4) | st.dictionaries(st.text(max_size=12), children,
+                                                                                max_size=5),
+            max_leaves=20)
+
+        @hyp_settings(max_examples=300, deadline=None)
+        @given(json_values)
+        def test_any_json_as_an_advisory_is_skipped_or_read_with_clean_text(self, doc):
+            raw = json.dumps(doc).encode("utf-8")
+            try:
+                found, cves = ics._read_advisory(raw, "icsa-26-006-01")
+            except ValueError:
+                return
+            self.assertTrue(found.title.isprintable())
+            self.assertLessEqual(len(found.title), ics.MAX_TITLE_CHARS)
+            self.assertTrue(all(td.CVE_RE.match(c) for c in cves))
+            self.assertTrue(found.url.startswith("https://www.cisa.gov/news-events/ics"))
+
+        @hyp_settings(max_examples=200, deadline=None)
+        @given(st.text(max_size=300), st.text(max_size=100), st.lists(st.text(max_size=20), max_size=4))
+        def test_any_text_in_an_advisory_is_stored_clean_and_reads_back_the_same(self, title, vendor, cves):
+            doc = advisory(title=title, vendor=vendor, cves=[*cves, "CVE-2026-0001"])
+            try:
+                data = ics.parse_archive(good(doc))
+            except td.ThreatDataError:
+                return                          # a title that cleans to nothing is skipped, leaving no advisories
+            again = ics.parse_index(ics.to_index(data))
+            self.assertEqual((again.advisories, again.by_cve), (data.advisories, data.by_cve))
+            for found in data.advisories.values():
+                self.assertTrue(found.title.isprintable() and all(v.isprintable() for v in found.vendors))
 
 
 class FakeFetcher:
@@ -375,6 +461,14 @@ class StorageTests(unittest.TestCase):
                                          self.NOW)
         self.assertFalse(result.ok)
         self.assertIn("previous copy was kept", result.message)
+        self.assertEqual((self.dir / ics.ICS_FILE).read_bytes(), before)
+
+    def test_an_index_that_does_not_read_back_is_never_stored(self):
+        self.assertTrue(self.update(good(advisory())).ok)
+        before = (self.dir / ics.ICS_FILE).read_bytes()
+        with mock.patch.object(ics, "to_index", return_value=b'{"version": 1}'):
+            result = self.update(good(advisory("ICSA-26-007-01", cves=("CVE-2026-0002",))))
+        self.assertFalse(result.ok)
         self.assertEqual((self.dir / ics.ICS_FILE).read_bytes(), before)
 
     def test_invalid_data_keeps_the_previous_copy(self):

@@ -689,6 +689,24 @@ class FetchTests(unittest.TestCase):
         self.assertFalse(data_dir.exists() and any(data_dir.iterdir()))
 
 
+class ExactMatchTests(unittest.TestCase):
+    """Text from a downloaded file must match exactly: a trailing new line does not get past the checks."""
+
+    def test_a_cve_id_with_a_trailing_new_line_is_refused_in_both_files(self):
+        entry = kev_entry("CVE-2024-0001")
+        entry["cveID"] = "CVE-2024-0001\n"
+        with self.assertRaisesRegex(td.ThreatDataError, "invalid cveID"):
+            td.parse_kev(kev_bytes([entry]))
+        with self.assertRaisesRegex(td.ThreatDataError, "invalid row"):
+            td.parse_epss(epss_bytes(epss_text(['"CVE-2024-0001\n",0.5,0.9'])))
+
+    def test_a_catalog_version_with_a_trailing_new_line_is_refused(self):
+        doc = json.loads(kev_bytes())
+        doc["catalogVersion"] = "2026.10.04\n"
+        with self.assertRaisesRegex(td.ThreatDataError, "catalogVersion"):
+            td.parse_kev(json.dumps(doc).encode())
+
+
 class IcsLookupTests(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
