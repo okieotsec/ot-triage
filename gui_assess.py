@@ -7,6 +7,7 @@ import explain
 from explain import SHORT_LABELS, AssessInputs
 from gui_widgets import (
     MAX_ENTRY_CHARS,
+    AdvisoryList,
     Expander,
     FlowFrame,
     MessageLabel,
@@ -289,6 +290,13 @@ class AssessView:
         self.reference_list.pack(fill=tk.X)
         self.references = ()
 
+        self.advisories_body = card(parent, s, "ICS advisories from CISA")
+        self.advisories_card = self.advisories_body.master
+        self.advisories_card.pack_forget()
+        self.advisory_list = AdvisoryList(self.advisories_body, s, self.ctx.open_reference)
+        self.advisory_list.pack(fill=tk.X)
+        self.advisories, self._advisory_total = (), 0
+
         what = card(parent, s, "What would change this?")
         self.what_card = what.master
         self.whatif = tk.Frame(what, bg=t.card)
@@ -402,6 +410,7 @@ class AssessView:
     def _update(self):
         t, state = self.style.theme, self.state
         self._update_threat_controls()
+        self._set_advisories()
         raw = state.cvss.get().strip()
         self._update_cvss_band(raw)
         self._refresh_environmental()
@@ -451,13 +460,26 @@ class AssessView:
                 check.pack_forget()
         self._update_cve_chips()
 
+    def _set_advisories(self):
+        """Show the CISA ICS advisories that name the looked-up CVE, or hide the card when there are none."""
+        info = self.state.info
+        advisories = info.advisories if info is not None else ()
+        total = info.advisory_count if info is not None else 0
+        if (advisories, total) != (self.advisories, self._advisory_total):
+            self.advisories, self._advisory_total = advisories, total
+            self.advisory_list.show(advisories, total)
+        if self.advisories:
+            self.advisories_card.pack(fill=tk.X, pady=(0, 16), before=self.what_card)
+        else:
+            self.advisories_card.pack_forget()
+
     def _update_cve_chips(self):
         info, s, t = self.state.info, self.style, self.style.theme
         items = []
         if info is None:
             self.cve_message.configure(text="" if not self.state.cve.get().strip() else
                                        "Press Enter or Look up to check the local KEV and EPSS data.", fg=t.muted)
-        elif not (info.kev_loaded or info.epss_loaded):
+        elif not (info.kev_loaded or info.epss_loaded or info.ics_loaded):
             self.cve_message.configure(text="No threat data is loaded, so nothing was looked up. Open Threat data "
                                             "to update or import it. This does not mean the CVE is safe.", fg=t.warn)
         else:
@@ -476,6 +498,13 @@ class AssessView:
                                       "raise" if high else "neutral"))
             else:
                 items.append(chip(self.cve_chips, s, "EPSS not loaded", "warn"))
+            if info.ics_loaded:
+                count = info.advisory_count
+                items.append(chip(self.cve_chips, s, "Not in a CISA ICS advisory" if not count else
+                                  "In a CISA ICS advisory" if count == 1 else f"In {count} CISA ICS advisories",
+                                  "neutral"))
+            else:
+                items.append(chip(self.cve_chips, s, "ICS advisories not loaded", "warn"))
         self.cve_chips.set_items(items)
 
     def _update_cvss_band(self, raw):
@@ -703,13 +732,15 @@ class AssessView:
     def copy_summary(self):
         """Copy the plain-text summary."""
         if self.result:
-            self.ctx.copy(explain.summary_text(self.result, self.versions, self.vector_lines(), self.references))
+            self.ctx.copy(explain.summary_text(self.result, self.versions, self.vector_lines(), self.references,
+                                               self.advisories))
             self._flash("Summary copied")
 
     def copy_markdown(self):
         """Copy the Markdown summary."""
         if self.result:
-            self.ctx.copy(explain.markdown_summary(self.result, self.versions, self.vector_lines(), self.references))
+            self.ctx.copy(explain.markdown_summary(self.result, self.versions, self.vector_lines(), self.references,
+                                                   self.advisories))
             self._flash("Markdown copied")
 
     def _flash(self, text):

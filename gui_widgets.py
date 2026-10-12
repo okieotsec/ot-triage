@@ -5,6 +5,7 @@ import time
 import tkinter as tk
 from tkinter import ttk
 
+import references
 from gui_round import photo, recolor_corners, round_corners, shape_label, text_size
 from gui_theme import SYMBOLS
 
@@ -504,6 +505,42 @@ class ReferenceList(tk.Frame):
             tk.Label(self, text=f"and {left_out} more (see Assess or the CSV export)", font=s.font(9), bg=t.card,
                      fg=t.muted, anchor="w").pack(fill=tk.X)
         return left_out
+
+
+class AdvisoryList(tk.Frame):
+    """CISA ICS advisories that name a CVE: the advisory number is a link to cisa.gov, with its title, vendor and date.
+
+    The advisory data is untrusted, so only the address built from the validated advisory number is ever opened.
+    """
+
+    def __init__(self, parent, style, open_reference, compact=False):
+        super().__init__(parent, bg=style.theme.card)
+        self.style, self.open_reference, self.compact = style, open_reference, compact
+
+    def show(self, advisories, total=None):
+        """Replace the list's contents; total is how many advisories name the CVE when more than these are given."""
+        for child in self.winfo_children():
+            child.destroy()
+        s, t = self.style, self.style.theme
+        for advisory in advisories:
+            row = tk.Frame(self, bg=t.card)
+            row.pack(fill=tk.X, pady=(0, 3 if self.compact else 8))
+            link = references.Reference(label=advisory.id, url=advisory.url)
+            LinkLabel(row, s, advisory.id, lambda r=link: self.open_reference(r)).pack(
+                side=tk.LEFT if self.compact else None, anchor="w")
+            who = f" · {', '.join(advisory.vendors)}" if advisory.vendors else ""
+            text = f"{advisory.title}{who} · updated {advisory.updated}"
+            if self.compact:
+                tk.Label(row, text="  " + text, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
+                    side=tk.LEFT, anchor="w")
+            else:
+                detail = tk.Label(row, text=text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w", justify="left")
+                detail.pack(fill=tk.X)
+                wrap_to_width(detail)
+        left_out = (total or len(advisories)) - len(advisories)
+        if left_out > 0:
+            tk.Label(self, text=f"and {left_out} more advisories name this CVE (see cisa.gov)", font=s.font(9),
+                     bg=t.card, fg=t.muted, anchor="w").pack(fill=tk.X)
 
 
 def _short_path(url):

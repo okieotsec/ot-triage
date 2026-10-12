@@ -10,6 +10,7 @@ import threatdata
 from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
 from gui_widgets import (
+    AdvisoryList,
     FlowFrame,
     ReferenceList,
     ScrollFrame,
@@ -172,6 +173,9 @@ class BatchView:
         self.detail_refs_title = tk.Label(area, text="REFERENCES FROM CISA", font=s.font(9, "bold"), bg=t.card,
                                           fg=t.accent, anchor="w")
         self.detail_refs = ReferenceList(area, s, self.ctx.open_reference, compact=True, limit=REFERENCE_LIMIT)
+        self.detail_adv_title = tk.Label(area, text="ICS ADVISORIES FROM CISA", font=s.font(9, "bold"), bg=t.card,
+                                         fg=t.accent, anchor="w")
+        self.detail_adv = AdvisoryList(area, s, self.ctx.open_reference, compact=True)
 
     # ---- loading ----
     def open_file(self):
@@ -394,6 +398,7 @@ class BatchView:
         self.detail_chips.set_items([])
         self.detail_text.configure(text="")
         self._show_references(())
+        self._show_advisories(None)
 
     def _on_select(self, _event):
         selection = self.tree.selection()
@@ -426,6 +431,7 @@ class BatchView:
                 lines += ["", f"CVSS vector as given: {item.cvss_vector}"]
         self.detail_text.configure(text="\n".join(lines))
         self._show_references(item.references)
+        self._show_advisories(item)
         self.detail_scroll.scroll_to_top()
 
     def _show_references(self, references):
@@ -436,6 +442,16 @@ class BatchView:
         if references:
             self.detail_refs_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
             self.detail_refs.pack(fill=tk.X, before=self.detail_text)
+
+    def _show_advisories(self, item):
+        """Show the CISA ICS advisories that name the selected row's CVE, or nothing when there are none."""
+        self.detail_adv_title.pack_forget()
+        self.detail_adv.pack_forget()
+        advisories = item.advisories if item is not None else ()
+        self.detail_adv.show(advisories, item.advisory_count if item is not None else None)
+        if advisories:
+            self.detail_adv_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
+            self.detail_adv.pack(fill=tk.X, before=self.detail_text)
 
     # ---- export ----
     def export(self):

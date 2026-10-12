@@ -85,6 +85,8 @@ class BatchItem:
     requirements_from_inventory: bool = False
     threat_sources: str = ""
     references: tuple = ()
+    advisories: tuple = ()         # CISA ICS advisories that name the CVE (context only)
+    advisory_count: int = 0
     forensic_triage: bool = False
     asset_id: str = ""
     from_inventory: tuple = ()     # what came from the inventory: asset, exposure, controls, security requirements
@@ -262,6 +264,7 @@ def score_row(line, row, settings=DEFAULT_SETTINGS, threatdata=None, inventory=N
         item.result = apply_threat_context(item.result, decision, info)
         if info.kev is not None:
             item.references, item.forensic_triage = info.kev.references, info.kev.forensic_triage
+        item.advisories, item.advisory_count = info.advisories, info.advisory_count
     return item
 
 
@@ -300,7 +303,14 @@ OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cv
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
-                  "from_inventory", "cvss_environmental"]
+                  "from_inventory", "cvss_environmental", "ics_advisories"]
+
+
+def _advisory_cell(item):
+    """The ICS advisories for an export cell: each advisory's number and address, and a note if some are left out."""
+    cell = " ; ".join(f"{a.id}: {a.url}" for a in item.advisories)
+    left_out = item.advisory_count - len(item.advisories)
+    return f"{cell} ; and {left_out} more" if left_out > 0 else cell
 
 
 def write_results(path, items, threatdata=None):
@@ -317,7 +327,8 @@ def write_results(path, items, threatdata=None):
                    "references": _safe(" ; ".join(describe(r) for r in item.references)),
                    "forensic_triage": "Yes" if item.forensic_triage else "",
                    "asset_id": _safe(item.asset_id), "from_inventory": "; ".join(item.from_inventory),
-                   "cvss_environmental": "" if item.cvss_environmental is None else f"{item.cvss_environmental:.1f}"}
+                   "cvss_environmental": "" if item.cvss_environmental is None else f"{item.cvss_environmental:.1f}",
+                   "ics_advisories": _safe(_advisory_cell(item))}
             if item.result:
                 rank += 1
                 row.update(

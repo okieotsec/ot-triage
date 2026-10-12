@@ -9,12 +9,14 @@ from unittest import mock
 
 import gui_brand
 import gui_testing
+import icsadvisories
 import ot_triage_gui as app_module
 import settings as scoring
 import threatdata as td
 import uiprefs
 from gui_theme import DARK, LIGHT
 from settings import DEFAULT_SETTINGS, Settings
+from test_icsadvisories import advisory, good
 from test_threatdata import epss_bytes, kev_bytes
 from uiprefs import UiPrefs
 
@@ -573,6 +575,8 @@ class StatusBarTests(AppTestCase):
 
         def fake(url, max_bytes, hosts, **_kw):
             calls.append(url)
+            if url == icsadvisories.ICS_URL:
+                return good(advisory())
             return kev_bytes() if url == td.KEV_URL else epss_bytes()
 
         with mock.patch("threatdata.fetch", fake):
@@ -586,7 +590,7 @@ class StatusBarTests(AppTestCase):
                 app = self.make()
                 self.pump(10, until=lambda: bool(app.ctx.updater.results) and not app.ctx.worker.running)
                 self.pump(0.2)
-        self.assertEqual(sorted(calls), sorted([td.KEV_URL, td.EPSS_URL]))
+        self.assertEqual(sorted(calls), sorted([td.KEV_URL, td.EPSS_URL, icsadvisories.ICS_URL]))
         self.assertFalse(self.mocks["askokcancel"].called)
         self.assertTrue(all(r.ok for r in app.ctx.updater.results))
 
