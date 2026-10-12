@@ -133,6 +133,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP6 | Environmental CVSS scores, checked against FIRST's calculators | [reports/cp6-environmental-cvss](reports/cp6-environmental-cvss/claude.md) |
 | CP7 | Security requirements for the environmental score | [reports/cp7-security-requirements](reports/cp7-security-requirements/claude.md) |
 | CP8 | CISA ICS advisories: a new downloaded archive that is parsed | [reports/cp8-ics-advisories](reports/cp8-ics-advisories/claude.md) |
+| CP9 | What an ICS advisory says about a fix | [reports/cp9-ics-remediation](reports/cp9-ics-remediation/claude.md) |
 
 Across the checkpoints 29 findings were recorded (3 Medium, 7 Low, 19 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 

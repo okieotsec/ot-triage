@@ -419,6 +419,8 @@ class BatchView:
                 if item.cvss_environmental is not None:
                     lines.append(f"Environmental score: {item.cvss_environmental:.1f}, shown for comparison; the "
                                  "priority uses the base score.")
+            if item.advisories and item.advisories[0].fix_text:
+                lines += ["", f"CISA {item.advisories[0].id}: {item.advisories[0].fix_text} (context only)."]
             if item.asset_id:
                 taken = ", ".join(item.from_inventory) or "nothing"
                 lines += ["", f"Asset {item.asset_id}: {taken} filled in from the inventory"

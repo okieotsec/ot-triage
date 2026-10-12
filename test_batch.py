@@ -444,8 +444,8 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh)
                 rows = list(reader)
-        self.assertEqual(reader.fieldnames[-6:], ["references", "forensic_triage", "asset_id", "from_inventory",
-                                                  "cvss_environmental", "ics_advisories"])
+        self.assertEqual(reader.fieldnames[-7:], ["references", "forensic_triage", "asset_id", "from_inventory",
+                                                  "cvss_environmental", "ics_advisories", "ics_remediation"])
         by_cve = {r["cve"]: r for r in rows}
         kev_row = by_cve["CVE-2024-0001"]
         self.assertEqual(kev_row["forensic_triage"], "Yes")
@@ -556,6 +556,24 @@ class IcsAdvisoryBatchTests(unittest.TestCase):
                     row = next(csv.DictReader(fh))
                 self.assertIn(expected, row["ics_advisories"])
                 self.assertIn("ICS advisories 2026-", row["threat_data"])
+
+    def test_a_row_carries_what_the_advisory_says_about_a_fix_and_it_never_changes_the_result(self):
+        docs = [advisory("ICSA-26-006-01", "Acme Widget Controller", ("CVE-2024-0001",), "Acme",
+                         fixes={"CVE-2024-0001": ["none_available", "mitigation"]})]
+        entry = td.KevEntry("CVE-2024-0001", "Acme", "Widget", "Flaw", "2024-01-02", "Apply.", "2024-01-23", False)
+        data = td.ThreatData(td.KevData("2026.10.04", "2026-10-04", {entry.cve: entry}),
+                             td.EpssData("v2026.06.15", "2026-10-07", {}), ics=ics.parse_archive(good(*docs)))
+        item = batch.score_row(2, self.ROW, threatdata=data)
+        plain = batch.score_row(2, self.ROW, threatdata=self.data())
+        self.assertEqual(item.advisories[0].fix, "N")
+        self.assertTrue(any("(no fix available yet) names this CVE" in r for r in item.result.reasons))
+        self.assertIn("No fix yet (CISA)", [f.label for f in item.result.factors])
+        self.assertEqual((item.priority, item.result.score), (plain.priority, plain.result.score))
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, [item], data)
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                self.assertEqual(next(csv.DictReader(fh))["ics_remediation"], "no fix available yet")
 
     def test_the_export_column_is_empty_without_advisories_and_formula_safe(self):
         with tempfile.TemporaryDirectory() as folder:

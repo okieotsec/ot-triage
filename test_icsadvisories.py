@@ -25,13 +25,19 @@ ROOT = "CSAF-develop/csaf_files/OT/white"
 
 def advisory(ident="ICSA-26-006-01", title="Columbia Weather Systems MicroServer", cves=("CVE-2025-61939",),
              vendor="Columbia Weather Systems", published="2026-01-06T06:00:00.000000Z",
-             updated="2026-01-06T06:00:00.000000Z"):
-    return {
+             updated="2026-01-06T06:00:00.000000Z", fixes=None):
+    """Build a CSAF advisory; fixes maps a CVE id to the list of remediation categories to give it."""
+    doc = {
         "document": {"title": title, "tracking": {"id": ident, "initial_release_date": published,
                                                     "current_release_date": updated}},
         "product_tree": {"branches": [{"category": "vendor", "name": vendor, "branches": []}]},
         "vulnerabilities": [{"cve": c} for c in cves],
     }
+    for item in doc["vulnerabilities"]:
+        if fixes and item["cve"] in fixes:
+            item["remediations"] = [{"category": c, "details": "x", "product_ids": ["CSAFPID-0001"]}
+                                    for c in fixes[item["cve"]]]
+    return doc
 
 
 def member_path(ident):
@@ -293,6 +299,72 @@ class HostileArchiveTests(unittest.TestCase):
             ics.parse_archive(b"\x1f\x8b" + b"\0" * (ics.ICS_MAX_COMPRESSED + 1))
 
 
+class RemediationTests(unittest.TestCase):
+    CVE = "CVE-2025-61939"
+
+    def fix(self, *categories):
+        data = ics.parse_archive(good(advisory(cves=(self.CVE,), fixes={self.CVE: list(categories)})))
+        return data.lookup(self.CVE)[0][0].fix
+
+    def test_each_combination_of_categories_means_one_status(self):
+        cases = {
+            ("vendor_fix",): "F", ("vendor_fix", "mitigation"): "F", ("vendor_fix", "workaround"): "F",
+            ("vendor_fix", "none_available"): "P", ("vendor_fix", "no_fix_planned"): "P",
+            ("vendor_fix", "mitigation", "none_available", "no_fix_planned"): "P",
+            ("none_available",): "N", ("none_available", "mitigation"): "N",
+            ("no_fix_planned",): "X", ("no_fix_planned", "mitigation"): "X", ("no_fix_planned", "none_available"): "X",
+            ("mitigation",): "M", ("workaround",): "M", ("mitigation", "workaround"): "M",
+            (): "", ("something_new",): "",
+        }
+        for categories, letter in cases.items():
+            with self.subTest(categories):
+                self.assertEqual(self.fix(*categories), letter)
+
+    def test_the_words_are_plain_and_each_status_has_some(self):
+        def words_for(letter):
+            return ics.IcsAdvisory("ICSA-26-006-01", "t", "2026-01-01", "2026-01-01", (), letter).fix_text
+
+        words = {letter: words_for(letter) for letter in "FPNXM"}
+        self.assertEqual(words, {"F": "vendor fix available",
+                                 "P": "vendor fix for some products, none for others",
+                                 "N": "no fix available yet", "X": "no fix planned",
+                                 "M": "mitigation or workaround only"})
+        self.assertEqual(set(ics.REMEDIATION_CHIPS), set(ics.REMEDIATION_WORDS))
+        self.assertEqual(ics.IcsAdvisory("ICSA-26-006-01", "t", "2026-01-01", "2026-01-01").fix_text, "")
+
+    def test_each_cve_in_an_advisory_gets_its_own_status(self):
+        doc = advisory(cves=("CVE-2026-0001", "CVE-2026-0002", "CVE-2026-0003"),
+                       fixes={"CVE-2026-0001": ["vendor_fix"], "CVE-2026-0002": ["none_available"]})
+        data = ics.parse_archive(good(doc))
+        got = {c: data.lookup(c)[0][0].fix for c in ("CVE-2026-0001", "CVE-2026-0002", "CVE-2026-0003")}
+        self.assertEqual(got, {"CVE-2026-0001": "F", "CVE-2026-0002": "N", "CVE-2026-0003": ""})
+
+    def test_each_advisory_keeps_its_own_statement_for_the_same_cve(self):
+        older = advisory("ICSA-25-001-01", cves=(self.CVE,), updated="2025-01-01T00:00:00Z",
+                         fixes={self.CVE: ["none_available"]})
+        newer = advisory("ICSA-26-001-01", cves=(self.CVE,), updated="2026-01-01T00:00:00Z",
+                         fixes={self.CVE: ["vendor_fix"]})
+        found, _count = ics.parse_archive(good(older, newer)).lookup(self.CVE)
+        self.assertEqual([(a.id, a.fix) for a in found], [("ICSA-26-001-01", "F"), ("ICSA-25-001-01", "N")])
+
+    def test_the_status_survives_the_stored_index(self):
+        doc = advisory(cves=(self.CVE, "CVE-2026-0002"), fixes={self.CVE: ["vendor_fix", "no_fix_planned"]})
+        data = ics.parse_archive(good(doc))
+        again = ics.parse_index(ics.to_index(data))
+        self.assertEqual(again.fixes, data.fixes)
+        self.assertEqual(again.lookup(self.CVE)[0][0].fix, "P")
+        self.assertEqual(again.lookup("CVE-2026-0002")[0][0].fix, "")
+
+    def test_odd_remediation_data_is_ignored_not_trusted(self):
+        for odd in (None, "vendor_fix", 5, {}, [None, 5, "x"], [{"category": 5}], [{"category": ["vendor_fix"]}],
+                    [{"details": "no category"}]):
+            with self.subTest(odd=odd):
+                doc = advisory(cves=(self.CVE,))
+                doc["vulnerabilities"][0]["remediations"] = odd
+                data = ics.parse_archive(good(doc))
+                self.assertEqual(data.lookup(self.CVE)[0][0].fix, "")
+
+
 class IndexTests(unittest.TestCase):
     def setUp(self):
         self.data = ics.parse_archive(good(
@@ -318,7 +390,12 @@ class IndexTests(unittest.TestCase):
             return doc
 
         cases = {
-            "unknown version": mutate(lambda d: d.update(version=2)),
+            "unknown version": mutate(lambda d: d.update(version=3)),
+            "old version": mutate(lambda d: d.update(version=1)),
+            "remediation for a CVE the advisory does not name": mutate(
+                lambda d: d["advisories"][0].update(fixes={"CVE-2020-0001": "F"})),
+            "unknown remediation letter": mutate(lambda d: d["advisories"][0].update(fixes={"CVE-2025-61939": "Z"})),
+            "remediations not a dict": mutate(lambda d: d["advisories"][0].update(fixes=["F"])),
             "count mismatch": mutate(lambda d: d.update(count=99)),
             "no advisories": mutate(lambda d: d.update(advisories=[], count=0)),
             "extra field": mutate(lambda d: d["advisories"][0].update(url="https://evil.example")),
@@ -392,7 +469,7 @@ class IcsFuzzTests(unittest.TestCase):
         def test_any_json_as_an_advisory_is_skipped_or_read_with_clean_text(self, doc):
             raw = json.dumps(doc).encode("utf-8")
             try:
-                found, cves = ics._read_advisory(raw, "icsa-26-006-01")
+                found, cves, _fixes = ics._read_advisory(raw, "icsa-26-006-01")
             except ValueError:
                 return
             self.assertTrue(found.title.isprintable())
