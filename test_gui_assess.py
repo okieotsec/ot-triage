@@ -802,6 +802,27 @@ class AssessRequirementTests(AssessTestCase):
         self.assertEqual(set(self.view.requirement_controls), {"CR", "IR", "AR"})
         self.assertEqual({m: v.get() for m, v in self.state.requirements.items()}, {"CR": "X", "IR": "X", "AR": "X"})
 
+    def test_the_section_opens_by_itself_when_a_vector_is_entered(self):
+        self.assertFalse(self.view.requirements_box.is_open)
+        self.use(V31)
+        self.assertTrue(self.view.requirements_box.is_open)
+        self.assertEqual(self.view.requirements_box.body.winfo_manager(), "pack")
+
+    def test_a_plain_score_does_not_open_the_section(self):
+        self.state.cvss.set("7.5")
+        self.view.apply_vector()
+        self.pump(0.2)
+        self.assertFalse(self.view.requirements_box.is_open)
+
+    def test_closing_the_section_by_hand_sticks_until_the_vector_is_cleared_and_entered_again(self):
+        self.use(V31)
+        self.view.requirements_box.toggle()
+        self.use(V31 + "/CR:H")
+        self.assertFalse(self.view.requirements_box.is_open)
+        self.use("")
+        self.use(V31)
+        self.assertTrue(self.view.requirements_box.is_open)
+
     def test_choosing_requirements_gives_an_environmental_score_and_never_changes_the_priority(self):
         self.use(V31)
         before = self.view.badge.cget("text")
@@ -847,10 +868,10 @@ class AssessRequirementTests(AssessTestCase):
     def test_the_choices_survive_a_rebuild_and_the_section_can_be_opened(self):
         self.use(V31)
         self.choose(AR="H")
-        self.view.requirements_box.toggle()
         self.assertTrue(self.view.requirements_box.is_open)
         self.view.frame.destroy()
         rebuilt = self.build()
+        self.assertTrue(rebuilt.requirements_box.is_open)
         self.assertEqual(self.ctx.assess_state.requirements["AR"].get(), "H")
         self.assertIn("Environmental score", rebuilt.cvss_env.cget("text"))
 
