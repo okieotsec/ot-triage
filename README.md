@@ -30,7 +30,8 @@ threat-data update that you start yourself.
 
 ```
 python3 ot_triage_gui.py            # the app (Python 3.12 or newer, with Tkinter)
-python3 -m unittest                 # the tests
+python3 tools/headless_tests.py     # the tests, on an invisible display (no windows open on your screen)
+python3 -m unittest                 # the tests, the plain way (GUI tests open real windows)
 ```
 
 The tests that need a display skip themselves when none is available. `pip install hypothesis` adds the optional
