@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Security requirements for the environmental score:** an optional section in Assess (Low, Medium or High for confidentiality, integrity and availability) and optional `confidentiality`, `integrity` and `availability` columns in the asset inventory now apply the CVSS security requirements to a CVSS vector, so an environmental score no longer needs a hand-built vector. Anything the vector sets itself is kept. The score is still shown for comparison only; the priority is unchanged. Samples: `sample_inventory.csv` (now with requirement columns) and `sample_findings_environmental.csv`.
+- **Security requirements for the environmental score:** an optional section in Assess (Low, Medium or High for confidentiality, integrity and availability) and optional `confidentiality`, `integrity` and `availability` columns in the asset inventory now apply the CVSS security requirements to a CVSS vector, so an environmental score no longer needs a hand-built vector. Anything the vector sets itself is kept. The score is still shown for comparison only; the priority is unchanged. Samples: `sample_inventory.csv` (now with requirement columns) and `sample_findings_environmental.csv`. The section opens by itself when a CVSS vector is entered (closing it by hand sticks until the vector is cleared).
 
 ## 0.5.0 (2026-10-11)
 

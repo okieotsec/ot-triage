@@ -220,6 +220,7 @@ class AssessView:
     def _build_requirements(self, parent):
         """An optional, collapsed section for the CVSS security requirements (they only feed the environmental)."""
         s, t = self.style, self.style.theme
+        self._vector_seen = False
         self.requirements_box = Expander(parent, s, "Security requirements for the environmental score (optional)")
         self.requirements_box.pack(fill=tk.X, pady=(14, 0))
         body = self.requirements_box.body
@@ -507,6 +508,10 @@ class AssessView:
 
     def _refresh_environmental(self):
         """Show the environmental score under the base score, or say what is needed to get one."""
+        has_vector = self.state.vector_info is not None
+        if has_vector and not self._vector_seen and not self.requirements_box.is_open:
+            self.requirements_box.toggle()      # the section only does something with a vector, so show it then
+        self._vector_seen = has_vector          # closing it by hand sticks until the vector is cleared and re-entered
         effective = self._effective_vector()
         if effective is not None and effective.environmental_score is not None:
             self.cvss_env.configure(text=self._environmental_text(effective), fg=self.style.theme.muted)
