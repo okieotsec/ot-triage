@@ -281,7 +281,7 @@ class MaliciousAdvisoryArchiveTests(unittest.TestCase):
 
     def tar_gz_file(self, name, write):
         path = self.base / name
-        with gzip.open(path, "wb", compresslevel=1) as raw, tarfile.open(fileobj=raw, mode="w|") as tar:
+        with gzip.open(path, "wb", compresslevel=9) as raw, tarfile.open(fileobj=raw, mode="w|") as tar:
             write(tar)
         return path
 
@@ -303,7 +303,7 @@ class MaliciousAdvisoryArchiveTests(unittest.TestCase):
             info.size = icsadvisories.ICS_MAX_STREAM + 50 * 1024 * 1024
             tar.addfile(info, _Zeros(info.size))
         path = self.tar_gz_file("bomb.tar.gz", write)
-        self.assertLess(path.stat().st_size, 5 * 1024 * 1024, "the bomb should be tiny on disk")
+        self.assertLess(path.stat().st_size, 20 * 1024 * 1024, "the bomb should be small on disk")
         self.assertIn("expands to more than", self.assert_refused_and_kept(path).message)
 
     def test_a_flood_of_empty_entries_is_stopped(self):

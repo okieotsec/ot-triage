@@ -2,6 +2,7 @@
 import gzip
 import io
 import json
+import sys
 import tarfile
 import tempfile
 import threading
@@ -549,6 +550,7 @@ class StorageTests(unittest.TestCase):
         self.assertFalse(fresh.stale)
         self.assertIn("retrieved 0 days ago", fresh.text)
 
+    @unittest.skipIf(sys.platform == "win32", "Windows has no permission bits to check")
     def test_stored_files_are_not_world_writable(self):
         self.update(good(advisory()))
         for name in (ics.ICS_FILE, ics.ICS_META_FILE):
