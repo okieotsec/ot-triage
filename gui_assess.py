@@ -215,6 +215,8 @@ class AssessView:
         rem = card(parent, s, "Remediation & mitigation")
         field_label(rem, s, "Patch status", PATCH_HELP)
         Segmented(rem, s, _options(Patch), state.patch).pack(fill=tk.X)
+        self.patch_hint = MessageLabel(rem, s)
+        self.patch_hint.pack(fill=tk.X)
         field_label(rem, s, "Compensating controls", CONTROLS_HELP)
         Segmented(rem, s, _options(Controls), state.controls).pack(fill=tk.X)
 
@@ -468,10 +470,23 @@ class AssessView:
         if (advisories, total) != (self.advisories, self._advisory_total):
             self.advisories, self._advisory_total = advisories, total
             self.advisory_list.show(advisories, total)
+        self.patch_hint.configure(text=self._patch_hint())
         if self.advisories:
             self.advisories_card.pack(fill=tk.X, pady=(0, 16), before=self.what_card)
         else:
             self.advisories_card.pack_forget()
+
+    def _patch_hint(self):
+        """A note under Patch status saying what the newest CISA advisory says about a fix. It sets nothing."""
+        newest = self.advisories[0] if self.advisories else None
+        if newest is None or not newest.fix:
+            return ""
+        advice = {"F": "Check that the fix covers your product and version.",
+                  "P": "Check whether your product is one of those that has a fix.",
+                  "N": "If that applies to your product, Pending fits.",
+                  "X": "If that applies to your product, None (end of life) fits.",
+                  "M": "If no vendor fix exists for your product, Pending or None (end of life) may fit."}[newest.fix]
+        return f"CISA {newest.id}: {newest.fix_text}. {advice} Patch status is not changed for you."
 
     def _update_cve_chips(self):
         info, s, t = self.state.info, self.style, self.style.theme

@@ -701,7 +701,9 @@ def apply_threat_context(result, decision, info):
     if info is not None and info.advisories:
         newest = info.advisories[0]
         more = f" and {info.advisory_count - 1} more" if info.advisory_count > 1 else ""
-        reasons.append(f"CISA ICS advisory {newest.id}{more} names this CVE (context only; does not change the bucket)")
+        fix = f" ({newest.fix_text})" if newest.fix_text else ""
+        reasons.append(f"CISA ICS advisory {newest.id}{more}{fix} names this CVE (context only; does not change the "
+                       "bucket)")
     threat_factors = [_source_factor(source, info) for source in decision.sources
                       if not source.startswith("No KEV or elevated EPSS")]
     generic = {"Actively exploited", "Public or likely exploit"}
@@ -717,6 +719,9 @@ def apply_threat_context(result, decision, info):
         count = info.advisory_count
         factors.append(Factor("In a CISA ICS advisory" if count == 1 else f"In {count} CISA ICS advisories",
                               "neutral"))
+        if info.advisories[0].fix:
+            import icsadvisories  # imported here because that module itself builds on this one
+            factors.append(Factor(icsadvisories.REMEDIATION_CHIPS[info.advisories[0].fix], "neutral"))
     return dataclasses.replace(result, reasons=reasons, action=action, score=score, factors=factors)
 
 

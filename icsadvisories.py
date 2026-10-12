@@ -6,6 +6,7 @@ disk), keeps a small index of advisory -> CVEs, and stores only that index. The 
 every other downloaded file: sizes, counts and nesting are limited, one unreadable advisory is skipped and counted
 (never guessed at), and links are built from the validated advisory number, never copied from the file.
 """
+import dataclasses
 import gzip
 import hashlib
 import io
@@ -13,7 +14,7 @@ import json
 import re
 import tarfile
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import references
@@ -38,6 +39,17 @@ MAX_SKIPPED = 10                   # unreadable advisories tolerated, or 5% of t
 SKIPPED_SHARE = 0.05
 MAX_LISTED = 5                     # advisories shown for one CVE
 
+# What an advisory says about fixing one CVE, reduced to one letter (CSAF remediation categories vendor_fix,
+# mitigation, workaround, none_available and no_fix_planned). The words are shown to the person.
+REMEDIATION_WORDS = {"F": "vendor fix available",
+                     "P": "vendor fix for some products, none for others",
+                     "N": "no fix available yet",
+                     "X": "no fix planned",
+                     "M": "mitigation or workaround only"}
+REMEDIATION_CHIPS = {"F": "Vendor fix (CISA)", "P": "Partial fix (CISA)", "N": "No fix yet (CISA)",
+                     "X": "No fix planned (CISA)", "M": "Mitigation only (CISA)"}
+INDEX_VERSION = 2
+
 ICS_FILE, ICS_META_FILE = "ics_advisories.json", "ics_meta.json"
 ID_RE = re.compile(r"^ICS(?:A|MA)-\d{2}-\d{3}-\d{2}[A-Z]?$")
 MEMBER_RE = re.compile(r"^[^/]{1,100}/csaf_files/OT/white/\d{4}/(icsm?a-\d{2}-\d{3}-\d{2}[a-z]?)\.json$")
@@ -53,6 +65,12 @@ class IcsAdvisory:
     published: str
     updated: str
     vendors: tuple = ()
+    fix: str = ""               # what this advisory says about fixing the looked-up CVE: a key of REMEDIATION_WORDS
+
+    @property
+    def fix_text(self):
+        """The remediation status in words, or an empty string when the advisory does not say."""
+        return REMEDIATION_WORDS.get(self.fix, "")
 
     @property
     def url(self):
@@ -73,11 +91,17 @@ class IcsData:
     feed_date: str
     advisories: dict            # advisory id -> IcsAdvisory
     by_cve: dict                # CVE id -> tuple of advisory ids, newest first
+    fixes: dict = field(default_factory=dict)    # advisory id -> {CVE id: remediation letter}
 
     def lookup(self, cve):
-        """Return the advisories that name this CVE, newest first (at most MAX_LISTED) and how many there are."""
-        ids = self.by_cve.get(threatdata.normalize_cve(cve), ())
-        return tuple(self.advisories[i] for i in ids[:MAX_LISTED]), len(ids)
+        """Return the advisories that name this CVE, newest first (at most MAX_LISTED) and how many there are.
+
+        Each advisory carries what it says about fixing this CVE in its fix field.
+        """
+        cve = threatdata.normalize_cve(cve)
+        ids = self.by_cve.get(cve, ())
+        return tuple(dataclasses.replace(self.advisories[i], fix=self.fixes.get(i, {}).get(cve, ""))
+                     for i in ids[:MAX_LISTED]), len(ids)
 
 
 def _date(text, where):
@@ -110,8 +134,29 @@ def _vendors(tree):
     return tuple(found[:MAX_VENDORS])
 
 
+def _remediation(item):
+    """Reduce one vulnerability's CSAF remediations to a letter of REMEDIATION_WORDS, or "" when it says nothing."""
+    found = item.get("remediations")
+    if not isinstance(found, list):
+        return ""
+    categories = {r.get("category") for r in found if isinstance(r, dict) and isinstance(r.get("category"), str)}
+    has_fix = "vendor_fix" in categories
+    if has_fix and categories & {"none_available", "no_fix_planned"}:
+        return "P"
+    if has_fix:
+        return "F"
+    if "no_fix_planned" in categories:
+        return "X"
+    if "none_available" in categories:
+        return "N"
+    return "M" if categories & {"mitigation", "workaround"} else ""
+
+
 def _read_advisory(raw, stem):
-    """Return (IcsAdvisory, cves) from one CSAF advisory file, or raise ValueError if it cannot be trusted."""
+    """Return (IcsAdvisory, cves, fixes) from one CSAF advisory file, or raise ValueError if it cannot be trusted.
+
+    fixes maps a CVE id to its remediation letter, and leaves out CVEs the advisory does not say anything about.
+    """
     try:
         doc = json.loads(raw.decode("utf-8"), parse_constant=threatdata._reject_constant,
                          object_pairs_hook=threatdata._reject_duplicates)
@@ -134,31 +179,35 @@ def _read_advisory(raw, stem):
     items = doc.get("vulnerabilities", [])
     if not isinstance(items, list):
         raise ValueError("vulnerabilities is not a list")
-    cves = []
+    cves, fixes = [], {}
     for item in items:
         cve = item.get("cve") if isinstance(item, dict) else None
         if isinstance(cve, str) and CVE_RE.fullmatch(cve) and cve not in cves:
             cves.append(cve)
             if len(cves) > ICS_MAX_CVES:
                 raise ValueError(f"it names more than {ICS_MAX_CVES:,} CVEs")
+            if _remediation(item):
+                fixes[cve] = _remediation(item)
     tree = doc.get("product_tree")
     vendors = _vendors(tree) if isinstance(tree, dict) else ()
-    return IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors), cves
+    return IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors), cves, fixes
 
 
-def _assemble(pairs):
-    """Build an IcsData from (IcsAdvisory, cves) pairs."""
-    advisories, links = {}, {}
-    for advisory, cves in pairs:
+def _assemble(triples):
+    """Build an IcsData from (IcsAdvisory, cves, fixes) triples."""
+    advisories, links, all_fixes = {}, {}, {}
+    for advisory, cves, fixes in triples:
         if advisory.id in advisories:
             raise ThreatDataError(f"advisory {advisory.id} is listed twice")
         advisories[advisory.id] = advisory
+        if fixes:
+            all_fixes[advisory.id] = fixes
         for cve in cves:
             links.setdefault(cve, []).append(advisory.id)
     by_cve = {cve: tuple(sorted(ids, key=lambda i: (advisories[i].updated, i), reverse=True))
               for cve, ids in links.items()}
     feed_date = max(a.updated for a in advisories.values())
-    return IcsData(feed_date, advisories, by_cve)
+    return IcsData(feed_date, advisories, by_cve, all_fixes)
 
 
 class _Counting(io.RawIOBase):
@@ -213,7 +262,7 @@ def parse_archive(data):
     if skipped > max(MAX_SKIPPED, int(candidates * SKIPPED_SHARE)):
         raise ThreatDataError(f"{skipped} of {candidates} advisories could not be read (has the format changed?)")
     # An advisory that names no CVE stays out of the index: there is nothing to look up
-    return _assemble([(a, c) for a, c in pairs if c])
+    return _assemble([(a, c, f) for a, c, f in pairs if c])
 
 
 def to_index(data):
@@ -223,8 +272,9 @@ def to_index(data):
         for ident in ids:
             names.setdefault(ident, []).append(cve)
     rows = [{"id": a.id, "title": a.title, "published": a.published, "updated": a.updated, "vendors": list(a.vendors),
-             "cves": sorted(names.get(a.id, ()))} for a in sorted(data.advisories.values(), key=lambda a: a.id)]
-    return json.dumps({"version": 1, "feed_date": data.feed_date, "count": len(rows), "advisories": rows},
+             "cves": sorted(names.get(a.id, ())), "fixes": dict(sorted(data.fixes.get(a.id, {}).items()))}
+            for a in sorted(data.advisories.values(), key=lambda a: a.id)]
+    return json.dumps({"version": INDEX_VERSION, "feed_date": data.feed_date, "count": len(rows), "advisories": rows},
                       separators=(",", ":")).encode("utf-8")
 
 
@@ -237,7 +287,7 @@ def parse_index(raw):
                          object_pairs_hook=threatdata._reject_duplicates)
     except (UnicodeDecodeError, ValueError, RecursionError):
         raise ThreatDataError("the stored ICS index is not valid JSON") from None
-    if not isinstance(doc, dict) or doc.get("version") != 1:
+    if not isinstance(doc, dict) or doc.get("version") != INDEX_VERSION:
         raise ThreatDataError("the stored ICS index has an unknown version")
     rows = doc.get("advisories")
     if not isinstance(rows, list) or not rows or len(rows) > ICS_MAX_ADVISORIES or doc.get("count") != len(rows):
@@ -252,9 +302,9 @@ def parse_index(raw):
 
 
 def _index_row(row):
-    if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "cves"}:
+    if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "cves", "fixes"}:
         raise ValueError("unexpected fields")
-    ident, title, vendors, cves = row["id"], row["title"], row["vendors"], row["cves"]
+    ident, title, vendors, cves, fixes = row["id"], row["title"], row["vendors"], row["cves"], row["fixes"]
     if not isinstance(ident, str) or not ID_RE.fullmatch(ident):
         raise ValueError("bad id")
     if not isinstance(title, str) or not title or len(title) > MAX_TITLE_CHARS or title != references.clean(title):
@@ -265,8 +315,10 @@ def _index_row(row):
     if not isinstance(cves, list) or not cves or len(cves) > ICS_MAX_CVES or not all(
             isinstance(c, str) and CVE_RE.fullmatch(c) for c in cves) or len(set(cves)) != len(cves):
         raise ValueError("bad CVE list")
+    if not isinstance(fixes, dict) or not all(k in cves and v in REMEDIATION_WORDS for k, v in fixes.items()):
+        raise ValueError("bad remediation list")
     return IcsAdvisory(ident, title, _date(row["published"], "published"), _date(row["updated"], "updated"),
-                       tuple(vendors)), cves
+                       tuple(vendors)), cves, fixes
 
 
 # ---- storage, update and import ---------------------------------------------

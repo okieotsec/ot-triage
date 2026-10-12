@@ -303,7 +303,7 @@ OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cv
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
-                  "from_inventory", "cvss_environmental", "ics_advisories"]
+                  "from_inventory", "cvss_environmental", "ics_advisories", "ics_remediation"]
 
 
 def _advisory_cell(item):
@@ -328,7 +328,8 @@ def write_results(path, items, threatdata=None):
                    "forensic_triage": "Yes" if item.forensic_triage else "",
                    "asset_id": _safe(item.asset_id), "from_inventory": "; ".join(item.from_inventory),
                    "cvss_environmental": "" if item.cvss_environmental is None else f"{item.cvss_environmental:.1f}",
-                   "ics_advisories": _safe(_advisory_cell(item))}
+                   "ics_advisories": _safe(_advisory_cell(item)),
+                   "ics_remediation": _safe(item.advisories[0].fix_text if item.advisories else "")}
             if item.result:
                 rank += 1
                 row.update(

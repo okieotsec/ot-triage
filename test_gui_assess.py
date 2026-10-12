@@ -1005,6 +1005,35 @@ class AssessAdvisoryTests(AssessTestCase):
         self.assertIn("and 3 more advisories name this CVE (see cisa.gov)", self.texts(view))
         self.assertTrue(self.has_chip(view.chips, "In 8 CISA ICS advisories"))
 
+    def test_the_card_and_hint_say_what_the_advisory_says_about_a_fix_and_change_nothing(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        before = (self.ctx.assess_state.patch.get(), view.badge.cget("text"), view.score_label.cget("text"))
+        self.load_ics(advisory("ICSA-26-006-01", "Acme Widget Controller", (KEV_CVE,), "Acme",
+                               fixes={KEV_CVE: ["no_fix_planned"]}))
+        self.ctx.reload_threat_data()
+        self.lookup(KEV_CVE)
+        self.assertIn("Acme Widget Controller · Acme · updated 2026-01-06 · no fix planned", self.texts(view))
+        self.assertTrue(self.has_chip(view.chips, "No fix planned (CISA)"))
+        hint = view.patch_hint.cget("text")
+        self.assertIn("ICSA-26-006-01: no fix planned.", hint)
+        self.assertIn("None (end of life) fits", hint)
+        self.assertIn("Patch status is not changed for you", hint)
+        self.assertEqual((self.ctx.assess_state.patch.get(), view.badge.cget("text"),
+                          view.score_label.cget("text")), before)
+
+    def test_there_is_no_hint_when_the_advisory_says_nothing_about_a_fix_or_there_is_no_advisory(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        self.assertEqual(view.patch_hint.cget("text"), "")
+        self.lookup(EPSS_CVE)
+        self.assertEqual(view.patch_hint.cget("text"), "")
+
     def test_clearing_the_cve_hides_the_card(self):
         self.load_data()
         self.load_ics()

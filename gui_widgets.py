@@ -529,7 +529,8 @@ class AdvisoryList(tk.Frame):
             LinkLabel(row, s, advisory.id, lambda r=link: self.open_reference(r)).pack(
                 side=tk.LEFT if self.compact else None, anchor="w")
             who = f" · {', '.join(advisory.vendors)}" if advisory.vendors else ""
-            text = f"{advisory.title}{who} · updated {advisory.updated}"
+            fix = f" · {advisory.fix_text}" if advisory.fix_text else ""
+            text = f"{advisory.title}{who} · updated {advisory.updated}{fix}"
             if self.compact:
                 tk.Label(row, text="  " + text, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
                     side=tk.LEFT, anchor="w")
