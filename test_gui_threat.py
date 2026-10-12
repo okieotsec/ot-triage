@@ -122,6 +122,19 @@ class ThreatViewTests(ThreatViewTestCase):
         self.assertEqual(str(view.update_button.cget("state")), "normal")
         self.assertFalse(view.progress_row.winfo_ismapped())
 
+    def test_the_three_cards_settle_instead_of_flickering_when_they_are_squeezed(self):
+        # In the real window the three cards share about 990 px: they used to flip between two sizes forever
+        self.holder.geometry("990x800+0+0")
+        with self.fake_network(kev_bytes(), epss_bytes()):
+            self.build()
+            self.view.update()
+            self.wait_idle()
+        self.pump(1.0)
+        changes = []
+        self.view.body.bind("<Configure>", lambda e: changes.append((e.width, e.height)), add="+")
+        self.pump(1.0)
+        self.assertLessEqual(len(changes), 2, changes)
+
     def test_failures_are_listed_and_the_previous_copy_is_kept(self):
         view = self.build()
         with self.fake_network(kev_bytes(), epss_bytes()):

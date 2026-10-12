@@ -523,6 +523,17 @@ class StatusBarTests(AppTestCase):
         chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
         self.assertTrue(any(c.startswith("⚠ KEV") and c.endswith("(stale)") for c in chips), chips)
 
+    def test_the_ics_advisories_get_their_own_chip_with_tidy_text(self):
+        self.make()
+        chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
+        self.assertIn("⚠ ICS advisories not loaded", chips)
+        (self.work / "csaf.tar.gz").write_bytes(good(advisory()))
+        self.assertTrue(icsadvisories.import_from_file(self.work / "csaf.tar.gz", self.data_dir).ok)
+        self.app.refresh_status()
+        chips = [w.cget("text") for w in self.app.status_bar.winfo_children() if isinstance(w, tk.Label)]
+        self.assertIn("✓ ICS advisories · 0 days", chips)
+        self.assertFalse(any("  " in c for c in chips), chips)
+
     def test_the_status_bar_never_draws_a_black_focus_border(self):
         app = self.make()
         self.assertEqual(str(app.status_bar.cget("highlightcolor")), str(app.status_bar.cget("highlightbackground")))

@@ -133,7 +133,10 @@ class ThreatView:
             state_slot.pack(side=tk.LEFT)
             version = tk.Label(top, text="", font=s.font(11, "bold"), bg=t.card, fg=t.text)
             version.pack(side=tk.LEFT, padx=10)
-            detail = tk.Label(outer, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left")
+            # A small fixed requested width (not the width of the wrapped text) keeps the cards from feeding their
+            # own size back into the layout: with three cards squeezed side by side that flickered forever.
+            detail = tk.Label(outer, text="", font=s.font(9), bg=t.card, fg=t.muted, anchor="w", justify="left",
+                              width=10)
             detail.pack(fill=tk.X, padx=16, pady=(8, 2))
             wrap_to_width(detail)
             tk.Label(outer, text=f"Source: {host}", font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(

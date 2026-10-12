@@ -134,7 +134,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP7 | Security requirements for the environmental score | [reports/cp7-security-requirements](reports/cp7-security-requirements/claude.md) |
 | CP8 | CISA ICS advisories: a new downloaded archive that is parsed | [reports/cp8-ics-advisories](reports/cp8-ics-advisories/claude.md) |
 
-Across the checkpoints 28 findings were recorded (3 Medium, 6 Low, 19 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 29 findings were recorded (3 Medium, 7 Low, 19 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 
