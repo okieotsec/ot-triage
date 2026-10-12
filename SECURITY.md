@@ -24,14 +24,16 @@ The application works **fully offline**. It connects to the internet only when y
 | --- | --- | --- |
 | CISA Known Exploited Vulnerabilities catalog | `https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json` | Public file |
 | EPSS scores | `https://epss.empiricalsecurity.com/epss_scores-current.csv.gz` | Public file; redirects to a dated file on the same host |
+| CISA ICS advisories (CSAF) | `https://codeload.github.com/cisagov/CSAF/tar.gz/refs/heads/develop` | Public archive of CISA's advisory repository (about 12 MB); only the OT advisory files are read, and nothing is unpacked to disk |
 
-- Those two hosts are the only ones the application will contact. Anything else, including redirects elsewhere, is refused.
+- Those three hosts are the only ones the application will contact. Anything else, including redirects elsewhere, is refused.
 - HTTPS only, with certificate and host name verification that cannot be turned off from the interface or the settings.
-- No account, no telemetry, no analytics, no usage data, and no data about your vulnerabilities, assets or settings is ever sent. Only the two download requests above are made.
+- No account, no telemetry, no analytics, no usage data, and no data about your vulnerabilities, assets or settings is ever sent. Only the three download requests above are made.
 - System proxy settings (`HTTPS_PROXY`) are honoured.
 - **Links from CISA's notes:** the Assess view lists the reference links CISA includes with a KEV entry. The application never fetches them. A link opens in your own web browser only when you click it (or press Enter on it), and the domain is always shown next to it. Because the notes come from a downloaded file they are treated as untrusted: only plain `https` links to an ordinary host name are clickable (no `http`, `javascript:`, `file:`, addresses with a user name or unusual port, IP addresses or look-alike characters). Anything else is shown as plain text and is never opened.
 - Downloads are limited in size and time, validated completely before use, and replace the stored copy only on success. A failed update keeps the previous data.
-- For networks with no internet access, download the two files elsewhere and use **Import from files**; they get the same checks.
+- **Advisory links:** the ICS advisory links in the Assess and Batch views are built from the validated advisory number and always point to `www.cisa.gov`; nothing in the downloaded file can change where one goes. They open in your own browser only when you click.
+- For networks with no internet access, download the files elsewhere and use **Import from files**; they get the same checks.
 
 ## What the application reads and writes
 
@@ -51,6 +53,7 @@ The application works **fully offline**. It connects to the internet only when y
 
 - Tkinter has weak screen reader support, so accessibility relies on keyboard use and contrast, not on assistive technology.
 - CVSS 2 vectors are not supported, and only base scores are calculated (see [docs/CVSS.md](docs/CVSS.md)).
+- The CISA ICS advisories archive is trusted on HTTPS to GitHub only. CISA signs each advisory file with PGP, but the archive as a whole is not signed and the Python standard library cannot check PGP signatures, so the tool treats the content as untrusted and validates it (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)).
 
 ## How the application is tested
 

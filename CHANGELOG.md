@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **CISA ICS advisories:** the Threat data view can now download CISA's public ICS advisories (the CSAF repository at github.com/cisagov/CSAF, about 12 MB) or import the archive from a file. A looked-up CVE shows which advisories name it: an **ICS advisories from CISA** card in Assess with links to each advisory's page on cisa.gov, a chip, a line in the reasoning, the copied summaries, the Batch Details box, and a new `ics_advisories` export column. Context only: the bucket and the ordering score never change. Only the OT advisory files are read from the archive and nothing is unpacked to disk; limits on size, entries and nesting, a skip-and-count rule for unreadable advisories, and links built from the validated advisory number rather than copied from the file. Security checkpoint CP8 in `reports/cp8-ics-advisories/`. The update now asks about three hosts (`www.cisa.gov`, `epss.empiricalsecurity.com`, `codeload.github.com`).
+- **Exact matching:** CVE ids, versions and dates read from the KEV and EPSS files must now match exactly; before, a trailing new line slipped past the pattern. It could never be looked up, so nothing was affected in practice.
+
 ## 0.6.0 (2026-10-11)
 
 - **Security requirements for the environmental score:** an optional section in Assess (Low, Medium or High for confidentiality, integrity and availability) and optional `confidentiality`, `integrity` and `availability` columns in the asset inventory now apply the CVSS security requirements to a CVSS vector, so an environmental score no longer needs a hand-built vector. Anything the vector sets itself is kept. The score is still shown for comparison only; the priority is unchanged. Samples: `sample_inventory.csv` (now with requirement columns) and `sample_findings_environmental.csv`. The section opens by itself when a CVSS vector is entered (closing it by hand sticks until the vector is cleared).
