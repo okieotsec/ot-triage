@@ -1,0 +1,16 @@
+id,asset_id,name,cve,cvss,threat,patch
+M-01,GW-EDGE-01,Remote code execution in a logging library,CVE-2021-44228,10.0,,available
+M-02,GW-EDGE-01,Remote access service flaw,CVE-2019-0708,9.8,,available
+M-03,GW-EDGE-01,Information disclosure in the TLS library,CVE-2014-0160,7.5,,available
+M-04,GW-EDGE-01,Verbose error pages leak software versions,,3.7,none,available
+M-05,HMI-LINE-01,SMB remote code execution,CVE-2017-0144,8.1,,pending
+M-06,HMI-LINE-01,Print spooler remote code execution,CVE-2021-34527,8.8,,available
+M-07,HMI-LINE-01,Weak password policy on the HMI account,,5.5,none,available
+M-08,PLC-PKG-01,Firmware web interface flaw,,6.5,none,eol
+M-09,PLC-PKG-01,Unauthenticated configuration download,,7.5,public,pending
+M-10,RTU-TANK-07,Default credentials on the remote unit,,9.8,public,pending
+M-11,RTU-TANK-07,Unencrypted telemetry link,,5.9,none,eol
+M-12,HIST-01,SQL injection in the historian web client,,7.2,none,available
+M-13,HIST-01,Domain controller privilege escalation,CVE-2020-1472,10.0,,available
+M-14,SW-ACC-03,Denial of service in the switch,,5.3,none,available
+M-15,UNKNOWN-99,A finding for an asset that is not in the inventory,,7.0,none,available

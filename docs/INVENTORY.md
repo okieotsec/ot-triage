@@ -16,6 +16,12 @@ change any rule: a finding scores exactly as if you had typed the same values by
 
 Loading, replacing or clearing the inventory scores the open findings file again straight away.
 
+## Several findings on one asset
+
+Many findings can point to the same `asset_id`; only the inventory must list each asset once. Every finding is scored on its own, using the asset's values from the inventory plus the finding's own CVSS, CVE, threat and patch status, so one asset can have findings in different buckets. All findings are ranked together in one list.
+
+When the file has asset ids, the Batch table shows an **Asset** column. Click its heading to sort by asset and group each asset's findings together, or type an asset id in the search box to see only that asset's findings. The `sample_findings_multiple_per_asset.csv` file has 15 findings on six assets to try this (load `sample_inventory.csv` first).
+
 ## The inventory file
 
 | Column | Meaning | Accepted header names |
