@@ -18,7 +18,7 @@ def wordmark(parent, style, bg, size=11):
     """Return the OkieOTSec wordmark: the letters OT stand out in the accent colour."""
     t = style.theme
     box = tk.Frame(parent, bg=bg)
-    font = style.font(size, "bold")
+    font = style.font(size, "bold", "title")
     for text, colour in (("Okie", t.text), ("OT", t.accent), ("Sec", t.text)):
         tk.Label(box, text=text, font=font, bg=bg, fg=colour, padx=0, pady=0, bd=0).pack(side=tk.LEFT)
     return box

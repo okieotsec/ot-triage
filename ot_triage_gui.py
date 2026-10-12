@@ -80,19 +80,15 @@ class App:
         shell.rowconfigure(1, weight=1)
         self._build_header(shell)
         self.nav = tk.Frame(shell, bg=t.header, highlightthickness=0)
-        self.nav_buttons, self.nav_items, self.nav_bars, self.nav_hints = {}, {}, {}, {}
-        for index, (name, label, _cls) in enumerate(VIEWS, start=1):
+        self.nav_buttons, self.nav_items, self.nav_bars = {}, {}, {}
+        for name, label, _cls in VIEWS:
             item = tk.Frame(self.nav, bg=t.header)
             bar = tk.Frame(item, width=4, bg=t.header)
             bar.pack(side=tk.LEFT, fill=tk.Y)
-            button = tk.Button(item, text=label, anchor="w", relief="flat", bd=0, padx=12, pady=11, font=s.font(10),
+            button = tk.Button(item, text=label, anchor="w", relief="flat", bd=0, padx=18, pady=11, font=s.font(10),
                                cursor="hand2", highlightthickness=2, command=lambda n=name: self.show_view(n))
             button.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            hint = tk.Label(item, text=f"Ctrl+{index}", font=s.font(8), cursor="hand2")
-            hint.pack(side=tk.RIGHT, padx=(0, 12))
-            hint.bind("<Button-1>", lambda _e, n=name: self.show_view(n))
-            self.nav_items[name], self.nav_bars[name], self.nav_buttons[name], self.nav_hints[name] = (
-                item, bar, button, hint)
+            self.nav_items[name], self.nav_bars[name], self.nav_buttons[name] = item, bar, button
         self.content = tk.Frame(shell, bg=t.bg)
         self.status_bar = tk.Frame(shell, bg=t.header, highlightthickness=1, highlightbackground=t.border,
                                    highlightcolor=t.border)
@@ -107,18 +103,20 @@ class App:
         t, s = self.style.theme, self.style
         self.header = tk.Frame(parent, bg=t.header)
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew")
-        tk.Frame(self.header, bg=t.accent, height=3).pack(side=tk.BOTTOM, fill=tk.X)
+        tk.Frame(self.header, bg=t.copper, height=3).pack(side=tk.BOTTOM, fill=tk.X)
         text = tk.Frame(self.header, bg=t.header)
         text.pack(side=tk.LEFT, padx=20, pady=12)
-        tk.Label(text, text="OT Triage", font=s.font(18, "bold"), bg=t.header, fg=t.text).pack(
+        tk.Label(text, text="OT Triage", font=s.font(18, "bold", "title"), bg=t.header, fg=t.text).pack(
             anchor="w")
         subtitle = tk.Label(text, text=SUBTITLE, font=s.font(9), bg=t.header, fg=t.muted, anchor="w", justify="left")
         subtitle.pack(anchor="w")
         subtitle.bind("<Configure>", lambda e: subtitle.configure(wraplength=max(e.width, 200)))
         brand = tk.Frame(self.header, bg=t.header)
         brand.pack(side=tk.RIGHT, padx=(0, 20))
-        tk.Label(brand, text="by", font=s.font(9), bg=t.header, fg=t.muted, padx=0).pack(side=tk.LEFT, padx=(0, 4))
+        tk.Label(brand, text="An", font=s.font(9), bg=t.header, fg=t.muted, padx=0).pack(side=tk.LEFT, padx=(0, 4))
         wordmark(brand, s, t.header, size=11).pack(side=tk.LEFT)
+        tk.Label(brand, text="project", font=s.font(9), bg=t.header, fg=t.muted, padx=0).pack(side=tk.LEFT,
+                                                                                               padx=(4, 0))
         self.badge = shape_label(self.header, "\u26a0 Custom scoring", s.font(9, "bold"), t.on_next, fill=t.next,
                                  outside=t.header, padx=14, pady=5)
         self._update_badge()
@@ -146,8 +144,6 @@ class App:
             self.status_bar.grid(row=3, column=0, columnspan=2, sticky="ew")
             for item in self.nav_items.values():
                 item.pack(side=tk.LEFT, padx=2, pady=4)
-            for hint in self.nav_hints.values():
-                hint.pack_forget()
         else:
             self.shell.rowconfigure(2, weight=0)
             self.shell.rowconfigure(1, weight=1)
@@ -157,8 +153,6 @@ class App:
             self.nav.configure(width=int(210 * self.style.scale))
             for item in self.nav_items.values():
                 item.pack(fill=tk.X, padx=8, pady=3)
-            for hint in self.nav_hints.values():
-                hint.pack(side=tk.RIGHT, padx=(0, 12))
         self._mark_current()
 
     def _on_resize(self, event):
@@ -190,7 +184,6 @@ class App:
             row_bg = t.card if on else t.header
             self.nav_items[name].configure(bg=row_bg)
             self.nav_bars[name].configure(bg=t.accent if on else t.header)
-            self.nav_hints[name].configure(bg=row_bg, fg=t.muted)
             button.configure(bg=row_bg, fg=t.text if on else t.muted, activebackground=t.card,
                              activeforeground=t.text, font=self.style.font(10, "bold" if on else "normal"),
                              highlightbackground=row_bg, highlightcolor=t.accent)
