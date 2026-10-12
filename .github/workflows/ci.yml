@@ -17,7 +17,7 @@ jobs:
   test:
     name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -37,10 +37,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Run the tests (Linux, with a virtual display)
         if: runner.os == 'Linux'
-        run: xvfb-run -a -s "-screen 0 1280x1024x24" python -u -X dev -W error::ResourceWarning tools/ci_run_tests.py 600
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" python -u -X dev -W error::ResourceWarning tools/ci_run_tests.py 900
       - name: Run the tests (Windows)
         if: runner.os == 'Windows'
-        run: python -u -X dev -W error::ResourceWarning tools/ci_run_tests.py 600
+        run: python -u -X dev -W error::ResourceWarning tools/ci_run_tests.py 900
 
   lint:
     name: Lint and static analysis

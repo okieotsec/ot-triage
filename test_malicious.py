@@ -281,7 +281,7 @@ class MaliciousAdvisoryArchiveTests(unittest.TestCase):
 
     def tar_gz_file(self, name, write):
         path = self.base / name
-        with gzip.open(path, "wb", compresslevel=9) as raw, tarfile.open(fileobj=raw, mode="w|") as tar:
+        with gzip.open(path, "wb", compresslevel=1) as raw, tarfile.open(fileobj=raw, mode="w|") as tar:
             write(tar)
         return path
 
@@ -347,7 +347,9 @@ class MaliciousAdvisoryArchiveTests(unittest.TestCase):
             info = tarfile.TarInfo(member_path("ICSA-26-006-01"))
             info.size = 3 * 1024 ** 3
             tar.addfile(info, _Zeros(info.size))
-        self.assert_refused_and_kept(self.tar_gz_file("claims.tar.gz", write))
+        # A smaller stream limit keeps this quick; the full-size limit is exercised by the gzip bomb test above
+        with mock.patch.object(icsadvisories, "ICS_MAX_STREAM", 20 * 1024 * 1024):
+            self.assert_refused_and_kept(self.tar_gz_file("claims.tar.gz", write))
 
     def test_hostile_advisory_content_is_neutralised(self):
         title = "=HYPERLINK(\"http://evil.example\") \x1b[31m\u202e\u200b"
