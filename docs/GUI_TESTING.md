@@ -2,7 +2,11 @@
 
 ## Automated tests
 
-Run everything with `python3 -m unittest` (about 80 seconds, mostly the tests that open real windows). Tests that need a display skip themselves when none is available.
+Run everything with `python3 tools/headless_tests.py`. On Linux it starts a private virtual display (Xvfb), so **no window ever opens on your screen**; that matters on a tiling window manager, where every test window would take over your desktop. It also matches how the GitHub CI runs the tests. If Xvfb is not installed the GUI tests are skipped (nothing is opened) and the script tells you how to install it (`sudo pacman -S xorg-server-xvfb`, or `sudo apt install xvfb`).
+
+`python3 -m unittest` also works (about 3 minutes), but it opens real windows on your display. Tests that need a display skip themselves when none is available.
+
+To make sure a machine never opens test windows on its real display, set `OT_TRIAGE_REQUIRE_PRIVATE_DISPLAY=1` in its environment: the GUI tests then skip unless they run on a private display (`tools/headless_tests.py` provides one). A test checks that this guard works.
 
 | Area | File | What it checks |
 | --- | --- | --- |

@@ -4,3 +4,4 @@ __pycache__/
 data/
 .idea/
 .vscode/
+.claude/settings.local.json

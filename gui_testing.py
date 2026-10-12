@@ -3,6 +3,7 @@ import atexit
 import gc
 import os
 import shutil
+import sys
 import tempfile
 import time
 import tkinter as tk
@@ -17,6 +18,17 @@ os.environ.update({"HOME": SANDBOX, "USERPROFILE": SANDBOX, "XDG_CONFIG_HOME": o
                    "XDG_DATA_HOME": os.path.join(SANDBOX, "data"), "APPDATA": os.path.join(SANDBOX, "appdata"),
                    "LOCALAPPDATA": os.path.join(SANDBOX, "localappdata")})
 atexit.register(shutil.rmtree, SANDBOX, ignore_errors=True)
+
+# Tests that create windows are disruptive on a real desktop, especially a tiling window manager. When this variable is
+# set (by a developer's own environment), the GUI tests may only run on a private display such as the one that
+# tools/headless_tests.py starts; on the real display they skip themselves instead of opening any window.
+REQUIRE_PRIVATE_DISPLAY = "OT_TRIAGE_REQUIRE_PRIVATE_DISPLAY"
+PRIVATE_DISPLAY = "OT_TRIAGE_PRIVATE_DISPLAY"
+if os.environ.get(REQUIRE_PRIVATE_DISPLAY) == "1" and os.environ.get(PRIVATE_DISPLAY) != "1":
+    for _name in ("DISPLAY", "WAYLAND_DISPLAY"):
+        os.environ.pop(_name, None)
+    print("GUI tests skipped: this environment keeps them off the real display. Run tools/headless_tests.py to run "
+          "them on a private, invisible display.", file=sys.stderr)
 
 
 class DisplayTestCase(unittest.TestCase):
