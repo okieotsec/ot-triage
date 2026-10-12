@@ -1,4 +1,5 @@
 import csv
+import os
 import tempfile
 import threading
 import time
@@ -19,6 +20,7 @@ from test_threatdata import epss_bytes, epss_text, kev_bytes, kev_entry
 from uiprefs import DEFAULT_PREFS
 
 HERE = Path(__file__).resolve().parent
+COL = {name: index for index, (name, *_rest) in enumerate(gui_batch.COLUMNS)}
 SAMPLE = str(HERE / "sample_vulns.csv")
 
 
@@ -32,6 +34,8 @@ class BatchViewTestCase(DisplayTestCase):
         for name in ("info", "error", "warn", "copy", "confirm"):
             setattr(self.ctx, name, mock.Mock())
         self.holder = tk.Toplevel(self.root)
+        if self.holder.tk.call("tk", "windowingsystem") == "x11":
+            self.holder.wm_attributes("-type", "dialog")  # a floating window keeps its size on tiling window managers
         self.holder.geometry("1200x800+0+0")
         self.addCleanup(self.holder.destroy)
         self.view = None
@@ -79,10 +83,10 @@ class BatchLoadTests(BatchViewTestCase):
                                                   "ERROR": str(counts["ERROR"])})
         rows = self.rows()
         self.assertEqual(len(rows), len(expected))
-        self.assertEqual([r[1] for r in rows], [i.id for i in expected])
-        ranks = [r[0] for r in rows if r[0] != ""]
+        self.assertEqual([r[COL["id"]] for r in rows], [i.id for i in expected])
+        ranks = [r[COL["rank"]] for r in rows if r[COL["rank"]] != ""]
         self.assertEqual([int(r) for r in ranks], list(range(1, len(ranks) + 1)))
-        self.assertTrue(rows[0][4].startswith("▲ NOW"))
+        self.assertTrue(rows[0][COL["priority"]].startswith("▲ NOW"))
         self.assertIn("sample_vulns.csv", view.file_label.cget("text"))
         self.assertEqual(str(view.export_button.cget("state")), "normal")
         self.assertEqual(str(view.open_button.cget("state")), "normal")
@@ -117,8 +121,8 @@ class BatchLoadTests(BatchViewTestCase):
         view.set_filter("ERROR")
         self.pump()
         rows = self.rows()
-        self.assertTrue(rows and all(r[4].startswith("! ERROR") for r in rows))
-        self.assertTrue(all(r[0] == "" and r[7] for r in rows))
+        self.assertTrue(rows and all(r[COL["priority"]].startswith("! ERROR") for r in rows))
+        self.assertTrue(all(r[COL["rank"]] == "" and r[COL["source"]] for r in rows))
         self.assertEqual(view.detail_chips.items[0].cget("text"), "! Not scored")
         self.assertIn("•", view.detail_text.cget("text"))
 
@@ -288,7 +292,7 @@ class BatchFilterSortTests(BatchViewTestCase):
             view.set_filter(key)
             rows = self.rows()
             self.assertEqual(len(rows), int(numbers[key]))
-            self.assertTrue(all(key in r[4] for r in rows))
+            self.assertTrue(all(key in r[COL["priority"]] for r in rows))
             self.assertEqual(self.counter_numbers(), numbers)
             self.assertEqual(str(view.counters[key][0].cget("highlightbackground")), self.style.theme.accent)
         view.set_filter("all")
@@ -304,7 +308,7 @@ class BatchFilterSortTests(BatchViewTestCase):
             view.apply_search()
             rows = self.rows()
             self.assertTrue(rows, text)
-            self.assertIn(target.id, [r[1] for r in rows])
+            self.assertIn(target.id, [r[COL["id"]] for r in rows])
             self.assertTrue(all(text.lower() in " ".join(map(str, r)).lower() for r in rows), text)
         view.search_var.set("zzzz-nothing")
         view.apply_search()
@@ -325,34 +329,34 @@ class BatchFilterSortTests(BatchViewTestCase):
     def test_search_and_filter_combine(self):
         view = self.load()
         view.set_filter("NOW")
-        now_ids = {r[1] for r in self.rows()}
+        now_ids = {r[COL["id"]] for r in self.rows()}
         view.search_var.set("")
         view.apply_search()
-        self.assertEqual({r[1] for r in self.rows()}, now_ids)
+        self.assertEqual({r[COL["id"]] for r in self.rows()}, now_ids)
 
     def test_sorting_toggles_direction_and_marks_the_heading(self):
         view = self.load()
         view.sort_by("score")
-        asc = [r[5] for r in self.rows() if r[5]]
+        asc = [r[COL["score"]] for r in self.rows() if r[COL["score"]]]
         self.assertEqual(asc, sorted(asc, key=float))
         self.assertTrue(view.tree.heading("score", "text").endswith("▲"))
         view.sort_by("score")
-        desc = [r[5] for r in self.rows() if r[5]]
+        desc = [r[COL["score"]] for r in self.rows() if r[COL["score"]]]
         self.assertEqual(desc, sorted(desc, key=float, reverse=True))
         self.assertTrue(view.tree.heading("score", "text").endswith("▼"))
         self.assertNotIn("▲", view.tree.heading("id", "text"))
 
     def test_sorting_keeps_the_original_ranks_and_rank_restores_the_order(self):
         view = self.load()
-        original = [r[1] for r in self.rows()]
+        original = [r[COL["id"]] for r in self.rows()]
         view.sort_by("id")
-        ids = [r[1] for r in self.rows()]
+        ids = [r[COL["id"]] for r in self.rows()]
         self.assertEqual(ids, sorted(ids, key=str.lower))
-        by_id = {r[1]: r[0] for r in self.rows()}
+        by_id = {r[COL["id"]]: r[COL["rank"]] for r in self.rows()}
         for rank, item in enumerate((i for i in batch.process_file(SAMPLE) if i.result), start=1):
             self.assertEqual(int(by_id[item.id]), rank)
         view.sort_by("rank")
-        self.assertEqual([r[1] for r in self.rows()], original)
+        self.assertEqual([r[COL["id"]] for r in self.rows()], original)
 
     def test_every_column_sorts_without_error(self):
         view = self.load()
@@ -381,19 +385,19 @@ class BatchThreatDataTests(BatchViewTestCase):
     def test_cve_file_uses_local_data_and_shows_sources_and_versions(self):
         self.load_data()
         view = self.load(self.write_csv("cves.csv", self.CSV))
-        by_id = {r[1]: r for r in self.rows()}
-        self.assertEqual(by_id["A"][7], "In CISA KEV")
-        self.assertTrue(by_id["B"][7].startswith("Elevated EPSS"))
-        self.assertEqual(by_id["C"][7], "No KEV or elevated EPSS signal")
-        self.assertIn("cve:", by_id["D"][7])
+        by_id = {r[COL["id"]]: r for r in self.rows()}
+        self.assertEqual(by_id["A"][COL["source"]], "In CISA KEV")
+        self.assertTrue(by_id["B"][COL["source"]].startswith("Elevated EPSS"))
+        self.assertEqual(by_id["C"][COL["source"]], "No KEV or elevated EPSS signal")
+        self.assertIn("cve:", by_id["D"][COL["source"]])
         self.assertIn("KEV 2026.10.04", view.file_label.cget("text"))
         self.assertIsNotNone(self.ctx.threat_data)
 
     def test_cve_file_without_data_reports_rows_as_errors_not_safe(self):
         view = self.load(self.write_csv("cves.csv", self.CSV))
-        by_id = {r[1]: r for r in self.rows()}
-        self.assertTrue(all(by_id[k][4].startswith("! ERROR") for k in "ABCD"))
-        self.assertIn("no threat data loaded", by_id["A"][7])
+        by_id = {r[COL["id"]]: r for r in self.rows()}
+        self.assertTrue(all(by_id[k][COL["priority"]].startswith("! ERROR") for k in "ABCD"))
+        self.assertIn("no threat data loaded", by_id["A"][COL["source"]])
         self.assertEqual(view.state.data.versions(), "KEV not loaded; EPSS not loaded")
         self.assertIn("KEV not loaded", view.file_label.cget("text"))
 
@@ -439,7 +443,7 @@ class BatchThreatDataTests(BatchViewTestCase):
     def test_custom_settings_are_used_when_scoring(self):
         self.ctx.settings = Settings(cvss_high=7.5)
         view = self.load(self.write_csv("one.csv", "cvss,threat,asset,exposure\n7.2,public,standard,high\n"))
-        self.assertEqual(self.rows(view)[0][4], "▬ NEXT")
+        self.assertEqual(self.rows(view)[0][COL["priority"]], "▬ NEXT")
 
 
 class BatchVectorTests(BatchViewTestCase):
@@ -455,16 +459,17 @@ class BatchVectorTests(BatchViewTestCase):
 
     def test_scores_come_from_vectors_and_the_details_name_the_vector(self):
         view = self.load(self.write_csv("vectors.csv", self.csv_text()))
-        by_id = {r[1]: r for r in self.rows()}
-        self.assertEqual(by_id["A"][6], "9.8")
-        self.assertEqual(by_id["B"][6], "8.7")
-        self.assertTrue(by_id["C"][4].startswith("! ERROR"))
-        self.assertIn("cvss (5.0) does not match", by_id["C"][7])
-        self.assertIn("cvss_vector:", by_id["D"][7])
+        by_id = {r[COL["id"]]: r for r in self.rows()}
+        self.assertEqual(by_id["A"][COL["cvss"]], "9.8")
+        self.assertEqual(by_id["B"][COL["cvss"]], "8.7")
+        self.assertTrue(by_id["C"][COL["priority"]].startswith("! ERROR"))
+        self.assertIn("cvss (5.0) does not match", by_id["C"][COL["source"]])
+        self.assertIn("cvss_vector:", by_id["D"][COL["source"]])
         view.tree.selection_set(view.tree.get_children()[0])
         self.pump()
         text = view.detail_text.cget("text")
-        first = next(i for i in view.state.items if i.id == view.tree.item(view.tree.selection()[0], "values")[1])
+        selected_id = view.tree.item(view.tree.selection()[0], "values")[COL["id"]]
+        first = next(i for i in view.state.items if i.id == selected_id)
         self.assertIn(f"CVSS vector: {first.cvss_vector} (CVSS {first.cvss_version}", text)
 
     def test_an_error_row_shows_the_vector_as_given(self):
@@ -505,7 +510,7 @@ class BatchReferenceTests(BatchViewTestCase):
     CSV = BatchThreatDataTests.CSV
 
     def select(self, view, item_id):
-        iid = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[1] == item_id)
+        iid = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[COL["id"]] == item_id)
         view.tree.selection_set(iid)
         view.tree.focus(iid)
         self.pump(0.1)
@@ -587,7 +592,7 @@ class BatchInventoryTests(BatchViewTestCase):
         self.pump(0.1)
 
     def by_id(self):
-        return {values[1]: values for values in self.rows()}
+        return {values[COL["id"]]: values for values in self.rows()}
 
     def test_the_inventory_fills_in_the_findings_and_the_label_says_what_was_loaded(self):
         view = self.build()
@@ -597,18 +602,18 @@ class BatchInventoryTests(BatchViewTestCase):
         self.assertEqual(str(view.inventory_clear_button.cget("state")), "normal")
         self.load(self.write_csv("findings.csv", FINDINGS))
         rows = self.by_id()
-        self.assertTrue(rows["F1"][4].endswith("NOW"))
-        self.assertTrue(rows["F2"][4].endswith("NEVER"))
-        self.assertTrue(rows["F3"][4].startswith("! ERROR"))
-        self.assertIn("is not in the inventory", rows["F3"][7])
+        self.assertTrue(rows["F1"][COL["priority"]].endswith("NOW"))
+        self.assertTrue(rows["F2"][COL["priority"]].endswith("NEVER"))
+        self.assertTrue(rows["F3"][COL["priority"]].startswith("! ERROR"))
+        self.assertIn("is not in the inventory", rows["F3"][COL["source"]])
 
     def test_loading_an_inventory_after_the_findings_scores_them_again_and_clearing_undoes_it(self):
         view = self.build()
         self.load(self.write_csv("findings.csv", FINDINGS))
-        self.assertTrue(all(v[4].startswith("! ERROR") for v in self.rows()))
-        self.assertIn("no inventory is loaded", self.by_id()["F1"][7])
+        self.assertTrue(all(v[COL["priority"]].startswith("! ERROR") for v in self.rows()))
+        self.assertIn("no inventory is loaded", self.by_id()["F1"][COL["source"]])
         self.pick_inventory(INVENTORY)
-        self.assertTrue(self.by_id()["F1"][4].endswith("NOW"))
+        self.assertTrue(self.by_id()["F1"][COL["priority"]].endswith("NOW"))
         self.assertEqual(self.counter_numbers()["ERROR"], "1")
         view.clear_inventory()
         self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
@@ -649,7 +654,7 @@ class BatchInventoryTests(BatchViewTestCase):
         view = self.build()
         self.pick_inventory(INVENTORY)
         self.load(self.write_csv("findings.csv", FINDINGS))
-        first = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[1] == "F1")
+        first = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[COL["id"]] == "F1")
         view.tree.selection_set(first)
         self.pump(0.2)
         self.assertIn("Asset GW-01: asset, exposure, controls filled in from the inventory",
@@ -657,7 +662,7 @@ class BatchInventoryTests(BatchViewTestCase):
         self.assertTrue(any("From inventory: GW-01" in c.cget("text") for c in view.detail_chips.items))
         view.search_var.set("plc-01")
         self.pump(0.6)
-        self.assertEqual([v[1] for v in self.rows()], ["F2"])
+        self.assertEqual([v[COL["id"]] for v in self.rows()], ["F2"])
 
     def test_the_inventory_survives_a_rebuild_of_the_window(self):
         view = self.build()
@@ -698,13 +703,101 @@ class BatchEnvironmentalTests(BatchViewTestCase):
                 "E2,CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H,none,important,medium\n")
         self.load(self.write_csv("env.csv", text))
         for item_id, expected in (("E1", True), ("E2", False)):
-            row = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[1] == item_id)
+            row = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[COL["id"]] == item_id)
             view.tree.selection_set(row)
             self.pump(0.2)
             shown = "Environmental score: 5.7, shown for comparison; the priority uses the base score." in \
                 view.detail_text.cget("text")
             self.assertEqual(shown, expected, item_id)
-        self.assertEqual({v[1]: v[5] for v in self.rows()}["E1"], {v[1]: v[5] for v in self.rows()}["E2"])
+        scores = {v[COL["id"]]: v[COL["score"]] for v in self.rows()}
+        self.assertEqual(scores["E1"], scores["E2"])
+
+
+class BatchAssetColumnTests(BatchViewTestCase):
+    MANY = ("id,asset_id,cvss,threat\nF1,PLC-01,5.0,none\nF2,GW-01,8.8,active\nF3,GW-01,3.0,none\n"
+            "F4,PLC-01,7.0,public\n")
+
+    def shown_columns(self, view):
+        return list(view.tree.cget("displaycolumns"))
+
+    def reload(self, path):
+        """Load a findings file and wait until that file (not an earlier one) is what is shown."""
+        self.view.load(path)
+        self.assertTrue(self.pump(15, until=lambda: not self.ctx.worker.running
+                                  and os.path.samefile(self.ctx.batch_state.path, path)))
+        self.pump(0.2)
+
+    def load_with_inventory(self, findings):
+        view = self.build()
+        path = self.write_csv("inventory.csv", INVENTORY)
+        self.ctx.open_file = mock.Mock(return_value=path)
+        view.load_inventory()
+        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+        self.load(self.write_csv("findings.csv", findings))
+        return view
+
+    def test_the_asset_column_shows_each_rows_asset_so_several_findings_on_one_asset_are_visible(self):
+        view = self.load_with_inventory(self.MANY)
+        self.assertIn("asset", self.shown_columns(view))
+        self.assertEqual(self.shown_columns(view)[:3], ["rank", "id", "asset"])
+        assets = {values[COL["id"]]: values[COL["asset"]] for values in self.rows()}
+        self.assertEqual(assets, {"F1": "PLC-01", "F2": "GW-01", "F3": "GW-01", "F4": "PLC-01"})
+
+    def test_a_file_without_asset_ids_does_not_show_the_column(self):
+        view = self.build()
+        self.load(SAMPLE)
+        self.assertNotIn("asset", self.shown_columns(view))
+        self.assertTrue(all(values[COL["asset"]] == "" for values in self.rows()))
+
+    def test_the_column_appears_and_disappears_with_the_data(self):
+        view = self.load_with_inventory(self.MANY)
+        self.assertIn("asset", self.shown_columns(view))
+        self.reload(SAMPLE)
+        self.assertNotIn("asset", self.shown_columns(view))
+
+    def test_clicking_the_asset_heading_sorts_by_asset_and_clicking_again_reverses_it(self):
+        view = self.load_with_inventory(self.MANY)
+        view.sort_by("asset")
+        self.pump(0.1)
+        ascending = [values[COL["asset"]] for values in self.rows()]
+        self.assertEqual(ascending, sorted(ascending, key=str.lower))
+        view.sort_by("asset")
+        self.pump(0.1)
+        descending = [values[COL["asset"]] for values in self.rows()]
+        self.assertEqual(descending, sorted(descending, key=str.lower, reverse=True))
+        self.assertIn("Asset", view.tree.heading("asset", "text"))
+
+    def test_sorting_by_asset_groups_the_findings_of_one_asset_together(self):
+        view = self.load_with_inventory(self.MANY)
+        view.sort_by("asset")
+        self.pump(0.1)
+        assets = [values[COL["asset"]] for values in self.rows()]
+        self.assertEqual(assets, ["GW-01", "GW-01", "PLC-01", "PLC-01"])
+
+
+class BatchTableFitTests(BatchViewTestCase):
+    def test_the_columns_always_fit_inside_the_table_at_any_window_width(self):
+        view = self.build()
+        self.root.deiconify()
+        self.load(SAMPLE)
+        for width in (1300, 1100, 900):
+            self.holder.geometry(f"{width}x700+0+0")
+            self.pump(0.5)
+            shown = view.tree.cget("displaycolumns")
+            total = sum(int(view.tree.column(key, "width")) for key in shown)
+            self.assertLessEqual(total, view.tree.winfo_width() + 2, (width, total, view.tree.winfo_width()))
+
+    def test_name_and_threat_source_get_the_room_the_fixed_columns_leave(self):
+        view = self.build()
+        self.root.deiconify()
+        self.holder.geometry("1300x700+0+0")
+        self.load(SAMPLE)
+        self.pump(0.4)
+        wide = int(view.tree.column("name", "width"))
+        self.holder.geometry("900x700+0+0")
+        self.pump(0.5)
+        self.assertLess(int(view.tree.column("name", "width")), wide)
+        self.assertGreaterEqual(int(view.tree.column("name", "width")), gui_batch.MIN_FLEXIBLE["name"])
 
 
 if __name__ == "__main__":

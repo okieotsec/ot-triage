@@ -24,9 +24,13 @@ from gui_widgets import (
 REFERENCE_LIMIT = 5
 DETAILS_MAX_HEIGHT = 190
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
-COLUMNS = [("rank", "#", 50, "center"), ("id", "ID", 100, "w"), ("cve", "CVE", 130, "w"), ("name", "Name", 240, "w"),
-           ("priority", "Priority", 100, "w"), ("score", "Score", 70, "center"), ("cvss", "CVSS", 60, "center"),
-           ("source", "Threat source", 220, "w")]
+COLUMNS = [("rank", "#", 46, "center"), ("id", "ID", 80, "w"), ("asset", "Asset", 112, "w"),
+           ("cve", "CVE", 124, "w"), ("name", "Name", 200, "w"),
+           ("priority", "Priority", 96, "w"), ("score", "Score", 62, "center"), ("cvss", "CVSS", 54, "center"),
+           ("source", "Threat source", 190, "w")]
+FLEXIBLE_COLUMNS = ("name", "source")   # share what the fixed-width columns leave over
+MIN_FLEXIBLE = {"name": 110, "source": 90}
+NAME_SHARE = 0.55
 HEADING_ARROWS = {False: " ▲", True: " ▼"}
 SEARCH_DELAY_MS = 250
 
@@ -139,12 +143,13 @@ class BatchView:
         scroll.configure(command=self.tree.yview)
         for key, title, width, anchor in COLUMNS:
             self.tree.heading(key, text=title, command=lambda k=key: self.sort_by(k))
-            self.tree.column(key, width=int(width * s.scale), anchor=anchor, stretch=key in ("name", "source"))
+            self.tree.column(key, width=int(width * s.scale), anchor=anchor, stretch=False, minwidth=40)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         for priority in ("NOW", "NEXT", "NEVER", "ERROR"):
             self.tree.tag_configure(priority, foreground=s.priority_text_color(priority))
         round_corners(wrap, 10, t.border, t.bg, fill={"tl": t.border, "tr": t.card, "bl": t.card, "br": t.card})
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
+        self.tree.bind("<Configure>", self._fit_columns, add="+")
 
     def _build_details(self):
         s, t = self.style, self.style.theme
@@ -313,6 +318,7 @@ class BatchView:
         rows = [i for i in state.items if (state.filter == "all" or i.priority == state.filter)
                 and (not state.search or state.search in _text(i))]
         keys = {"rank": lambda i: state.ranks.get(id(i), 10 ** 9), "id": lambda i: i.id.lower(),
+                "asset": lambda i: i.asset_id.lower(),
                 "cve": lambda i: i.cve, "name": lambda i: i.name.lower(),
                 "priority": lambda i: -explain.URGENCY.get(i.priority, -1),
                 "score": lambda i: i.result.score if i.result else -1.0, "cvss": lambda i: i.cvss or -1.0,
@@ -333,6 +339,10 @@ class BatchView:
         for key, title, _w, _a in COLUMNS:
             arrow = HEADING_ARROWS[state.sort_desc] if key == state.sort_key else ""
             self.tree.heading(key, text=title + arrow)
+        # The Asset column only appears when the file has asset ids, so ordinary files keep the room.
+        has_assets = any(i.asset_id for i in state.items)
+        self.tree.configure(displaycolumns=[c[0] for c in COLUMNS if c[0] != "asset" or has_assets])
+        self._fit_columns()
         self.tree.delete(*self.tree.get_children())
         shown = self.visible()
         index_of = {id(item): n for n, item in enumerate(state.items)}
@@ -344,8 +354,8 @@ class BatchView:
             cvss = f"{item.cvss:.1f}" if item.result else item.cvss_raw
             source = item.threat_sources if item.result else item.error
             self.tree.insert("", tk.END, iid=str(index), tags=(item.priority,),
-                             values=(rank, item.id, item.cve, item.name, f"{symbol} {item.priority}", score, cvss,
-                                     source))
+                             values=(rank, item.id, item.asset_id, item.cve, item.name, f"{symbol} {item.priority}",
+                                     score, cvss, source))
         if state.items:
             scored = next((i for i in state.items if i.result), None)
             outdated = scored is not None and scored.result.profile != self.ctx.settings.describe()
@@ -362,6 +372,20 @@ class BatchView:
         self._clear_details()
         if shown:
             self.tree.selection_set(str(index_of[id(shown[0])]))
+
+    def _fit_columns(self, _event=None):
+        """Share the room left over by the fixed-width columns between Name and Threat source, so the table always
+        fits the window instead of clipping its last column (Tk widens columns but never shrinks them)."""
+        available = self.tree.winfo_width() - 6
+        if available <= 1:
+            return
+        shown = self.tree.cget("displaycolumns")
+        fixed = sum(int(width * self.style.scale) for key, _title, width, _anchor in COLUMNS
+                    if key in shown and key not in FLEXIBLE_COLUMNS)
+        room = max(available - fixed, sum(MIN_FLEXIBLE.values()))
+        name = max(MIN_FLEXIBLE["name"], int(room * NAME_SHARE))
+        self.tree.column("name", width=name)
+        self.tree.column("source", width=max(MIN_FLEXIBLE["source"], room - name))
 
     def _clear_details(self):
         self.detail_title.configure(text="Select a row to see why." if self.state.items else
