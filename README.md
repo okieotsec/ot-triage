@@ -42,7 +42,7 @@ property-based tests.
 | View | What it does |
 | --- | --- |
 | **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV, EPSS and CISA ICS advisory data to fill in the threat level. Shows the bucket, why-chips, the recommended action, the reference links CISA lists for a KEV entry, the ICS advisories that name the CVE, and what single change would move the result. |
-| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. |
+| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. **By asset** groups the findings by `asset_id`: the worst bucket on each asset, how many NOW, NEXT and NEVER findings it has, and what could be handled on one outage window. |
 | **Threat data** | See how fresh the KEV, EPSS and ICS advisory data is. Update it (after a confirmation) or import files for offline use. |
 | **Settings** | Change the four scoring settings with live validation, and choose the theme and text size. |
 | **About** | Version, the exposure definition, where the categories come from, and the documentation. |
@@ -52,7 +52,7 @@ scoring settings differ from the defaults.
 
 | Shortcut | Action |
 | --- | --- |
-| Ctrl+1 to Ctrl+5 | Switch views |
+| Ctrl+1 to Ctrl+5 | Switch views (Assess, Batch, Threat data, Settings, About) |
 | Ctrl+L | Go to the CVE field |
 | Ctrl+Shift+C | Copy the summary of the current result |
 | Ctrl+plus / Ctrl+minus / Ctrl+0 | Make the text larger or smaller, or reset it (also in Settings) |
@@ -134,6 +134,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP7 | Security requirements for the environmental score | [reports/cp7-security-requirements](reports/cp7-security-requirements/claude.md) |
 | CP8 | CISA ICS advisories: a new downloaded archive that is parsed | [reports/cp8-ics-advisories](reports/cp8-ics-advisories/claude.md) |
 | CP9 | What an ICS advisory says about a fix | [reports/cp9-ics-remediation](reports/cp9-ics-remediation/claude.md) |
+| CP10 | Per-asset roll-up | [reports/cp10-asset-rollup](reports/cp10-asset-rollup/claude.md) |
 
 Across the checkpoints 29 findings were recorded (3 Medium, 7 Low, 19 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
