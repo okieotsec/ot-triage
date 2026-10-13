@@ -927,7 +927,7 @@ class BatchByAssetTests(BatchViewTestCase):
         self.assertEqual(next(r for r in rows if r[0] == "NOPE-9")[7], "not scored")
         self.assertEqual(view.assets_frame.winfo_manager(), "pack")
         self.assertEqual(view.findings_frame.winfo_manager(), "")
-        self.assertEqual(view.counter_row.winfo_manager(), "")
+        self.assertEqual(view.counter_boxes.winfo_manager(), "")
         self.assertIn("1 row has no asset id", view.mode_note.cget("text"))
         self.assertEqual(view.export_button.cget("text"), "Export asset roll-up")
         self.assertIn("findings.csv", view.file_label.cget("text"))
@@ -938,7 +938,7 @@ class BatchByAssetTests(BatchViewTestCase):
         view.set_mode("findings")
         self.pump(0.2)
         self.assertEqual((view.findings_frame.winfo_manager(), view.assets_frame.winfo_manager()), ("pack", ""))
-        self.assertEqual(view.counter_row.winfo_manager(), "pack")
+        self.assertEqual(view.counter_boxes.winfo_manager(), "pack")
         self.assertEqual(view.export_button.cget("text"), "Export ranked CSV")
         self.assertEqual(len(self.rows()), 7)
 

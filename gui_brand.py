@@ -1,9 +1,12 @@
-"""OkieOTSec branding for OT Triage: the wordmark, the window icon and the project's public links."""
-import base64
-import tkinter as tk
+"""OkieOTSec branding for OT Triage: the logo images, the window icon, the wordmark and the public links.
 
-from gui_round import png_bytes, shape_rgba
-from gui_theme import DARK
+The images come from the OkieOTSec brand kit (see assets/brand/README.md). Tk cannot read SVG, so the vector files
+were turned into PNGs at the sizes the application needs. Nothing here depends on the images being present: if a
+file is missing the application simply starts without that picture.
+"""
+import sys
+import tkinter as tk
+from pathlib import Path
 
 BRAND_NAME = "OkieOTSec"
 TAGLINE = "OT/ICS security from the radio tower to the control room."
@@ -11,7 +14,30 @@ LINKS = (("Website", "https://okieotsec.com"),
          ("GitHub", "https://github.com/okieotsec"),
          ("YouTube", "https://www.youtube.com/@OkieOTSec"),
          ("X", "https://x.com/okieotsec"))
-ICON_SIZES = (64, 32, 16)
+ASSETS = Path(__file__).resolve().parent / "assets" / "brand"
+ICON_SIZES = (256, 128, 64, 48, 32, 16)          # the app tile, as PNGs (the window icon)
+HEADER_HEIGHTS = (32, 40, 48, 56, 64)            # the shield next to the title, for different text sizes
+HEADER_HEIGHT = 40                               # at 100% text size
+LOCKUP_WIDTHS = (240, 320, 400, 480)
+FAVICON = ASSETS / "icons" / "favicon.ico"
+
+
+def _photo(root, relative):
+    """Load one brand image, or None if it is missing or unreadable."""
+    try:
+        return tk.PhotoImage(master=root, file=str(ASSETS / relative))
+    except (tk.TclError, OSError):
+        return None
+
+
+def nearest(options, wanted):
+    """The option closest to the wanted size."""
+    return min(options, key=lambda option: abs(option - wanted))
+
+
+def _theme_prefix(style):
+    """The kit has one set of images for dark backgrounds and one for light ones."""
+    return "-dark" if style.theme.name == "dark" else ""
 
 
 def wordmark(parent, style, bg, size=11):
@@ -24,43 +50,41 @@ def wordmark(parent, style, bg, size=11):
     return box
 
 
-def _over(canvas, shape, left, top):
-    """Paint a small RGBA shape onto the canvas with normal alpha blending."""
-    for y, row in enumerate(shape):
-        for x, pixel in enumerate(row):
-            alpha = pixel[3]
-            if not alpha:
-                continue
-            base = canvas[top + y][left + x]
-            if not base[3]:
-                canvas[top + y][left + x] = pixel
-                continue
-            weight = alpha / 255
-            pairs = zip(pixel[:3], base[:3], strict=True)
-            blended = tuple(round(new * weight + old * (1 - weight)) for new, old in pairs)
-            canvas[top + y][left + x] = (*blended, max(base[3], alpha))
+def header_logo(parent, style, bg):
+    """Return a label showing the shield for the window header, or None if the image is not available."""
+    height = nearest(HEADER_HEIGHTS, round(HEADER_HEIGHT * style.scale))
+    image = _photo(parent, f"header/shield{_theme_prefix(style)}-{height}.png")
+    if image is None:
+        return None
+    label = tk.Label(parent, image=image, bg=bg, bd=0, padx=0, pady=0)
+    label.image = image                    # keep a reference, or Tk drops the picture
+    return label
 
 
-def icon_rows(size):
-    """Return the icon as rows of RGBA pixels: three bars (red, amber, green) on a navy rounded square."""
-    unit = size / 64
-    canvas = [[(0, 0, 0, 0)] * size for _ in range(size)]
-    _over(canvas, shape_rgba(size, size, max(2, round(14 * unit)), DARK.bg, DARK.accent, max(1, round(2.5 * unit))),
-          0, 0)
-    bar_height, gap, left = max(2, round(9 * unit)), max(1, round(6 * unit)), round(13 * unit)
-    top = round((64 - (3 * 9 + 2 * 6)) / 2 * unit)
-    for index, (colour, length) in enumerate(((DARK.now, 38), (DARK.next, 29), (DARK.never, 20))):
-        width = max(3, round(length * unit))
-        _over(canvas, shape_rgba(width, bar_height, bar_height // 2, colour), left, top + index * (bar_height + gap))
-    return canvas
+def lockup(parent, style, bg, width=320):
+    """Return a label showing the shield-and-name lockup, or None if the image is not available."""
+    wanted = nearest(LOCKUP_WIDTHS, round(width * style.scale))
+    image = _photo(parent, f"lockup/lockup{_theme_prefix(style)}-{wanted}.png")
+    if image is None:
+        return None
+    label = tk.Label(parent, image=image, bg=bg, bd=0, padx=0, pady=0)
+    label.image = image
+    return label
 
 
 def app_icon(root):
-    """Set the window icon for the application and its dialogs; the image is kept alive on the root."""
-    images = [tk.PhotoImage(master=root, data=base64.b64encode(png_bytes(icon_rows(size)))) for size in ICON_SIZES]
+    """Set the window icon for the application and its dialogs; the images are kept alive on the root."""
+    images = [image for image in (_photo(root, f"icons/tile-{size}.png") for size in ICON_SIZES) if image is not None]
+    if not images:
+        return None
     try:
         root.iconphoto(True, *images)
     except tk.TclError:
         return None  # some window managers have no icon support; the application works the same without one
+    if sys.platform == "win32" and FAVICON.is_file():
+        try:
+            root.iconbitmap(default=str(FAVICON))
+        except tk.TclError:
+            pass
     root.app_icons = images
     return images

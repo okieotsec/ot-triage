@@ -28,7 +28,7 @@ from gui_widgets import (
 ADVISORIES_TITLE = "ICS ADVISORIES FROM CISA"
 POSSIBLE_TITLE = "ICS ADVISORIES THAT MAY APPLY (MATCHED ON VENDOR AND PRODUCT)"
 REFERENCE_LIMIT = 5
-DETAILS_MAX_HEIGHT = 190
+DETAILS_MAX_HEIGHT = 150
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
 COLUMNS = [("rank", "#", 46, "center"), ("id", "ID", 80, "w"), ("asset", "Asset", 112, "w"),
            ("cve", "CVE", 124, "w"), ("name", "Name", 200, "w"),
@@ -86,7 +86,6 @@ class BatchView:
         self.body.pack(fill=tk.BOTH, expand=True)
         self.search_var = tk.StringVar(self.frame, self.state.search)
         self._build_toolbar()
-        self._build_view_row()
         self._build_counters()
         self._build_table()
         self._build_details()
@@ -139,25 +138,17 @@ class BatchView:
         self.progress_bar.pack(side=tk.LEFT, padx=10)
         button(self.progress_row, s, "Cancel", self.ctx.worker.cancel, "secondary").pack(side=tk.LEFT)
 
-    def _build_view_row(self):
-        s, t = self.style, self.style.theme
-        self.view_row = tk.Frame(self.body, bg=t.bg)
-        self.view_row.pack(fill=tk.X, pady=(12, 0))
-        self.mode_var = tk.StringVar(self.frame, self.state.mode)
-        self.mode_control = Segmented(self.view_row, s, MODES, self.mode_var)
-        self.mode_control.pack(side=tk.LEFT)
-        self.mode_var.trace_add("write", lambda *_: self.set_mode(self.mode_var.get()))
-        self.mode_note = tk.Label(self.view_row, text="", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
-        self.mode_note.pack(side=tk.LEFT, padx=14, fill=tk.X, expand=True)
-
     def _build_counters(self):
         s, t = self.style, self.style.theme
         self.counter_row = tk.Frame(self.body, bg=t.bg)
-        self.counter_row.pack(fill=tk.X, pady=12)
-        self.counter_row_pack = {"fill": tk.X, "pady": 12}
+        self.counter_row.pack(fill=tk.X, pady=(8, 8))
+        # The bucket counters (findings view) and the asset summary (By asset view) share the left side
+        self.counter_boxes = tk.Frame(self.counter_row, bg=t.bg)
+        self.counter_boxes.pack(side=tk.LEFT)
+        self.mode_note = tk.Label(self.counter_row, text="", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
         self.counters = {}
         for key, label in FILTERS:
-            box = tk.Frame(self.counter_row, bg=t.card, highlightthickness=2, highlightbackground=t.border,
+            box = tk.Frame(self.counter_boxes, bg=t.card, highlightthickness=2, highlightbackground=t.border,
                            highlightcolor=t.accent, takefocus=1, cursor="hand2")
             box.pack(side=tk.LEFT, padx=(0, 10))
             number = tk.Label(box, text="0", font=s.font(18, "bold"), bg=t.card,
@@ -172,8 +163,12 @@ class BatchView:
             for sequence in ("<Return>", "<space>"):
                 box.bind(sequence, lambda _e, k=key: self.set_filter(k))
             self.counters[key] = (box, number)
+        self.mode_var = tk.StringVar(self.frame, self.state.mode)
+        self.mode_control = Segmented(self.counter_row, s, MODES, self.mode_var)
+        self.mode_control.pack(side=tk.RIGHT)
+        self.mode_var.trace_add("write", lambda *_: self.set_mode(self.mode_var.get()))
         self.count_label = tk.Label(self.counter_row, text="", font=s.font(10), bg=t.bg, fg=t.muted)
-        self.count_label.pack(side=tk.RIGHT)
+        self.count_label.pack(side=tk.RIGHT, padx=(0, 14))
 
     def _build_table(self):
         s, t = self.style, self.style.theme
@@ -462,11 +457,13 @@ class BatchView:
         if assets:
             self.findings_frame.pack_forget()
             self.assets_frame.pack(fill=tk.BOTH, expand=True)
-            self.counter_row.pack_forget()
+            self.counter_boxes.pack_forget()
+            self.mode_note.pack(side=tk.LEFT, fill=tk.X, expand=True)
         else:
             self.assets_frame.pack_forget()
             self.findings_frame.pack(fill=tk.BOTH, expand=True)
-            self.counter_row.pack(after=self.view_row, **self.counter_row_pack)
+            self.mode_note.pack_forget()
+            self.counter_boxes.pack(side=tk.LEFT, before=self.mode_control)
             self.mode_note.configure(text="")
         self.export_button.configure(text="Export asset roll-up" if assets else "Export ranked CSV")
 
@@ -619,7 +616,7 @@ class BatchView:
     def _update_compare_label(self):
         state = self.state
         if state.previous is None:
-            text = "No comparison (optional: what is new, what moved and what was resolved since an earlier export)"
+            text = "No comparison \u00b7 see what changed since an earlier export"
         elif state.comparison is None:
             text = f"Previous export: {state.previous[0]}, {len(state.previous[1]):,} rows. Open a findings file."
         else:

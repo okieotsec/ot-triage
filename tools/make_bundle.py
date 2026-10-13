@@ -23,7 +23,7 @@ ENTRY_POINTS = ("ot_triage_gui", "ot_triage_cli")
 LAUNCHER = "OT Triage.pyw"
 TOP_LEVEL_FILES = ("README.md", "CHANGELOG.md", "LICENSE", "SECURITY.md", "THIRD_PARTY_NOTICES.md", "requirements.txt",
                    LAUNCHER)
-FOLDERS = ("docs/", "sbom/")
+FOLDERS = ("docs/", "sbom/", "assets/")
 SAMPLE_PREFIX = "sample_"
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 START_HERE = f"""OT Triage {__version__}  -  an OkieOTSec project
