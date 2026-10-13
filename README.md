@@ -54,6 +54,7 @@ threat-data update that you start yourself.
 ```
 python3 ot_triage_gui.py            # the app (Python 3.12 or newer, with Tkinter)
 python3 ot_triage_cli.py findings.csv -o ranked.csv    # the same ranking on the command line (docs/CLI.md)
+python3 ot_triage_import.py scan.csv -o findings.csv   # findings and an inventory from a Nessus, Tenable or OpenVAS export (docs/IMPORT.md)
 python3 tools/headless_tests.py     # the tests, on an invisible display (no windows open on your screen)
 python3 -m unittest                 # the tests, the plain way (GUI tests open real windows)
 ```
@@ -137,6 +138,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 - [docs/CVSS.md](docs/CVSS.md): pasting CVSS vectors, supported versions and how the scores were verified
 - [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV, EPSS and ICS advisory data, offline updates and safety checks
 - [docs/CLI.md](docs/CLI.md): the command line, for scripts and scheduled jobs
+- [docs/IMPORT.md](docs/IMPORT.md): importing Nessus, Tenable and OpenVAS exports into findings and an inventory
 - [docs/INVENTORY.md](docs/INVENTORY.md): the asset inventory, which fills in asset criticality, exposure and controls, the per-asset view and comparing with a previous export
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
@@ -171,8 +173,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP15 | The OkieOTSec brand kit in the application | [reports/cp15-brand-kit](reports/cp15-brand-kit/claude.md) |
 | CP16 | What the vendor says to do (the advisories' remediation text) | [reports/cp16-vendor-steps](reports/cp16-vendor-steps/claude.md) |
 | CP17 | Version-aware advisory matching | [reports/cp17-version-aware](reports/cp17-version-aware/claude.md) |
+| CP18 | Scanner import, phase 1: Nessus, Tenable and OpenVAS CSV | [reports/cp18-scanner-import-phase1](reports/cp18-scanner-import-phase1/claude.md) |
 
-Across the checkpoints 37 findings were recorded (3 Medium, 12 Low, 22 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 38 findings were recorded (3 Medium, 13 Low, 22 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 

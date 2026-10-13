@@ -48,9 +48,10 @@ class ContentTests(BundleCase):
             self.assertFalse(name.startswith("/") or ".." in Path(name).parts or "\\" in name, name)
 
     def test_it_has_what_a_person_needs(self):
-        for needed in ("ot_triage_gui.py", "ot_triage_cli.py", "OT Triage.pyw", "README.md", "LICENSE", "CHANGELOG.md",
+        for needed in ("ot_triage_gui.py", "ot_triage_cli.py", "ot_triage_import.py", "scanimport.py",
+                       "OT Triage.pyw", "README.md", "LICENSE", "CHANGELOG.md",
                        "SECURITY.md", "THIRD_PARTY_NOTICES.md", "START-HERE.txt", "sbom/sbom.cdx.json",
-                       "docs/CLI.md", "docs/POLICY.md", "sample_inventory.csv",
+                       "docs/CLI.md", "docs/POLICY.md", "sample_inventory.csv", "sample_scan_nessus.csv",
                        "sample_findings_multiple_per_asset.csv", "requirements.txt"):
             self.assertIn(f"{TOP}/{needed}", self.names, needed)
 
@@ -108,6 +109,14 @@ class RunsOnItsOwnTests(BundleCase):
                                str(self.root / "data"))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("NOW", done.stdout)
+
+    def test_the_scanner_import_runs_from_the_extracted_bundle(self):
+        out = self.root / "imported.csv"
+        done = self.run_python("ot_triage_import.py", "sample_scan_nessus.csv", "sample_scan_openvas.csv",
+                               "-o", str(out), "--inventory-out", str(self.root / "inventory.new.csv"))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("Nessus CSV", done.stdout)
+        self.assertTrue(out.read_text(encoding="utf-8").startswith("id,asset_id,name,cve,cvss,patch,source_tool"))
 
     def test_every_module_imports_from_the_extracted_bundle_alone(self):
         modules = [p.stem for p in self.root.glob("*.py")]

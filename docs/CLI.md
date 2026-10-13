@@ -1,5 +1,7 @@
 # Command line
 
+To turn a scanner export into a findings file first, see [IMPORT.md](IMPORT.md) (`ot_triage_import.py`).
+
 `ot_triage_cli.py` ranks a findings file without opening a window, with the same rules, scoring settings and threat data as the application. It is for scripts, scheduled jobs and quick checks.
 
 ```
