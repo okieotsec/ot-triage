@@ -1,4 +1,5 @@
 """The Batch view: score a CSV file, filter and search the ranked results, export them."""
+import dataclasses
 import os
 import tkinter as tk
 from tkinter import ttk
@@ -542,12 +543,30 @@ class BatchView:
             self.detail_refs_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
             self.detail_refs.pack(fill=tk.X, before=self.detail_text)
 
+    def _with_version_notes(self, item):
+        """The row's advisories; if its asset has a vendor, product and version in the inventory, each says whether
+        that version is inside the versions it lists (only for advisories that name that vendor and product)."""
+        inv = self.state.inventory
+        if not item.advisories or inv is None or not item.asset_id:
+            return item.advisories          # (and no threat data is loaded for a file that has no CVE column)
+        ics = self.ctx.get_threat_data().ics
+        if ics is None:
+            return item.advisories
+        status, record = inv.lookup(item.asset_id)
+        if status != "found" or not (record.vendor and record.product and record.version):
+            return item.advisories
+        noted = []
+        for advisory in item.advisories:
+            check = ics.check_advisory(advisory.id, record.vendor, record.product, record.version)
+            noted.append(dataclasses.replace(advisory, version_note=check.note(record.version)) if check else advisory)
+        return tuple(noted)
+
     def _show_advisories(self, item, advisories=None, total=None, title=ADVISORIES_TITLE):
         """Show the CISA ICS advisories that name the selected row's CVE (or the ones given, for an asset)."""
         self.detail_adv_title.pack_forget()
         self.detail_adv.pack_forget()
         if advisories is None:
-            advisories = item.advisories if item is not None else ()
+            advisories = self._with_version_notes(item) if item is not None else ()
             total = item.advisory_count if item is not None else None
         self.detail_adv_title.configure(text=title)
         self.detail_adv.show(advisories, total)
@@ -748,13 +767,9 @@ class BatchView:
         """The advisories that may apply to an asset, from its vendor and product in the inventory (or a message)."""
         inv = self.state.inventory
         status, record = inv.lookup(summary.asset_id) if inv is not None else ("missing", None)
-        if status != "found" or not record.vendor or not record.product:
+        if status != "found":
             return None
-        ics = self.ctx.get_threat_data().ics
-        if ics is None:
-            return rollup.PossibleAdvisories(record.vendor, record.product, (), -1, False)
-        advisories, count, known = ics.match(record.vendor, record.product)
-        return rollup.PossibleAdvisories(record.vendor, record.product, advisories, count, known)
+        return rollup.possible_for_record(record, self.ctx.get_threat_data().ics)
 
     @staticmethod
     def _possible_lines(possible):
@@ -769,8 +784,17 @@ class BatchView:
         if not possible.count:
             return [head + "No CISA advisory names both that vendor and that product."]
         plural = "advisories" if possible.count != 1 else "advisory"
-        return [head + f"{possible.count} CISA {plural} name that vendor and product and may apply. This does not "
-                "know the version you run, so read each one."]
+        if not possible.version:
+            return [head + f"{possible.count} CISA {plural} name that vendor and product and may apply. This does "
+                    "not know the version you run (add a version column to the inventory), so read each one."]
+        if not possible.compared:
+            return [head + f"{possible.count} CISA {plural} name that vendor and product and may apply. The version "
+                    f"'{possible.version}' could not be read as a version number, so it was not compared: read each "
+                    "advisory."]
+        return [head + f"{possible.count} CISA {plural} name that vendor and product. For version "
+                f"{possible.version}: {possible.affected} list it as affected, {possible.outside} list other "
+                f"versions only, {possible.unknown} could not be compared. Those that list it come first. Being "
+                "outside a listed range does not mean the asset is safe: read each advisory."]
 
     def export_current(self):
         """Export what the current view shows: the ranked findings or the per-asset roll-up."""

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import references
 import threatdata
+import versions as vers
 from threatdata import CVE_RE, MB, FetchError, SourceResult, ThreatDataError
 
 ICS_URL = "https://codeload.github.com/cisagov/CSAF/tar.gz/refs/heads/develop"
@@ -65,7 +66,16 @@ MAX_STEP_URL_CHARS = 500           # a longer address is left out; the text is k
 MAX_STEPS = 25                     # steps kept for one CVE of one advisory
 MAX_STEP_TABLE = 100               # different steps kept for one advisory
 ELLIPSIS = "\u2026"
-INDEX_VERSION = 4
+MAX_AFFECTED_IDS = 10_000         # product ids read from one vulnerability's known_affected list
+MAX_AFFECTED = 40                  # listed affected product and version pairs kept per advisory
+MAX_VERSION_CHARS = 80             # one listed version or version range, as the advisory words it
+MAX_RANGES_SHOWN = 3               # listed ranges named in a version note
+MAX_VERSION_NOTE_CHARS = 200
+VERSION_CATEGORIES = ("product_version", "product_version_range")
+# What comparing an asset's version with an advisory's listed versions found (VersionCheck.status)
+VERSION_WORDS = {"A": "lists your version as affected", "O": "lists other versions only",
+                 "U": "could not be compared with your version"}
+INDEX_VERSION = 5
 
 ICS_FILE, ICS_META_FILE = "ics_advisories.json", "ics_meta.json"
 ID_RE = re.compile(r"^ICS(?:A|MA)-\d{2}-\d{3}-\d{2}[A-Z]?$")
@@ -93,6 +103,53 @@ class Step:
 
 
 @dataclass(frozen=True)
+class Affected:
+    """One product and the version (or range of versions) an advisory lists as affected, in the advisory's words."""
+
+    product: str
+    versions: str = ""
+
+
+@dataclass(frozen=True)
+class VersionCheck:
+    """What comparing one asset's version with one advisory's listed affected versions found.
+
+    status is "A" (inside a listed range), "O" (outside every listed range) or "U" (cannot be said); ranges holds
+    the listed texts that decided it (at most MAX_RANGES_SHOWN).
+    """
+
+    status: str
+    ranges: tuple = ()
+
+    def note(self, version):
+        """One sentence for the person, naming the version that was checked. It never says the asset is safe."""
+        listed = "; ".join(self.ranges)
+        shown = version if len(version) <= 40 else version[:39] + "\u2026"
+        if self.status == "A":
+            text = f"your version {shown} is inside a listed affected range ({listed})"
+        elif self.status == "O":
+            text = f"your version {shown} is outside the listed affected versions ({listed}); read the advisory anyway"
+        else:
+            text = f"your version {shown} could not be compared with the listed versions" + (
+                f" ({listed})" if listed else "")
+        return text[:MAX_VERSION_NOTE_CHARS]
+
+
+@dataclass(frozen=True)
+class VersionSummary:
+    """The advisories that may apply to an asset, checked against its version (see IcsData.check)."""
+
+    advisories: tuple           # at most MAX_LISTED, those listing the version as affected first; each has version_note
+    total: int                  # how many advisories match the vendor and product
+    vendor_known: bool
+    readable: bool = True       # False when the version cannot be read as a number, so nothing was compared
+    affected: int = 0           # how many list the version as affected
+    outside: int = 0            # how many list other versions only
+    unknown: int = 0            # how many could not be compared
+    newest: str = ""            # the id of the newest advisory that matches (listed first when the order is by date)
+
+
+@dataclass(frozen=True)
 class IcsAdvisory:
     """One CISA ICS advisory: what it is called, when it was published and updated, and whose products it covers."""
 
@@ -104,6 +161,8 @@ class IcsAdvisory:
     products: tuple = ()        # product names the advisory lists (for matching an asset's vendor and product)
     fix: str = ""               # what this advisory says about fixing the looked-up CVE: a key of REMEDIATION_WORDS
     steps: tuple = ()           # the vendor's fixes and mitigations for the looked-up CVE (Step objects)
+    affected: tuple = ()        # the products and versions the advisory lists as affected (Affected objects)
+    version_note: str = ""      # what comparing the asset's version with them found, in words (set by check)
 
     @property
     def fix_text(self):
@@ -176,9 +235,14 @@ class IcsData:
         the asset's version. Returns (advisories newest first, at most MAX_LISTED; how many match in all; whether
         any advisory names this vendor at all). Needs a vendor and a product word of at least three characters.
         """
+        ids, vendor_known = self._matching_ids(vendor, product)
+        return tuple(self.advisories[i] for i in ids[:MAX_LISTED]), len(ids), vendor_known
+
+    def _matching_ids(self, vendor, product):
+        """The ids of the advisories that match a vendor and product (newest first) and whether the vendor is known."""
         vendor_words, product_words = name_tokens(vendor, drop_legal=True), name_tokens(product)
         if not vendor_words or not any(len(w) >= 3 for w in product_words):
-            return (), 0, False
+            return (), False
         key = (vendor_words, product_words)
         found = self._cache.get(key)
         if found is None:
@@ -186,8 +250,59 @@ class IcsData:
             if len(self._cache) > MAX_MATCH_CACHE:
                 self._cache.clear()
             self._cache[key] = found
-        ids, vendor_known = found
-        return tuple(self.advisories[i] for i in ids[:MAX_LISTED]), len(ids), vendor_known
+        return found
+
+    def check_advisory(self, ident, vendor, product, version):
+        """Compare an asset's version with the versions one advisory lists as affected; a VersionCheck, or None.
+
+        None means there is nothing to say: the version cannot be read, the advisory does not name this vendor, or
+        none of the products it lists is this product. Otherwise the answer is "inside a listed range" if any
+        listed range for the product holds the version, "outside" only if every one is understood and none does, and
+        "cannot be said" if some text was not understood. It is a pointer for the person to read, not a verdict.
+        """
+        advisory, wanted = self.advisories.get(ident), vers.parse_version(version)
+        vendor_words, product_words = set(name_tokens(vendor, drop_legal=True)), set(name_tokens(product))
+        if advisory is None or wanted is None or not vendor_words or not product_words:
+            return None
+        if not any(vendor_words <= set(name_tokens(v, drop_legal=True)) for v in advisory.vendors):
+            return None
+        inside, unclear, outside = [], [], []
+        for entry in advisory.affected:
+            if not product_words <= set(name_tokens(entry.product)):
+                continue
+            answer = vers.in_range(wanted, vers.parse_range(entry.versions))
+            label = vers.describe_range(entry.versions) or "no version given"
+            (inside if answer is True else outside if answer is False else unclear).append(label)
+        if not (inside or unclear or outside):
+            return None
+        status, listed = ("A", inside) if inside else ("U", unclear) if unclear else ("O", outside)
+        return VersionCheck(status, tuple(dict.fromkeys(listed))[:MAX_RANGES_SHOWN])
+
+    def check(self, vendor, product, version):
+        """Find the advisories that may apply to an asset (see match) and compare its version with each one.
+
+        The advisories listing the version as affected come first, then those that could not be compared, then those
+        listing other versions only; within each, newest first. At most MAX_LISTED are returned, each with a
+        version_note, and the counts cover all of them.
+        """
+        ids, vendor_known = self._matching_ids(vendor, product)
+        if vers.parse_version(version) is None:
+            return VersionSummary(tuple(self.advisories[i] for i in ids[:MAX_LISTED]), len(ids), vendor_known, False,
+                                  0, 0, len(ids), ids[0] if ids else "")
+        rank, order = {"A": 0, "U": 1, "O": 2}, []
+        counts = {"A": 0, "O": 0, "U": 0}
+        checks = {}
+        for position, ident in enumerate(ids):
+            checks[ident] = self.check_advisory(ident, vendor, product, version)
+            status = checks[ident].status if checks[ident] else "U"
+            counts[status] += 1
+            order.append((rank[status], position, ident))
+        shown = []
+        for _rank, _position, ident in sorted(order)[:MAX_LISTED]:
+            check = checks[ident]
+            shown.append(dataclasses.replace(self.advisories[ident], version_note=check.note(version) if check else ""))
+        return VersionSummary(tuple(shown), len(ids), vendor_known, True, counts["A"], counts["O"], counts["U"],
+                              ids[0] if ids else "")
 
     def _find(self, vendor_words, product_words):
         vendors, products = self._postings()
@@ -234,6 +349,49 @@ def _products(tree):
         if isinstance(children, list):
             stack.extend((child, depth + 1) for child in reversed(children))
     return tuple(found)
+
+
+def _affected(tree, listed_ids):
+    """Return the products and versions a CSAF product tree lists as known affected (bounded in depth and size).
+
+    listed_ids is the set of product ids that the advisory's vulnerabilities list as known_affected. Each is paired
+    with the nearest product name above it and the text of the version branch it hangs on.
+    """
+    found, stack, seen = [], [(tree, 0, "")], 0
+    while stack:
+        node, depth, context = stack.pop()
+        seen += 1
+        if seen > MAX_TREE_NODES or depth > MAX_TREE_DEPTH:
+            raise ValueError("the product tree is too large or too deeply nested")
+        if not isinstance(node, dict):
+            continue
+        name, category = node.get("name"), node.get("category")
+        if category in ("product_name", "product_family") and isinstance(name, str):
+            context = _clean(name, MAX_PRODUCT_CHARS) or context
+        product = node.get("product")
+        if isinstance(product, dict) and isinstance(product.get("product_id"), str) \
+                and product["product_id"] in listed_ids:
+            text = _clean(name, MAX_VERSION_CHARS) if category in VERSION_CATEGORIES and isinstance(name, str) else ""
+            label = context or (_clean(product["name"], MAX_PRODUCT_CHARS) if isinstance(product.get("name"), str)
+                                else "")
+            entry = Affected(label, text)
+            if label and entry not in found and len(found) < MAX_AFFECTED:
+                found.append(entry)
+        children = node.get("branches")
+        if isinstance(children, list):
+            stack.extend((child, depth + 1, context) for child in reversed(children))
+    return tuple(found)
+
+
+def _listed_affected(items):
+    """The product ids the vulnerabilities list as known_affected (a set of at most a few thousand strings)."""
+    ids = set()
+    for item in items:
+        status = item.get("product_status") if isinstance(item, dict) else None
+        listed = status.get("known_affected") if isinstance(status, dict) else None
+        if isinstance(listed, list):
+            ids.update(p for p in listed[:MAX_AFFECTED_IDS] if isinstance(p, str))
+    return ids
 
 
 def _vendors(tree):
@@ -354,7 +512,9 @@ def _read_advisory(raw, stem):
     tree = doc.get("product_tree")
     vendors = _vendors(tree) if isinstance(tree, dict) else ()
     products = _products(tree) if isinstance(tree, dict) else ()
-    advisory = IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors, products)
+    affected = _affected(tree, _listed_affected(items)) if isinstance(tree, dict) else ()
+    advisory = IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors, products,
+                           affected=affected)
     return advisory, cves, fixes, steps
 
 
@@ -449,7 +609,8 @@ def to_index(data):
             applies[cve] = [position[step] for step in steps]
         rows.append({"id": a.id, "title": a.title, "published": a.published, "updated": a.updated,
                      "vendors": list(a.vendors), "products": list(a.products), "cves": sorted(names.get(a.id, ())),
-                     "fixes": dict(sorted(data.fixes.get(a.id, {}).items())), "steps": table, "applies": applies})
+                     "fixes": dict(sorted(data.fixes.get(a.id, {}).items())), "steps": table, "applies": applies,
+                     "affected": [[e.product, e.versions] for e in a.affected]})
     return json.dumps({"version": INDEX_VERSION, "feed_date": data.feed_date, "count": len(rows), "advisories": rows},
                       separators=(",", ":")).encode("utf-8")
 
@@ -479,7 +640,7 @@ def parse_index(raw):
 
 def _index_row(row):
     if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "products",
-                                                 "cves", "fixes", "steps", "applies"}:
+                                                 "cves", "fixes", "steps", "applies", "affected"}:
         raise ValueError("unexpected fields")
     ident, title, vendors, cves, fixes = row["id"], row["title"], row["vendors"], row["cves"], row["fixes"]
     products = row["products"]
@@ -499,8 +660,27 @@ def _index_row(row):
     if not isinstance(fixes, dict) or not all(k in cves and v in REMEDIATION_WORDS for k, v in fixes.items()):
         raise ValueError("bad remediation list")
     steps = _index_steps(row["steps"], row["applies"], cves)
+    affected = _index_affected(row["affected"])
     return IcsAdvisory(ident, title, _date(row["published"], "published"), _date(row["updated"], "updated"),
-                       tuple(vendors), tuple(products)), cves, fixes, steps
+                       tuple(vendors), tuple(products), affected=affected), cves, fixes, steps
+
+
+def _index_affected(rows):
+    """Validate the stored affected products and versions of one advisory; return a tuple of Affected."""
+    if not isinstance(rows, list) or len(rows) > MAX_AFFECTED:
+        raise ValueError("bad affected list")
+    found = []
+    for entry in rows:
+        if not isinstance(entry, list) or len(entry) != 2 or not all(isinstance(x, str) for x in entry):
+            raise ValueError("bad affected entry")
+        product, text = entry
+        if (not 0 < len(product) <= MAX_PRODUCT_CHARS or len(text) > MAX_VERSION_CHARS
+                or product != references.clean(product) or text != references.clean(text)):
+            raise ValueError("bad affected text")
+        found.append(Affected(product, text))
+    if len(set(found)) != len(found):
+        raise ValueError("repeated affected entry")
+    return tuple(found)
 
 
 def _index_steps(table, applies, cves):

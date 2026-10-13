@@ -234,6 +234,24 @@ class VendorProductTests(InventoryCase):
         inv = self.load("asset_id,make,product\nA,Moxa,NPort 5110\n")
         self.assertEqual(inv.lookup("A")[1].vendor, "Moxa")
 
+    def test_the_version_column_and_its_aliases_are_read(self):
+        for header in ("version", "Firmware", "firmware_version", "FW Version", "software_version", "SW-Version"):
+            with self.subTest(header=header):
+                inv = self.load(f"asset_id,vendor,product,{header}\nA,Acme,Widget,V3.11.0\n")
+                self.assertEqual(inv.lookup("A")[1].version, "V3.11.0")
+        self.assertEqual(self.load("asset_id,vendor,product\nA,Acme,Widget\n").lookup("A")[1].version, "")
+
+    def test_the_version_is_cleaned_limited_and_never_changes_a_priority(self):
+        inv = self.load('asset_id,vendor,product,version\nA,Acme,Widget,"  3.1\x07 \u202e "\n'
+                        'B,Acme,Widget,"' + "9" * 500 + '"\n')
+        self.assertTrue(inv.lookup("A")[1].version.isprintable() and "\u202e" not in inv.lookup("A")[1].version)
+        self.assertEqual(len(inv.lookup("B")[1].version), inventory.MAX_TEXT_CHARS)
+        plain = self.load("asset_id,asset,exposure\nA,standard,high\n")
+        marked = self.load("asset_id,asset,exposure,version\nA,standard,high,3.11.0\n")
+        path = self.write("f.csv", "id,asset_id,cvss,threat\nF,A,9.0,active\n")
+        one, two = (batch.process_file(path, inventory=i)[0] for i in (plain, marked))
+        self.assertEqual((one.priority, one.result.score), (two.priority, two.result.score))
+
     def test_an_inventory_with_only_a_vendor_and_a_product_is_a_valid_inventory(self):
         inv = self.load("asset_id,vendor,product\nA,Acme,Widget\nB,,\n")
         self.assertEqual(len(inv), 2)

@@ -188,6 +188,58 @@ class PossibleAdvisoriesTests(unittest.TestCase):
         self.assertEqual(rows["RTU-2"]["possible_advisories"], "0")
         self.assertEqual((rows["HMI-3"]["vendor"], rows["HMI-3"]["possible_advisories"]), ("", ""))
 
+    def versioned(self, version):
+        (self.dir / "v.csv").write_text(f"asset_id,vendor,product,version\nPLC-1,Siemens AG,S7-1500,{version}\n",
+                                        encoding="utf-8")
+        return inventory.load(self.dir / "v.csv")
+
+    def newer_ics(self):
+        docs = [advisory("ICSA-26-001-01", "Siemens SIMATIC S7-1500 CPU", ("CVE-2026-0001",), "Siemens",
+                         versions=[("SIMATIC S7-1500 CPU", "vers:intdot/<2.9.9")], updated="2026-01-01T00:00:00Z"),
+                advisory("ICSA-26-002-01", "Siemens SIMATIC S7-1500 CPU", ("CVE-2026-0002",), "Siemens",
+                         versions=[("SIMATIC S7-1500 CPU", "<2.0")], updated="2026-02-01T00:00:00Z")]
+        return ics.parse_archive(good(*docs))
+
+    def test_with_a_version_the_advisories_are_compared_and_those_listing_it_come_first(self):
+        found = rollup.possible_advisories(self.summaries, self.versioned("V2.9.4"), self.newer_ics())["PLC-1"]
+        self.assertEqual((found.version, found.compared, found.affected, found.outside, found.unknown, found.count),
+                         ("V2.9.4", True, 1, 1, 0, 2))
+        self.assertEqual([a.id for a in found.advisories], ["ICSA-26-001-01", "ICSA-26-002-01"])
+        self.assertEqual(found.newest, "ICSA-26-002-01")
+
+    def test_without_a_version_nothing_is_compared_and_the_order_is_by_date(self):
+        found = rollup.possible_advisories(self.summaries, self.inventory, self.newer_ics())["PLC-1"]
+        self.assertEqual((found.version, found.compared, found.affected), ("", False, 0))
+        self.assertEqual(found.newest, found.advisories[0].id)
+
+    def test_a_version_that_cannot_be_read_is_reported_as_not_compared(self):
+        found = rollup.possible_advisories(self.summaries, self.versioned("banana"), self.newer_ics())["PLC-1"]
+        self.assertEqual((found.version, found.compared, found.count), ("banana", False, 2))
+
+    def test_the_export_carries_the_version_and_how_many_advisories_list_it(self):
+        for version, expected in (("V2.9.4", "1"), ("3.0", "0"), ("banana", "")):
+            with self.subTest(version=version):
+                found = rollup.possible_advisories(self.summaries, self.versioned(version), self.newer_ics())
+                path = self.dir / "assets.csv"
+                rollup.write_rollup(path, self.summaries, found)
+                with open(path, newline="", encoding="utf-8-sig") as fh:
+                    row = next(r for r in csv.DictReader(fh) if r["asset_id"] == "PLC-1")
+                self.assertEqual((row["version"], row["listing_your_version"], row["possible_advisories"],
+                                  row["newest_possible_advisory"]), (version, expected, "2", "ICSA-26-002-01"))
+        found = rollup.possible_advisories(self.summaries, self.inventory, self.newer_ics())
+        rollup.write_rollup(self.dir / "assets.csv", self.summaries, found)
+        with open(self.dir / "assets.csv", newline="", encoding="utf-8-sig") as fh:
+            row = next(r for r in csv.DictReader(fh) if r["asset_id"] == "PLC-1")
+        self.assertEqual((row["version"], row["listing_your_version"]), ("", ""))
+
+    def test_the_version_cell_cannot_run_as_a_formula_and_without_advisories_nothing_is_compared(self):
+        found = {"PLC-1": rollup.PossibleAdvisories("A", "B", (), 0, False, "=1+1", True, 1, 0, 0)}
+        rollup.write_rollup(self.dir / "assets.csv", self.summaries, found)
+        with open(self.dir / "assets.csv", newline="", encoding="utf-8-sig") as fh:
+            row = next(r for r in csv.DictReader(fh) if r["asset_id"] == "PLC-1")
+        self.assertEqual(row["version"], "'=1+1")
+        self.assertEqual(rollup.possible_for_record(self.versioned("1").lookup("PLC-1")[1], None).count, -1)
+
     def test_the_vendor_and_product_cells_cannot_run_as_formulas(self):
         found = {"PLC-1": rollup.PossibleAdvisories("=cmd", "+SUM", (), 0, False)}
         path = self.dir / "assets.csv"
