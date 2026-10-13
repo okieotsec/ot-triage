@@ -181,7 +181,8 @@ def _date(text, where):
 
 
 def _clean(text, limit):
-    return references.clean(text)[:limit]
+    """Clean text and cut it to a limit, without leaving a space at the cut (stored text must be exactly clean)."""
+    return references.clean(text)[:limit].rstrip()
 
 
 def _products(tree):

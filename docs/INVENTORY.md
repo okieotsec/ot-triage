@@ -51,6 +51,14 @@ The three requirement columns feed only the **CVSS environmental score** (see [C
 
 The inventory is read like every other file: at most 5 MB and 20,000 rows, UTF-8 only, control and invisible characters removed from ids and names, and bad rows skipped and reported, never guessed at. Nothing is sent anywhere, and the inventory's path is not remembered between runs. The export gains two columns, `asset_id` and `from_inventory` (which values came from the inventory), and neutralises spreadsheet formulas as usual.
 
+## Vendor and product (optional)
+
+Two optional columns, `vendor` and `product` (aliases: `manufacturer`, `make`, `model`, `product_name`), say what each asset is. They are used only to point at **CISA ICS advisories that may apply**; they never feed the scoring, so adding them cannot change any priority. An inventory with only `asset_id`, `vendor` and `product` is valid.
+
+- **Where it shows:** in the Batch view's **By asset** mode, selecting an asset lists the advisories that may apply to it (the newest five, links to cisa.gov, with the total), or says plainly that none was found. The roll-up export gains `vendor`, `product`, `possible_advisories` and `newest_possible_advisory` columns, and the command line's `--assets` file has them too. They need the ICS advisories to be downloaded (Threat data).
+- **How it matches:** an advisory matches when every word of the vendor appears among its vendor names and every word of the product appears among its product names or its title, ignoring case, punctuation, accents, order and endings such as Inc, GmbH and AG. A vendor and a product word of at least three characters are needed. So `Siemens AG` / `S7-1500` finds the advisories for the SIMATIC S7-1500, and an asset with only a vendor, or a product like `A1`, matches nothing.
+- **What it means:** a pointer to read, never proof. It does not know the version you run, and advisories use the vendor's own names: if the inventory says `Allen-Bradley` and CISA writes `Rockwell Automation`, nothing matches and the tool says that no advisory names that vendor. Check each advisory against your product and version.
+
 ## The per-asset view
 
 With a findings file that has an `asset_id` column (with or without an inventory), the Batch view's **By asset** button groups the findings by asset. OT assets are usually patched in short outage windows, so the question is often "what is on this asset?", not only "what is the worst finding?".

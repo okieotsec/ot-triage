@@ -1,7 +1,7 @@
-asset_id,name,criticality,exposure,controls,confidentiality,integrity,availability
-GW-EDGE-01,Plant edge gateway,crown jewel,high,none,medium,high,high
-HMI-LINE-01,Line 1 operator HMI,important,medium,partial,low,high,high
-PLC-PKG-01,Packaging line PLC,standard,low,partial,low,high,high
-RTU-TANK-07,Remote tank RTU (cellular),crown jewel,high,strong,low,high,high
-HIST-01,Plant historian,important,medium,none,high,medium,low
-SW-ACC-03,Access switch,standard,low,,low,low,medium
+asset_id,name,criticality,exposure,controls,confidentiality,integrity,availability,vendor,product
+GW-EDGE-01,Plant edge gateway,crown jewel,high,none,medium,high,high,Moxa,NPort 5110
+HMI-LINE-01,Line 1 operator HMI,important,medium,partial,low,high,high,Advantech,WebAccess
+PLC-PKG-01,Packaging line PLC,standard,low,partial,low,high,high,Siemens,S7-1500
+RTU-TANK-07,Remote tank RTU (cellular),crown jewel,high,strong,low,high,high,Hitachi Energy,RTU500
+HIST-01,Plant historian,important,medium,none,high,medium,low,Honeywell,Experion PKS
+SW-ACC-03,Access switch,standard,low,,low,low,medium,Allen-Bradley,Stratix 5700

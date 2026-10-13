@@ -528,6 +528,18 @@ class MatchingTests(unittest.TestCase):
         self.assertTrue(product.isprintable())
         self.assertLessEqual(len(product), ics.MAX_PRODUCT_CHARS)
 
+    def test_text_cut_at_a_limit_never_ends_in_a_space_so_the_stored_index_reads_back(self):
+        cut_inside_a_gap = {"title": ("T" * 199 + " tail", ics.MAX_TITLE_CHARS),
+                            "vendor": ("V" * 79 + " tail", ics.MAX_VENDOR_CHARS),
+                            "product": ("P" * 119 + " tail", ics.MAX_PRODUCT_CHARS)}
+        for label, (text, limit) in cut_inside_a_gap.items():
+            self.assertFalse(ics._clean(text, limit).endswith(" "), label)
+        doc = advisory("ICSA-26-001-01", cut_inside_a_gap["title"][0], ("CVE-2026-0001",),
+                       cut_inside_a_gap["vendor"][0], products=[cut_inside_a_gap["product"][0]])
+        data = self.data(doc)
+        again = ics.parse_index(ics.to_index(data))        # the check every update does before it stores anything
+        self.assertEqual(again.advisories, data.advisories)
+
     def test_a_product_family_counts_and_duplicates_collapse(self):
         doc = self.pair("ICSA-26-001-01", "Acme", ["Widget", "Widget"])
         doc["product_tree"]["branches"][0]["branches"].append({"category": "product_family", "name": "Gadget line"})
@@ -539,6 +551,18 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual([a.id for a in data.match("Siemens", "S7-1500")[0]], ["ICSA-26-001-01"])
         self.assertEqual(data.match("Siemens", "WebAccess")[:2], ((), 0))    # in different advisories
         self.assertEqual(data.match("Advantech", "S7-1500")[:2], ((), 0))
+
+    def test_every_word_of_the_vendor_must_match_not_just_one(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Rockwell Automation", ["Widget"]),
+                         self.pair("ICSA-26-002-01", "Schneider Electric", ["Widget"], cve="CVE-2026-0002"))
+        self.assertEqual(data.match("Rockwell Automation", "Widget")[1], 1)
+        self.assertEqual(data.match("Rockwell Electric", "Widget"), ((), 0, False))
+        self.assertEqual(data.match("Schneider", "Widget")[1], 1)
+
+    def test_a_product_alone_never_matches_when_the_vendor_is_unknown(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Siemens", ["SIMATIC S7-1500 CPU"]))
+        self.assertEqual(data.match("Unknown Vendor", "S7-1500"), ((), 0, False))
+        self.assertEqual(data.match("Siemens", "S7-1500")[1], 1)
 
     def test_matching_ignores_case_order_punctuation_and_a_legal_ending(self):
         data = self.data(self.pair("ICSA-26-001-01", "Siemens AG", ["SIMATIC S7-1500 CPU 1511-1 PN"]))

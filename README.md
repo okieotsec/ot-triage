@@ -139,8 +139,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP10 | Per-asset roll-up | [reports/cp10-asset-rollup](reports/cp10-asset-rollup/claude.md) |
 | CP11 | Comparing with a previous export | [reports/cp11-compare](reports/cp11-compare/claude.md) |
 | CP12 | The command line | [reports/cp12-cli](reports/cp12-cli/claude.md) |
+| CP13 | Advisories that may apply to an asset (vendor and product) | [reports/cp13-asset-advisories](reports/cp13-asset-advisories/claude.md) |
 
-Across the checkpoints 31 findings were recorded (3 Medium, 8 Low, 20 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 32 findings were recorded (3 Medium, 9 Low, 20 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 
