@@ -38,6 +38,10 @@ python3 -m unittest                 # the tests, the plain way (GUI tests open r
 The tests that need a display skip themselves when none is available. `pip install hypothesis` adds the optional
 property-based tests.
 
+## Download and run
+
+Each [release](https://github.com/okieotsec/ot-triage/releases) has a portable bundle, `ot-triage-<version>.zip`, with a `.sha256` file next to it. Unzip it anywhere and, on Windows, double-click **OT Triage.pyw**; everywhere else run `python3 ot_triage_gui.py`. You need Python 3.12 or newer with Tkinter (the installer from python.org includes it). There is nothing to install: no third-party packages, no executable that could be mistaken for malware, and the bundle is reproducible, so anyone can rebuild it from the tag with `python3 tools/make_bundle.py` and compare the checksum. See [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Using the GUI
 
 | View | What it does |
@@ -140,6 +144,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP11 | Comparing with a previous export | [reports/cp11-compare](reports/cp11-compare/claude.md) |
 | CP12 | The command line | [reports/cp12-cli](reports/cp12-cli/claude.md) |
 | CP13 | Advisories that may apply to an asset (vendor and product) | [reports/cp13-asset-advisories](reports/cp13-asset-advisories/claude.md) |
+| CP14 | The portable bundle and launcher | [reports/cp14-bundle](reports/cp14-bundle/claude.md) |
 
 Across the checkpoints 32 findings were recorded (3 Medium, 9 Low, 20 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
