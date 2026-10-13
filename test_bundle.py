@@ -18,6 +18,12 @@ TOP = f"ot-triage-{__version__}"
 class BundleCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        try:
+            make_bundle.tracked_files()
+        except (SystemExit, subprocess.CalledProcessError, OSError):
+            # The bundle is built from the files git tracks: a source zip without git (or without the repository)
+            # cannot build one, and that must skip these tests, not end the whole run (SystemExit would)
+            raise unittest.SkipTest("git is not available here, or this is not a git checkout") from None
         cls.tmp = tempfile.TemporaryDirectory()
         cls.out = Path(cls.tmp.name) / "dist"
         cls.zip, cls.digest = make_bundle.build(cls.out)

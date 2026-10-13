@@ -26,9 +26,9 @@ ROOT = "CSAF-develop/csaf_files/OT/white"
 
 def advisory(ident="ICSA-26-006-01", title="Columbia Weather Systems MicroServer", cves=("CVE-2025-61939",),
              vendor="Columbia Weather Systems", published="2026-01-06T06:00:00.000000Z",
-             updated="2026-01-06T06:00:00.000000Z", fixes=None, products=None):
-    """Build a CSAF advisory; fixes maps a CVE id to the list of remediation categories to give it, and products
-    lists product names to put under the vendor."""
+             updated="2026-01-06T06:00:00.000000Z", fixes=None, products=None, remediations=None):
+    """Build a CSAF advisory; fixes maps a CVE id to the list of remediation categories to give it, products
+    lists product names to put under the vendor, and remediations maps a CVE id to ready-made remediation entries."""
     doc = {
         "document": {"title": title, "tracking": {"id": ident, "initial_release_date": published,
                                                     "current_release_date": updated}},
@@ -43,6 +43,8 @@ def advisory(ident="ICSA-26-006-01", title="Columbia Weather Systems MicroServer
         if fixes and item["cve"] in fixes:
             item["remediations"] = [{"category": c, "details": "x", "product_ids": ["CSAFPID-0001"]}
                                     for c in fixes[item["cve"]]]
+        if remediations and item["cve"] in remediations:
+            item["remediations"] = remediations[item["cve"]]
     return doc
 
 
@@ -371,10 +373,138 @@ class RemediationTests(unittest.TestCase):
                 self.assertEqual(data.lookup(self.CVE)[0][0].fix, "")
 
 
+class StepTests(unittest.TestCase):
+    """The vendor's own words about what to do (CSAF remediation entries)."""
+
+    CVE = "CVE-2025-61939"
+
+    def steps(self, entries, cve=None):
+        doc = advisory(cves=(self.CVE,), remediations={self.CVE: entries})
+        return ics.parse_archive(good(doc)).lookup(cve or self.CVE)[0][0].steps
+
+    def test_the_steps_keep_the_vendors_words_and_order(self):
+        steps = self.steps([
+            {"category": "vendor_fix", "details": "Upgrade to version 3.11.1", "url": "https://vendor.example/fw"},
+            {"category": "mitigation", "details": "Disable the web GUI"},
+            {"category": "workaround", "details": "Use a VPN"},
+            {"category": "none_available", "details": "No fix for the old model"},
+            {"category": "no_fix_planned", "details": "End of life"}])
+        self.assertEqual([(s.kind, s.text, s.url) for s in steps], [
+            ("F", "Upgrade to version 3.11.1", "https://vendor.example/fw"), ("M", "Disable the web GUI", ""),
+            ("W", "Use a VPN", ""), ("N", "No fix for the old model", ""), ("X", "End of life", "")])
+        self.assertEqual([s.kind_text for s in steps], ["Fix", "Mitigation", "Workaround", "No fix available",
+                                                         "No fix planned"])
+        self.assertEqual(steps[0].line, "Fix: Upgrade to version 3.11.1")
+
+    def test_an_exact_repeat_is_kept_once(self):
+        entry = {"category": "mitigation", "details": "Disable the web GUI", "product_ids": ["A"]}
+        again = dict(entry, product_ids=["B"])
+        self.assertEqual(len(self.steps([entry, again, entry])), 1)
+
+    def test_the_same_words_with_a_different_kind_or_link_are_different_steps(self):
+        steps = self.steps([{"category": "mitigation", "details": "See the vendor"},
+                            {"category": "workaround", "details": "See the vendor"},
+                            {"category": "mitigation", "details": "See the vendor", "url": "https://a.example/x"}])
+        self.assertEqual(len(steps), 3)
+
+    def test_a_cve_without_remediations_has_no_steps(self):
+        self.assertEqual(self.steps([]), ())
+        self.assertEqual(self.steps(None), ())
+
+    def test_each_cve_keeps_its_own_steps(self):
+        doc = advisory(cves=("CVE-2026-0001", "CVE-2026-0002", "CVE-2026-0003"), remediations={
+            "CVE-2026-0001": [{"category": "vendor_fix", "details": "Upgrade"}],
+            "CVE-2026-0002": [{"category": "mitigation", "details": "Segment the network"}]})
+        data = ics.parse_archive(good(doc))
+        got = {c: [s.text for s in data.lookup(c)[0][0].steps] for c in ("CVE-2026-0001", "CVE-2026-0002",
+                                                                         "CVE-2026-0003")}
+        self.assertEqual(got, {"CVE-2026-0001": ["Upgrade"], "CVE-2026-0002": ["Segment the network"],
+                               "CVE-2026-0003": []})
+
+    def test_each_advisory_keeps_its_own_steps_for_the_same_cve(self):
+        older = advisory("ICSA-25-001-01", cves=(self.CVE,), updated="2025-01-01T00:00:00Z",
+                         remediations={self.CVE: [{"category": "mitigation", "details": "Old advice"}]})
+        newer = advisory("ICSA-26-001-01", cves=(self.CVE,), updated="2026-01-01T00:00:00Z",
+                         remediations={self.CVE: [{"category": "vendor_fix", "details": "New firmware"}]})
+        found, _count = ics.parse_archive(good(older, newer)).lookup(self.CVE)
+        self.assertEqual([(a.id, [s.text for s in a.steps]) for a in found],
+                         [("ICSA-26-001-01", ["New firmware"]), ("ICSA-25-001-01", ["Old advice"])])
+
+    def test_entries_that_cannot_be_used_are_left_out(self):
+        odd = [None, 5, "text", [], {"details": "no category"}, {"category": 5, "details": "x"},
+               {"category": "something_new", "details": "x"}, {"category": "mitigation"},
+               {"category": "mitigation", "details": 5}, {"category": "mitigation", "details": "   "},
+               {"category": "mitigation", "details": "\x00\x1b"},
+               {"category": "mitigation", "details": "Good one"}]
+        self.assertEqual([s.text for s in self.steps(odd)], ["Good one"])
+        for bad in (None, "mitigation", 5, {}, {"category": "mitigation", "details": "x"}):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.steps(bad), ())
+
+    def test_text_is_cleaned_and_a_long_text_is_cut_with_an_ellipsis(self):
+        steps = self.steps([{"category": "mitigation", "details": "Turn  off\n the\x1b[31m  port\u202e"},
+                            {"category": "mitigation", "details": "word " * 200}])
+        self.assertEqual(steps[0].text, "Turn off the[31m port")
+        self.assertEqual(len(steps[1].text), ics.MAX_STEP_CHARS - 1 + len(ics.ELLIPSIS))
+        self.assertTrue(steps[1].text.endswith("word" + ics.ELLIPSIS))
+        exact = "x" * ics.MAX_STEP_CHARS
+        self.assertEqual(self.steps([{"category": "mitigation", "details": exact}])[0].text, exact)
+
+    def test_only_a_plain_https_link_is_kept(self):
+        links = {"https://vendor.example/a?b=1": "https://vendor.example/a?b=1", "http://vendor.example/a": "",
+                 "javascript:alert(1)": "", "file:///etc/passwd": "", "https://127.0.0.1/a": "",
+                 "https://user@vendor.example/a": "", "https://vendor.example:8443/a": "",
+                 "https://vendor.example/\u202ea": "", "https://vendor.example/a b": "", "//vendor.example/a": "",
+                 "https://vendor.example/" + "a" * 500: "", 5: "", None: "", "": ""}
+        for given, kept in links.items():
+            with self.subTest(given=given):
+                steps = self.steps([{"category": "mitigation", "details": "Read this", "url": given}])
+                self.assertEqual((steps[0].text, steps[0].url), ("Read this", kept))
+
+    def test_a_step_is_limited_in_number(self):
+        entries = [{"category": "mitigation", "details": f"Step {n}"} for n in range(60)]
+        self.assertEqual(len(self.steps(entries)), ics.MAX_STEPS)
+
+    def test_one_advisory_keeps_a_limited_number_of_different_steps(self):
+        cves = [f"CVE-2026-{n:04d}" for n in range(1, 11)]
+        doc = advisory(cves=cves, remediations={
+            cve: [{"category": "mitigation", "details": f"{cve} step {n}"} for n in range(20)] for cve in cves})
+        data = ics.parse_archive(good(doc))
+        table = {s for per_cve in data.steps["ICSA-26-006-01"].values() for s in per_cve}
+        self.assertEqual(len(table), ics.MAX_STEP_TABLE)
+        ics.parse_index(ics.to_index(data))     # and what is kept is accepted when it is read back
+
+    def test_the_steps_survive_the_stored_index(self):
+        doc = advisory(cves=(self.CVE, "CVE-2026-0002"), remediations={
+            self.CVE: [{"category": "vendor_fix", "details": "Upgrade", "url": "https://vendor.example/fw"},
+                       {"category": "mitigation", "details": "Disable the web GUI"}],
+            "CVE-2026-0002": [{"category": "mitigation", "details": "Disable the web GUI"}]})
+        data = ics.parse_archive(good(doc))
+        again = ics.parse_index(ics.to_index(data))
+        self.assertEqual(again.steps, data.steps)
+        self.assertEqual([s.text for s in again.lookup("CVE-2026-0002")[0][0].steps], ["Disable the web GUI"])
+        self.assertEqual(again.lookup(self.CVE)[0][0].steps[0].url, "https://vendor.example/fw")
+        row = json.loads(ics.to_index(data))["advisories"][0]
+        self.assertEqual(len(row["steps"]), 2)      # the repeated step is stored once
+        self.assertEqual(row["applies"], {self.CVE: [0, 1], "CVE-2026-0002": [1]})
+
+    def test_advisories_found_by_vendor_and_product_carry_no_steps(self):
+        doc = advisory(products=("MicroServer",), remediations={
+            self.CVE: [{"category": "mitigation", "details": "Segment the network"}]})
+        found, _count, _known = ics.parse_archive(good(doc)).match("Columbia Weather Systems", "MicroServer")
+        self.assertEqual(found[0].steps, ())
+
+    def test_a_step_cannot_carry_markup_that_a_screen_would_run(self):
+        # The text is shown as plain text and the link only opens when the person asks, so text stays text
+        steps = self.steps([{"category": "mitigation", "details": "<script>alert(1)</script> $(rm -rf ~) %s {0}"}])
+        self.assertEqual(steps[0].text, "<script>alert(1)</script> $(rm -rf ~) %s {0}")
+
+
 class IndexTests(unittest.TestCase):
     def setUp(self):
         self.data = ics.parse_archive(good(
-            advisory(), advisory("ICSA-26-007-01", "Other Product", ("CVE-2025-61939", "CVE-2026-0002"), "Other Co")))
+            advisory(fixes={"CVE-2025-61939": ["vendor_fix", "mitigation"]}),
+            advisory("ICSA-26-007-01", "Other Product", ("CVE-2025-61939", "CVE-2026-0002"), "Other Co")))
         self.index = json.loads(ics.to_index(self.data))
 
     def reload(self, doc):
@@ -396,8 +526,54 @@ class IndexTests(unittest.TestCase):
             return doc
 
         cases = {
-            "unknown version": mutate(lambda d: d.update(version=4)),
-            "old version": mutate(lambda d: d.update(version=2)),
+            "unknown version": mutate(lambda d: d.update(version=5)),
+            "old version": mutate(lambda d: d.update(version=3)),
+            "steps not a list": mutate(lambda d: d["advisories"][0].update(steps="Upgrade")),
+            "too many different steps": mutate(lambda d: d["advisories"][0].update(
+                steps=[["M", f"step {n}", ""] for n in range(101)], applies={})),
+            "step not a list": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(0, "Upgrade")),
+            "step with too few parts": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(0, ["F", "x"])),
+            "step with a part that is not text": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", 5, ""])),
+            "step of an unknown kind": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(0, ["Z", "x", ""])),
+            "step with no text": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(0, ["F", "", ""])),
+            "step with control characters": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "a\x1b[31mb", ""])),
+            "step with text that is too long": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "x" * 402, ""])),
+            "step with a space at the end": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "x ", ""])),
+            "step link that is not https": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "x", "http://example.com/a"])),
+            "step link to an address": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "x", "https://127.0.0.1/a"])),
+            "step link with a script": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "x", "javascript:alert(1)"])),
+            "step link that is too long": mutate(lambda d: d["advisories"][0]["steps"].__setitem__(
+                0, ["F", "x", "https://example.com/" + "a" * 500])),
+            "steps for a CVE the advisory does not name": mutate(lambda d: d["advisories"][0].update(
+                applies={"CVE-2020-0001": [0]})),
+            "steps applied as a list": mutate(lambda d: d["advisories"][0].update(applies=[0])),
+            "steps applied as an empty list": mutate(lambda d: d["advisories"][0].update(applies=[])),
+            "steps applied as text": mutate(lambda d: d["advisories"][0].update(applies="")),
+            "too many step positions": mutate(lambda d: d["advisories"][0].update(
+                steps=[["M", f"step {n}", ""] for n in range(30)],
+                applies={"CVE-2025-61939": list(range(ics.MAX_STEPS + 1))})),
+            "step positions not a list": mutate(lambda d: d["advisories"][0]["applies"].update(
+                {"CVE-2025-61939": 0})),
+            "no step positions": mutate(lambda d: d["advisories"][0]["applies"].update({"CVE-2025-61939": []})),
+            "step position out of range": mutate(lambda d: d["advisories"][0]["applies"].update(
+                {"CVE-2025-61939": [7]})),
+            "negative step position": mutate(lambda d: d["advisories"][0]["applies"].update(
+                {"CVE-2025-61939": [-1]})),
+            "step position that is not a whole number": mutate(lambda d: d["advisories"][0]["applies"].update(
+                {"CVE-2025-61939": [0.0]})),
+            "step position that is true": mutate(lambda d: d["advisories"][0]["applies"].update(
+                {"CVE-2025-61939": [True]})),
+            "step position repeated": mutate(lambda d: d["advisories"][0]["applies"].update(
+                {"CVE-2025-61939": [0, 0]})),
+            "missing steps": mutate(lambda d: d["advisories"][0].pop("steps")),
+            "missing step positions": mutate(lambda d: d["advisories"][0].pop("applies")),
             "products not a list": mutate(lambda d: d["advisories"][0].update(products="Widget")),
             "too many products": mutate(lambda d: d["advisories"][0].update(products=["p"] * 31)),
             "product with control characters": mutate(lambda d: d["advisories"][0].update(products=["a\x00b"])),
@@ -481,7 +657,7 @@ class IcsFuzzTests(unittest.TestCase):
         def test_any_json_as_an_advisory_is_skipped_or_read_with_clean_text(self, doc):
             raw = json.dumps(doc).encode("utf-8")
             try:
-                found, cves, _fixes = ics._read_advisory(raw, "icsa-26-006-01")
+                found, cves, _fixes, _steps = ics._read_advisory(raw, "icsa-26-006-01")
             except ValueError:
                 return
             self.assertTrue(found.title.isprintable())

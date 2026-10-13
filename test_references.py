@@ -105,6 +105,15 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(refs.describe(refs.Reference(text="plain")), "plain")
 
 
+class LinkSafetyTests(unittest.TestCase):
+    def test_an_address_with_white_space_is_not_a_link(self):
+        for text in ("https://vendor.example/a b", "https://vendor.example/a\tb", "https://vendor.example/a\u00a0b",
+                     "https://vendor.example/a\nb", " https://vendor.example/a", "https://vendor.example/a "):
+            with self.subTest(text=text):
+                self.assertEqual(refs.safe_https_url(text), "")
+        self.assertEqual(refs.safe_https_url("https://vendor.example/a"), "https://vendor.example/a")
+
+
 class MarkdownTests(unittest.TestCase):
     def test_labels_and_addresses_cannot_break_out_of_the_link(self):
         item = refs.Reference("Evil](https://bad.example.com) <b>x</b>", "https://a.example.com/p_(1)<x>")

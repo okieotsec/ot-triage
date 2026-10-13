@@ -2,6 +2,7 @@ import itertools
 import unittest
 
 import explain
+import icsadvisories as ics
 import threatdata as td
 from explain import AssessInputs
 from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Threat, prioritize
@@ -13,6 +14,42 @@ CUSTOM = Settings(cvss_high=7.5, cvss_critical=9.5)
 def inputs(cvss=8.8, threat=Threat.ACTIVE, asset=Asset.CROWN, exposure=Exposure.HIGH, controls=Controls.NONE,
            patch=Patch.AVAILABLE):
     return AssessInputs(cvss, threat, asset, exposure, controls, patch)
+
+
+class AdvisoryStepSummaryTests(unittest.TestCase):
+    def advisory(self, count=2, text="Upgrade to 3.11.1"):
+        steps = tuple([ics.Step("F", text, "https://vendor.example/fw")]
+                      + [ics.Step("M", f"Disable port {n}") for n in range(count - 1)])
+        return ics.IcsAdvisory("ICSA-26-281-01", "Red Lion N-Tron 700", "2026-10-08", "2026-10-08", steps=steps)
+
+    def result(self):
+        return prioritize(8.8, Threat.ACTIVE, Asset.CROWN, Exposure.HIGH, Controls.NONE, Patch.AVAILABLE, CUSTOM)
+
+    def test_the_plain_summary_lists_the_vendors_steps_under_the_advisory(self):
+        text = explain.summary_text(self.result(), advisories=(self.advisory(),))
+        self.assertIn("- ICSA-26-281-01: Red Lion N-Tron 700 (https://www.cisa.gov/news-events/ics-advisories/"
+                      "icsa-26-281-01)\n  - Fix: Upgrade to 3.11.1 (https://vendor.example/fw)\n"
+                      "  - Mitigation: Disable port 0", text)
+
+    def test_only_a_few_steps_are_listed_and_the_rest_are_counted(self):
+        text = explain.summary_text(self.result(), advisories=(self.advisory(count=9),))
+        self.assertEqual(text.count("  - Mitigation:"), explain.SUMMARY_STEPS - 1)
+        self.assertIn("  - and 3 more steps (see the advisory)", text)
+        self.assertNotIn("more steps", explain.summary_text(self.result(), advisories=(self.advisory(count=6),)))
+
+    def test_the_markdown_summary_escapes_the_vendors_text(self):
+        evil = "[click](javascript:alert(1)) <b>x</b> `y` *z*"
+        text = explain.markdown_summary(self.result(), advisories=(self.advisory(text=evil),))
+        step = next(line for line in text.splitlines() if "Fix:" in line)
+        self.assertTrue(step.startswith("  - ["))
+        self.assertNotIn("](javascript", step)
+        self.assertNotIn("<b>", step)
+        self.assertIn("\\[click\\]", step)
+        self.assertIn("(https://vendor.example/fw)", step)
+
+    def test_an_advisory_without_steps_adds_nothing(self):
+        plain = ics.IcsAdvisory("ICSA-26-281-01", "t", "2026-10-08", "2026-10-08")
+        self.assertNotIn("\n  - ", explain.summary_text(self.result(), advisories=(plain,)))
 
 
 class WhatWouldChangeTests(unittest.TestCase):

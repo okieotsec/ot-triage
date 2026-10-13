@@ -233,7 +233,7 @@ class BatchView:
         self.detail_refs = ReferenceList(area, s, self.ctx.open_reference, compact=True, limit=REFERENCE_LIMIT)
         self.detail_adv_title = tk.Label(area, text="ICS ADVISORIES FROM CISA", font=s.font(9, "bold"), bg=t.card,
                                          fg=t.accent, anchor="w")
-        self.detail_adv = AdvisoryList(area, s, self.ctx.open_reference, compact=True)
+        self.detail_adv = AdvisoryList(area, s, self.ctx.open_reference, compact=True, max_steps=4)
 
     # ---- loading ----
     def open_file(self):

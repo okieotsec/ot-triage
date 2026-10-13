@@ -56,12 +56,40 @@ REMEDIATION_WORDS = {"F": "vendor fix available",
                      "M": "mitigation or workaround only"}
 REMEDIATION_CHIPS = {"F": "Vendor fix (CISA)", "P": "Partial fix (CISA)", "N": "No fix yet (CISA)",
                      "X": "No fix planned (CISA)", "M": "Mitigation only (CISA)"}
-INDEX_VERSION = 3
+# The vendor's own words about each fix or mitigation: one Step per CSAF remediation entry. The letters are the
+# step kinds; the words are shown to the person.
+STEP_KINDS = {"vendor_fix": "F", "mitigation": "M", "workaround": "W", "none_available": "N", "no_fix_planned": "X"}
+STEP_WORDS = {"F": "Fix", "M": "Mitigation", "W": "Workaround", "N": "No fix available", "X": "No fix planned"}
+MAX_STEP_CHARS = 400               # text of one step (longer text is cut and ends with an ellipsis)
+MAX_STEP_URL_CHARS = 500           # a longer address is left out; the text is kept
+MAX_STEPS = 25                     # steps kept for one CVE of one advisory
+MAX_STEP_TABLE = 100               # different steps kept for one advisory
+ELLIPSIS = "\u2026"
+INDEX_VERSION = 4
 
 ICS_FILE, ICS_META_FILE = "ics_advisories.json", "ics_meta.json"
 ID_RE = re.compile(r"^ICS(?:A|MA)-\d{2}-\d{3}-\d{2}[A-Z]?$")
 MEMBER_RE = re.compile(r"^[^/]{1,100}/csaf_files/OT/white/\d{4}/(icsm?a-\d{2}-\d{3}-\d{2}[a-z]?)\.json$")
 DATE_RE = threatdata.DATE_RE
+
+
+@dataclass(frozen=True)
+class Step:
+    """One thing a vendor says to do about a CVE: a kind (a key of STEP_WORDS), the vendor's text, maybe a link."""
+
+    kind: str
+    text: str
+    url: str = ""               # a plain https address (references.safe_https_url), or empty
+
+    @property
+    def kind_text(self):
+        """The kind in words."""
+        return STEP_WORDS.get(self.kind, "")
+
+    @property
+    def line(self):
+        """One readable line: the kind and the text."""
+        return f"{self.kind_text}: {self.text}"
 
 
 @dataclass(frozen=True)
@@ -75,6 +103,7 @@ class IcsAdvisory:
     vendors: tuple = ()
     products: tuple = ()        # product names the advisory lists (for matching an asset's vendor and product)
     fix: str = ""               # what this advisory says about fixing the looked-up CVE: a key of REMEDIATION_WORDS
+    steps: tuple = ()           # the vendor's fixes and mitigations for the looked-up CVE (Step objects)
 
     @property
     def fix_text(self):
@@ -111,16 +140,18 @@ class IcsData:
     advisories: dict            # advisory id -> IcsAdvisory
     by_cve: dict                # CVE id -> tuple of advisory ids, newest first
     fixes: dict = field(default_factory=dict)    # advisory id -> {CVE id: remediation letter}
+    steps: dict = field(default_factory=dict)    # advisory id -> {CVE id: tuple of Step}
     _cache: dict = field(default_factory=dict, repr=False, compare=False)    # work done by match(), kept for reuse
 
     def lookup(self, cve):
         """Return the advisories that name this CVE, newest first (at most MAX_LISTED) and how many there are.
 
-        Each advisory carries what it says about fixing this CVE in its fix field.
+        Each advisory carries what it says about fixing this CVE in its fix and steps fields.
         """
         cve = threatdata.normalize_cve(cve)
         ids = self.by_cve.get(cve, ())
-        return tuple(dataclasses.replace(self.advisories[i], fix=self.fixes.get(i, {}).get(cve, ""))
+        return tuple(dataclasses.replace(self.advisories[i], fix=self.fixes.get(i, {}).get(cve, ""),
+                                         steps=self.steps.get(i, {}).get(cve, ()))
                      for i in ids[:MAX_LISTED]), len(ids)
 
     def _postings(self):
@@ -243,10 +274,43 @@ def _remediation(item):
     return "M" if categories & {"mitigation", "workaround"} else ""
 
 
+def _step_text(text):
+    """The vendor's text for one step, cleaned and cut to MAX_STEP_CHARS (an ellipsis shows that it was cut)."""
+    text = references.clean(text)
+    if len(text) <= MAX_STEP_CHARS:
+        return text
+    return text[:MAX_STEP_CHARS].rstrip() + ELLIPSIS
+
+
+def _steps(item):
+    """The vendor's steps for one vulnerability, in the order the advisory gives them: at most MAX_STEPS different ones.
+
+    Only remediation entries of a known category with some text are kept. A link is kept only when it is a plain
+    https address of reasonable length; otherwise the text is kept without it.
+    """
+    found = item.get("remediations")
+    steps = []
+    for entry in found if isinstance(found, list) else ():
+        if not isinstance(entry, dict) or not isinstance(entry.get("category"), str):
+            continue
+        kind, details = STEP_KINDS.get(entry["category"]), entry.get("details")
+        if kind is None or not isinstance(details, str) or not references.clean(details):
+            continue
+        url = entry.get("url")
+        url = url if isinstance(url, str) and len(url) <= MAX_STEP_URL_CHARS and references.safe_https_url(url) else ""
+        step = Step(kind, _step_text(details), url)
+        if step not in steps:
+            steps.append(step)
+            if len(steps) == MAX_STEPS:
+                break
+    return tuple(steps)
+
+
 def _read_advisory(raw, stem):
-    """Return (IcsAdvisory, cves, fixes) from one CSAF advisory file, or raise ValueError if it cannot be trusted.
+    """Return (IcsAdvisory, cves, fixes, steps) from one CSAF advisory file; raise ValueError if it is not trusted.
 
     fixes maps a CVE id to its remediation letter, and leaves out CVEs the advisory does not say anything about.
+    steps maps a CVE id to the vendor's steps (a tuple of Step), and leaves out CVEs that have none.
     """
     try:
         doc = json.loads(raw.decode("utf-8"), parse_constant=threatdata._reject_constant,
@@ -270,7 +334,7 @@ def _read_advisory(raw, stem):
     items = doc.get("vulnerabilities", [])
     if not isinstance(items, list):
         raise ValueError("vulnerabilities is not a list")
-    cves, fixes = [], {}
+    cves, fixes, steps, table = [], {}, {}, set()
     for item in items:
         cve = item.get("cve") if isinstance(item, dict) else None
         if isinstance(cve, str) and CVE_RE.fullmatch(cve) and cve not in cves:
@@ -279,28 +343,38 @@ def _read_advisory(raw, stem):
                 raise ValueError(f"it names more than {ICS_MAX_CVES:,} CVEs")
             if _remediation(item):
                 fixes[cve] = _remediation(item)
+            found = []
+            for step in _steps(item):
+                # Only so many different steps are kept for one advisory; a step that would go over that is left out
+                if step in table or len(table) < MAX_STEP_TABLE:
+                    table.add(step)
+                    found.append(step)
+            if found:
+                steps[cve] = tuple(found)
     tree = doc.get("product_tree")
     vendors = _vendors(tree) if isinstance(tree, dict) else ()
     products = _products(tree) if isinstance(tree, dict) else ()
     advisory = IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors, products)
-    return advisory, cves, fixes
+    return advisory, cves, fixes, steps
 
 
-def _assemble(triples):
-    """Build an IcsData from (IcsAdvisory, cves, fixes) triples."""
-    advisories, links, all_fixes = {}, {}, {}
-    for advisory, cves, fixes in triples:
+def _assemble(quads):
+    """Build an IcsData from (IcsAdvisory, cves, fixes, steps) tuples."""
+    advisories, links, all_fixes, all_steps = {}, {}, {}, {}
+    for advisory, cves, fixes, steps in quads:
         if advisory.id in advisories:
             raise ThreatDataError(f"advisory {advisory.id} is listed twice")
         advisories[advisory.id] = advisory
         if fixes:
             all_fixes[advisory.id] = fixes
+        if steps:
+            all_steps[advisory.id] = steps
         for cve in cves:
             links.setdefault(cve, []).append(advisory.id)
     by_cve = {cve: tuple(sorted(ids, key=lambda i: (advisories[i].updated, i), reverse=True))
               for cve, ids in links.items()}
     feed_date = max(a.updated for a in advisories.values())
-    return IcsData(feed_date, advisories, by_cve, all_fixes)
+    return IcsData(feed_date, advisories, by_cve, all_fixes, all_steps)
 
 
 class _Counting(io.RawIOBase):
@@ -355,7 +429,7 @@ def parse_archive(data):
     if skipped > max(MAX_SKIPPED, int(candidates * SKIPPED_SHARE)):
         raise ThreatDataError(f"{skipped} of {candidates} advisories could not be read (has the format changed?)")
     # An advisory that names no CVE stays out of the index: there is nothing to look up
-    return _assemble([(a, c, f) for a, c, f in pairs if c])
+    return _assemble([(a, c, f, s) for a, c, f, s in pairs if c])
 
 
 def to_index(data):
@@ -364,10 +438,18 @@ def to_index(data):
     for cve, ids in data.by_cve.items():
         for ident in ids:
             names.setdefault(ident, []).append(cve)
-    rows = [{"id": a.id, "title": a.title, "published": a.published, "updated": a.updated, "vendors": list(a.vendors),
-             "products": list(a.products), "cves": sorted(names.get(a.id, ())),
-             "fixes": dict(sorted(data.fixes.get(a.id, {}).items()))}
-            for a in sorted(data.advisories.values(), key=lambda a: a.id)]
+    rows = []
+    for a in sorted(data.advisories.values(), key=lambda a: a.id):
+        table, position, applies = [], {}, {}      # an advisory repeats the same steps for most of its CVEs
+        for cve, steps in sorted(data.steps.get(a.id, {}).items()):
+            for step in steps:
+                if step not in position:
+                    position[step] = len(table)
+                    table.append([step.kind, step.text, step.url])
+            applies[cve] = [position[step] for step in steps]
+        rows.append({"id": a.id, "title": a.title, "published": a.published, "updated": a.updated,
+                     "vendors": list(a.vendors), "products": list(a.products), "cves": sorted(names.get(a.id, ())),
+                     "fixes": dict(sorted(data.fixes.get(a.id, {}).items())), "steps": table, "applies": applies})
     return json.dumps({"version": INDEX_VERSION, "feed_date": data.feed_date, "count": len(rows), "advisories": rows},
                       separators=(",", ":")).encode("utf-8")
 
@@ -397,7 +479,7 @@ def parse_index(raw):
 
 def _index_row(row):
     if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "products",
-                                                 "cves", "fixes"}:
+                                                 "cves", "fixes", "steps", "applies"}:
         raise ValueError("unexpected fields")
     ident, title, vendors, cves, fixes = row["id"], row["title"], row["vendors"], row["cves"], row["fixes"]
     products = row["products"]
@@ -416,8 +498,36 @@ def _index_row(row):
         raise ValueError("bad CVE list")
     if not isinstance(fixes, dict) or not all(k in cves and v in REMEDIATION_WORDS for k, v in fixes.items()):
         raise ValueError("bad remediation list")
+    steps = _index_steps(row["steps"], row["applies"], cves)
     return IcsAdvisory(ident, title, _date(row["published"], "published"), _date(row["updated"], "updated"),
-                       tuple(vendors), tuple(products)), cves, fixes
+                       tuple(vendors), tuple(products)), cves, fixes, steps
+
+
+def _index_steps(table, applies, cves):
+    """Validate the stored steps of one advisory; return {CVE id: tuple of Step}."""
+    if not isinstance(table, list) or len(table) > MAX_STEP_TABLE:
+        raise ValueError("bad steps")
+    found = []
+    for entry in table:
+        if not isinstance(entry, list) or len(entry) != 3 or not all(isinstance(x, str) for x in entry):
+            raise ValueError("bad step")
+        kind, text, url = entry
+        if (kind not in STEP_WORDS or not text or len(text) > MAX_STEP_CHARS + len(ELLIPSIS)
+                or text != references.clean(text)):
+            raise ValueError("bad step text")
+        if url and (len(url) > MAX_STEP_URL_CHARS or references.safe_https_url(url) != url):
+            raise ValueError("bad step link")
+        found.append(Step(kind, text, url))
+    if not isinstance(applies, dict) or not all(k in cves for k in applies):
+        raise ValueError("bad step list")
+    steps = {}
+    for cve, positions in applies.items():
+        if (not isinstance(positions, list) or not positions or len(positions) > MAX_STEPS
+                or len(set(positions)) != len(positions)
+                or not all(type(p) is int and 0 <= p < len(found) for p in positions)):
+            raise ValueError("bad step positions")
+        steps[cve] = tuple(found[p] for p in positions)
+    return steps
 
 
 # ---- storage, update and import ---------------------------------------------

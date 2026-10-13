@@ -45,7 +45,8 @@ def clean(text):
 
 def safe_https_url(candidate):
     """Return the address if it is a plain, ordinary https link, otherwise an empty string."""
-    if len(candidate) > MAX_URL_CHARS or not candidate.isascii() or not candidate.isprintable() or "\\" in candidate:
+    if (len(candidate) > MAX_URL_CHARS or not candidate.isascii() or not candidate.isprintable() or "\\" in candidate
+            or any(ch.isspace() for ch in candidate)):
         return ""
     try:
         parts = urllib.parse.urlsplit(candidate)
