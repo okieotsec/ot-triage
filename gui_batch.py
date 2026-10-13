@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import batch
+import compare
 import explain
 import inventory
 import rollup
@@ -29,13 +30,17 @@ DETAILS_MAX_HEIGHT = 190
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
 COLUMNS = [("rank", "#", 46, "center"), ("id", "ID", 80, "w"), ("asset", "Asset", 112, "w"),
            ("cve", "CVE", 124, "w"), ("name", "Name", 200, "w"),
-           ("priority", "Priority", 96, "w"), ("score", "Score", 62, "center"), ("cvss", "CVSS", 54, "center"),
+           ("priority", "Priority", 96, "w"), ("change", "Change", 118, "w"), ("score", "Score", 62, "center"),
+           ("cvss", "CVSS", 54, "center"),
            ("source", "Threat source", 190, "w")]
 ASSET_COLUMNS = [("asset", "Asset", 160, "w"), ("worst", "Worst", 92, "w"), ("now", "Now", 56, "center"),
                  ("next", "Next", 56, "center"), ("never", "Never", 62, "center"),
                  ("findings", "Findings", 76, "center"), ("score", "Top score", 84, "center"),
                  ("top", "Top finding", 260, "w")]
 MODES = [("findings", "Findings"), ("assets", "By asset")]
+CHANGE_ORDER = {compare.NEW: 0, compare.UP: 1, compare.DOWN: 2, compare.AMBIGUOUS: 3, compare.UNSCORED: 4,
+                compare.SAME: 5, "": 6}
+RESOLVED_LISTED = 25
 FLEXIBLE_COLUMNS = ("name", "source")   # share what the fixed-width columns leave over
 MIN_FLEXIBLE = {"name": 110, "source": 90}
 NAME_SHARE = 0.55
@@ -55,6 +60,8 @@ class BatchState:
         self.mode = "findings"                       # "findings" or "assets" (the per-asset roll-up)
         self.asset_sort_key, self.asset_sort_desc = "rollup", False
         self.summaries, self.unassigned = None, ()   # the roll-up, worked out the first time it is needed
+        self.previous = None                         # (label, rows, skipped) of the export to compare with
+        self.comparison = None                       # the current findings compared with it (compare.Comparison)
 
 
 def _text(item):
@@ -110,6 +117,18 @@ class BatchView:
         self.inventory_label = tk.Label(self.inventory_row, text="", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
         self.inventory_label.pack(side=tk.LEFT, padx=12, fill=tk.X, expand=True)
         self._update_inventory_label()
+        self.compare_row = tk.Frame(self.body, bg=t.bg)
+        self.compare_row.pack(fill=tk.X, pady=(8, 0))
+        self.compare_button = button(self.compare_row, s, "Compare with previous\u2026", self.compare_with,
+                                     "secondary")
+        self.compare_button.pack(side=tk.LEFT)
+        self.compare_clear_button = button(self.compare_row, s, "Clear", self.clear_comparison, "secondary")
+        self.compare_clear_button.pack(side=tk.RIGHT)
+        self.resolved_button = button(self.compare_row, s, "Show resolved\u2026", self.show_resolved, "secondary")
+        self.resolved_button.pack(side=tk.RIGHT, padx=8)
+        self.compare_label = tk.Label(self.compare_row, text="", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
+        self.compare_label.pack(side=tk.LEFT, padx=12, fill=tk.X, expand=True)
+        self._update_compare_label()
         self.progress_row = tk.Frame(self.body, bg=t.bg)
         self.progress_label = tk.Label(self.progress_row, text="", font=s.font(9), bg=t.bg, fg=t.muted)
         self.progress_label.pack(side=tk.LEFT)
@@ -313,6 +332,7 @@ class BatchView:
         state.sort_key, state.sort_desc, state.filter = "rank", False, "all"
         state.summaries, state.unassigned = None, ()
         state.asset_sort_key, state.asset_sort_desc = "rollup", False
+        self._apply_comparison()
         self.ctx.status_changed()
         if alive:
             self.refresh()
@@ -369,6 +389,7 @@ class BatchView:
                 "asset": lambda i: i.asset_id.lower(),
                 "cve": lambda i: i.cve, "name": lambda i: i.name.lower(),
                 "priority": lambda i: -explain.URGENCY.get(i.priority, -1),
+                "change": lambda i: CHANGE_ORDER.get(self._change_kind(i), 9),
                 "score": lambda i: i.result.score if i.result else -1.0, "cvss": lambda i: i.cvss or -1.0,
                 "source": lambda i: i.threat_sources.lower()}
         rows.sort(key=keys[state.sort_key], reverse=state.sort_desc)
@@ -378,6 +399,7 @@ class BatchView:
         """Redraw the counters, headings, table and details from the current state."""
         state, t = self.state, self.style.theme
         self._show_mode()
+        self._update_compare_label()
         if state.mode == "assets":
             self._refresh_assets()
             return
@@ -393,7 +415,8 @@ class BatchView:
             self.tree.heading(key, text=title + arrow)
         # The Asset column only appears when the file has asset ids, so ordinary files keep the room.
         has_assets = any(i.asset_id for i in state.items)
-        self.tree.configure(displaycolumns=[c[0] for c in COLUMNS if c[0] != "asset" or has_assets])
+        self.tree.configure(displaycolumns=[c[0] for c in COLUMNS if (c[0] != "asset" or has_assets)
+                                            and (c[0] != "change" or state.comparison is not None)])
         self._fit_columns()
         self.tree.delete(*self.tree.get_children())
         shown = self.visible()
@@ -405,9 +428,10 @@ class BatchView:
             score = f"{item.result.score:.2f}" if item.result else ""
             cvss = f"{item.cvss:.1f}" if item.result else item.cvss_raw
             source = item.threat_sources if item.result else item.error
+            change = state.comparison.changes.get(id(item)) if state.comparison is not None else None
             self.tree.insert("", tk.END, iid=str(index), tags=(item.priority,),
                              values=(rank, item.id, item.asset_id, item.cve, item.name, f"{symbol} {item.priority}",
-                                     score, cvss, source))
+                                     change.text if change else "", score, cvss, source))
         self._update_file_label()
         self.count_label.configure(text=f"Showing {len(shown)} of {len(state.items)}" if state.items else "")
         set_enabled(self.export_button, bool(state.items))
@@ -486,6 +510,13 @@ class BatchView:
                 if item.cvss_environmental is not None:
                     lines.append(f"Environmental score: {item.cvss_environmental:.1f}, shown for comparison; the "
                                  "priority uses the base score.")
+            change = self.state.comparison.changes.get(id(item)) if self.state.comparison else None
+            if change is not None and change.text:
+                was = change.previous
+                score = f", ordering score {was.score:.2f}" if was is not None and was.score is not None else ""
+                lines += ["", f"Compared with the previous export: {change.text}"
+                              + (f" (it was {was.priority}{score})" if was is not None and change.kind != compare.SAME
+                                 else "") + "."]
             if item.advisories and item.advisories[0].fix_text:
                 lines += ["", f"CISA {item.advisories[0].id}: {item.advisories[0].fix_text} (context only)."]
             if item.asset_id:
@@ -521,6 +552,91 @@ class BatchView:
         if advisories:
             self.detail_adv_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
             self.detail_adv.pack(fill=tk.X, before=self.detail_text)
+
+    # ---- comparing with a previous export ----
+    def compare_with(self):
+        """Ask for a previous ranked export and compare the open findings with it."""
+        path = self.ctx.open_file("Select a previous ranked CSV export", [("CSV files", "*.csv"), ("All files", "*.*")])
+        if not path:
+            return
+
+        def job(_cancel, report):
+            report("Reading the previous export...")
+            rows, skipped = compare.load_previous(path)
+            return os.path.basename(path), rows, skipped
+
+        def done(result, error):
+            if self.frame.winfo_exists():
+                self.progress_bar.stop()
+                self.progress_row.pack_forget()
+                set_enabled(self.compare_button, True)
+            if self.ctx.worker.cancel_event.is_set():
+                return
+            if error:
+                self.ctx.error("Previous export", error)
+                return
+            self.state.previous = result
+            self._apply_comparison()
+            if self.frame.winfo_exists():
+                self.refresh()
+            skipped = result[2]
+            if skipped:
+                self.ctx.warn("Previous export", f"{skipped} row{'s' if skipped != 1 else ''} of the previous export "
+                                                 "had no usable priority and were left out.")
+
+        if not self.ctx.worker.start(job, done, self._progress):
+            self.ctx.info("Batch import", "Another task is still running. Wait for it to finish or cancel it.")
+            return
+        set_enabled(self.compare_button, False)
+        self.progress_row.pack(fill=tk.X, pady=(8, 0), after=self.toolbar)
+        self.progress_bar.start(12)
+
+    def clear_comparison(self):
+        """Stop comparing with a previous export."""
+        self.state.previous = self.state.comparison = None
+        self.refresh()
+
+    def _apply_comparison(self):
+        """Compare the current findings with the previous export, if there is one. Never raises."""
+        state = self.state
+        if state.previous is None or not state.items:
+            state.comparison = None
+        else:
+            label, rows, skipped = state.previous
+            state.comparison = compare.compare(state.items, rows, label, skipped)
+        if self.frame.winfo_exists():
+            self._update_compare_label()
+
+    def _change_kind(self, item):
+        change = self.state.comparison.changes.get(id(item)) if self.state.comparison is not None else None
+        return change.kind if change is not None else ""
+
+    def _update_compare_label(self):
+        state = self.state
+        if state.previous is None:
+            text = "No comparison (optional: what is new, what moved and what was resolved since an earlier export)"
+        elif state.comparison is None:
+            text = f"Previous export: {state.previous[0]}, {len(state.previous[1]):,} rows. Open a findings file."
+        else:
+            text = state.comparison.summary()
+        self.compare_label.configure(text=text)
+        set_enabled(self.compare_clear_button, state.previous is not None)
+        set_enabled(self.resolved_button, state.comparison is not None and bool(state.comparison.resolved))
+
+    def show_resolved(self):
+        """List the findings that were in the previous export and are not in the current file."""
+        comparison = self.state.comparison
+        if comparison is None or not comparison.resolved:
+            return
+        shown = comparison.resolved[:RESOLVED_LISTED]
+        lines = [f"\u2022 {row.label}  ({row.asset_id + ', ' if row.asset_id else ''}was {row.priority})"
+                 for row in shown]
+        more = len(comparison.resolved) - len(shown)
+        if more:
+            lines.append(f"...and {more} more")
+        self.ctx.info("Resolved since the previous export",
+                      f"{len(comparison.resolved)} finding{'s' if len(comparison.resolved) != 1 else ''} in "
+                      f"{comparison.label} are not in the open file:\n\n" + "\n".join(lines))
 
     # ---- the per-asset roll-up ----
     def set_mode(self, mode):
@@ -655,7 +771,7 @@ class BatchView:
         if not out:
             return
         try:
-            batch.write_results(out, state.items, state.data)
+            batch.write_results(out, state.items, state.data, state.comparison)
         except OSError as error:
             self.ctx.error("Export failed", str(error))
             return

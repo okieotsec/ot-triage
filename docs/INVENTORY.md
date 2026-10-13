@@ -61,3 +61,13 @@ With a findings file that has an `asset_id` column (with or without an inventory
 - **Export:** **Export asset roll-up** saves one row per asset (`asset_id`, `worst_priority`, `now`, `next`, `never`, `errors`, `findings`, `visit_together`, `top_ordering_score`, `top_finding`, `finding_ids`). Like every export, text cells that could run as a spreadsheet formula are neutralised.
 - **Nothing in this view changes a priority.** It only groups rows that were already scored.
 
+## Comparing with a previous export
+
+For a routine (a weekly scan, say) the useful question is often "what changed since last time?". In Batch, **Compare with previous…** asks for an earlier ranked CSV that was saved with **Export ranked CSV**.
+
+- **The Change column** appears next to Priority: *New* (not in the previous export), *Up from NEXT* or *Down from NOW* (the bucket changed), *Same*, *Not comparable* (one of the two could not be scored) and *Could not match*. The line above the table counts them, and **Show resolved…** lists the findings that were in the previous export and are not in the open file. Click the Change heading to sort the new and worsened findings to the top.
+- **How findings are recognised:** by `id` when both files have one; if that is missing or not unique, by CVE and asset; if that does not settle it, by name and asset. Case and extra spaces do not matter. If more than one previous row could be the same finding, the finding is reported as *Could not match* and none of those rows is used, rather than guessing.
+- **Keeping it:** the previous export stays loaded while you open newer findings files, so each new scan is compared with the same baseline. **Clear** stops the comparison.
+- **The export** gains `change` (`new`, `up`, `down`, `same`, `unscored` or `ambiguous`) and `previous_priority` columns, blank when no comparison is active. Resolved findings are not in the ranked export.
+- **Safety:** the previous file is untrusted like every other file the tool reads. It is limited to 25 MB and 50,000 rows, rows with an unknown priority are skipped and counted, and text is cleaned. Nothing about a comparison changes a priority or an ordering score.
+

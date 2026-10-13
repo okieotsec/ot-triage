@@ -303,7 +303,16 @@ OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cv
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
-                  "from_inventory", "cvss_environmental", "ics_advisories", "ics_remediation"]
+                  "from_inventory", "cvss_environmental", "ics_advisories", "ics_remediation", "change",
+                  "previous_priority"]
+
+
+def _change_cells(comparison, item):
+    """The change and previous_priority cells of one exported row (fixed words only; blank without a comparison)."""
+    change = comparison.changes.get(id(item)) if comparison is not None else None
+    if change is None:
+        return {"change": "", "previous_priority": ""}
+    return {"change": change.kind, "previous_priority": change.previous.priority if change.previous else ""}
 
 
 def _advisory_cell(item):
@@ -313,8 +322,12 @@ def _advisory_cell(item):
     return f"{cell} ; and {left_out} more" if left_out > 0 else cell
 
 
-def write_results(path, items, threatdata=None):
-    """Write ranked results to a CSV file with formula-safe text cells."""
+def write_results(path, items, threatdata=None, comparison=None):
+    """Write ranked results to a CSV file with formula-safe text cells.
+
+    With a comparison (see compare.py) the change and previous_priority columns say how each row differs from the
+    previous export; without one they are blank.
+    """
     data_versions = threatdata.versions() if threatdata is not None else ""
     with open(path, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.DictWriter(fh, fieldnames=OUTPUT_COLUMNS)
@@ -329,7 +342,8 @@ def write_results(path, items, threatdata=None):
                    "asset_id": _safe(item.asset_id), "from_inventory": "; ".join(item.from_inventory),
                    "cvss_environmental": "" if item.cvss_environmental is None else f"{item.cvss_environmental:.1f}",
                    "ics_advisories": _safe(_advisory_cell(item)),
-                   "ics_remediation": _safe(item.advisories[0].fix_text if item.advisories else "")}
+                   "ics_remediation": _safe(item.advisories[0].fix_text if item.advisories else ""),
+                   **_change_cells(comparison, item)}
             if item.result:
                 rank += 1
                 row.update(

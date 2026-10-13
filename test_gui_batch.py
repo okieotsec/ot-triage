@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import batch
+import compare
 import gui_batch
 import gui_widgets
 import icsadvisories
@@ -1038,6 +1039,137 @@ class BatchByAssetTests(BatchViewTestCase):
         view.set_mode("assets")
         self.pump(0.2)
         self.assertEqual([r[0] for r in self.asset_rows(view)], [s.asset_id for s in expected])
+
+
+class BatchCompareTests(BatchViewTestCase):
+    FINDINGS = ("id,name,cvss,threat,asset,exposure\n"
+                "F1,Gets worse,9.0,active,standard,high\nF2,Gets better,3.0,none,standard,high\n"
+                "F3,Stays,3.5,none,standard,high\nF4,Brand new,9.0,active,standard,high\n")
+    PREVIOUS = ("rank,id,cve,name,priority,ordering_score,asset_id\n"
+                "1,F1,,Gets worse,NEVER,1.00,\n2,F2,,Gets better,NOW,9.00,\n3,F3,,Stays,NEVER,2.00,\n"
+                "4,F9,CVE-2020-0001,Fixed since,NEXT,5.00,PLC-1\n")
+
+    def prepare(self, previous=None):
+        view = self.build()
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        self.ctx.open_file = mock.Mock(return_value=self.write_csv("previous.csv", previous or self.PREVIOUS))
+        view.compare_with()
+        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running and view.state.previous is not None))
+        self.pump(0.2)
+        return view
+
+    def by_id(self):
+        return {values[COL["id"]]: values for values in self.rows()}
+
+    def test_without_a_comparison_there_is_no_change_column(self):
+        view = self.build()
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        self.assertNotIn("change", view.tree.cget("displaycolumns"))
+        self.assertIn("No comparison", view.compare_label.cget("text"))
+        self.assertEqual(str(view.compare_clear_button.cget("state")), "disabled")
+        self.assertEqual(str(view.resolved_button.cget("state")), "disabled")
+
+    def test_the_change_column_says_how_each_finding_moved(self):
+        view = self.prepare()
+        self.assertIn("change", view.tree.cget("displaycolumns"))
+        rows = self.by_id()
+        self.assertEqual({k: v[COL["change"]] for k, v in rows.items()},
+                         {"F1": "Up from NEVER", "F2": "Down from NOW", "F3": "Same", "F4": "New"})
+        self.assertEqual(view.compare_label.cget("text"),
+                         "Compared with previous.csv: 1 new, 1 moved up, 1 moved down, 1 resolved")
+
+    def test_the_priorities_and_scores_are_the_same_with_and_without_a_comparison(self):
+        view = self.build()
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        before = {v[COL["id"]]: (v[COL["priority"]], v[COL["score"]]) for v in self.rows()}
+        self.ctx.open_file = mock.Mock(return_value=self.write_csv("previous.csv", self.PREVIOUS))
+        view.compare_with()
+        self.assertTrue(self.pump(10, until=lambda: view.state.previous is not None))
+        self.pump(0.2)
+        self.assertEqual({v[COL["id"]]: (v[COL["priority"]], v[COL["score"]]) for v in self.rows()}, before)
+
+    def test_the_details_of_a_row_say_what_it_was_before(self):
+        view = self.prepare()
+        iid = next(i for i in view.tree.get_children() if view.tree.item(i, "values")[COL["id"]] == "F1")
+        view.tree.selection_set(iid)
+        self.pump(0.2)
+        text = view.detail_text.cget("text")
+        self.assertIn("Compared with the previous export: Up from NEVER (it was NEVER, ordering score 1.00).", text)
+
+    def test_sorting_by_change_puts_new_findings_first(self):
+        view = self.prepare()
+        view.sort_by("change")
+        self.pump(0.1)
+        self.assertEqual([v[COL["id"]] for v in self.rows()][:2], ["F4", "F1"])
+
+    def test_show_resolved_lists_what_is_gone(self):
+        view = self.prepare()
+        self.assertEqual(str(view.resolved_button.cget("state")), "normal")
+        self.ctx.info = mock.Mock()
+        view.show_resolved()
+        title, message = self.ctx.info.call_args[0]
+        self.assertEqual(title, "Resolved since the previous export")
+        self.assertIn("F9 \u00b7 CVE-2020-0001 \u00b7 Fixed since  (PLC-1, was NEXT)", message)
+
+    def test_opening_another_findings_file_compares_it_with_the_same_previous_export(self):
+        view = self.prepare()
+        path = self.write_csv("later.csv", "id,name,cvss,threat,asset,exposure\n"
+                              "F9,Back again,3.0,none,standard,high\nF1,Gets worse,3.0,none,standard,high\n")
+        view.load(path)
+        self.assertTrue(self.pump(15, until=lambda: not self.ctx.worker.running
+                                  and os.path.samefile(self.ctx.batch_state.path, path)))
+        self.pump(0.2)
+        rows = self.by_id()
+        self.assertEqual((rows["F9"][COL["change"]], rows["F1"][COL["change"]]), ("Down from NEXT", "Same"))
+        self.assertIn("1 moved down, 2 resolved", view.compare_label.cget("text"))
+
+    def test_clear_stops_comparing_and_the_column_goes(self):
+        view = self.prepare()
+        view.clear_comparison()
+        self.pump(0.2)
+        self.assertNotIn("change", view.tree.cget("displaycolumns"))
+        self.assertIsNone(view.state.comparison)
+        self.assertIn("No comparison", view.compare_label.cget("text"))
+
+    def test_a_previous_file_that_cannot_be_used_is_reported_and_changes_nothing(self):
+        view = self.build()
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        self.ctx.open_file = mock.Mock(return_value=self.write_csv("previous.csv", "id,cve\nA,B\n"))
+        view.compare_with()
+        self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running and self.ctx.error.called))
+        self.assertIn("priority", self.ctx.error.call_args[0][1])
+        self.assertIsNone(view.state.previous)
+        self.assertNotIn("change", view.tree.cget("displaycolumns"))
+
+    def test_cancelling_the_file_dialog_does_nothing(self):
+        view = self.build()
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        self.ctx.open_file = mock.Mock(return_value="")
+        view.compare_with()
+        self.pump(0.2)
+        self.assertIsNone(view.state.previous)
+        self.assertFalse(self.ctx.worker.running)
+
+    def test_the_exported_file_carries_the_change_columns_and_round_trips(self):
+        view = self.prepare()
+        target = self.work / "out.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export()
+        self.pump(0.2)
+        with open(target, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["F1"]["change"], rows["F1"]["previous_priority"]), ("up", "NEVER"))
+        self.assertEqual((rows["F4"]["change"], rows["F4"]["previous_priority"]), ("new", ""))
+        again, _skipped = compare.load_previous(target)
+        self.assertEqual({r.id for r in again}, {"F1", "F2", "F3", "F4"})
+
+    def test_the_comparison_works_in_by_asset_mode_without_changing_it(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        self.pump(0.2)
+        self.assertIn("Compared with previous.csv", view.compare_label.cget("text"))
+        view.set_mode("findings")
+        self.assertIn("change", view.tree.cget("displaycolumns"))
 
 
 if __name__ == "__main__":
