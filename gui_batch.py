@@ -6,6 +6,7 @@ from tkinter import ttk
 import batch
 import explain
 import inventory
+import rollup
 import threatdata
 from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
@@ -14,6 +15,7 @@ from gui_widgets import (
     FlowFrame,
     ReferenceList,
     ScrollFrame,
+    Segmented,
     button,
     card,
     chip,
@@ -29,6 +31,11 @@ COLUMNS = [("rank", "#", 46, "center"), ("id", "ID", 80, "w"), ("asset", "Asset"
            ("cve", "CVE", 124, "w"), ("name", "Name", 200, "w"),
            ("priority", "Priority", 96, "w"), ("score", "Score", 62, "center"), ("cvss", "CVSS", 54, "center"),
            ("source", "Threat source", 190, "w")]
+ASSET_COLUMNS = [("asset", "Asset", 160, "w"), ("worst", "Worst", 92, "w"), ("now", "Now", 56, "center"),
+                 ("next", "Next", 56, "center"), ("never", "Never", 62, "center"),
+                 ("findings", "Findings", 76, "center"), ("score", "Top score", 84, "center"),
+                 ("top", "Top finding", 260, "w")]
+MODES = [("findings", "Findings"), ("assets", "By asset")]
 FLEXIBLE_COLUMNS = ("name", "source")   # share what the fixed-width columns leave over
 MIN_FLEXIBLE = {"name": 110, "source": 90}
 NAME_SHARE = 0.55
@@ -45,6 +52,9 @@ class BatchState:
         self.sort_key, self.sort_desc = "rank", False
         self.filter, self.search = "all", ""
         self.ranks = {}
+        self.mode = "findings"                       # "findings" or "assets" (the per-asset roll-up)
+        self.asset_sort_key, self.asset_sort_desc = "rollup", False
+        self.summaries, self.unassigned = None, ()   # the roll-up, worked out the first time it is needed
 
 
 def _text(item):
@@ -67,6 +77,7 @@ class BatchView:
         self.body.pack(fill=tk.BOTH, expand=True)
         self.search_var = tk.StringVar(self.frame, self.state.search)
         self._build_toolbar()
+        self._build_view_row()
         self._build_counters()
         self._build_table()
         self._build_details()
@@ -83,7 +94,7 @@ class BatchView:
         self.open_button = button(bar, s, "Open CSV…", self.open_file)
         self.open_button.pack(side=tk.LEFT)
         self.file_label = tk.Label(bar, text="No file loaded", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
-        self.export_button = button(bar, s, "Export ranked CSV", self.export, "secondary")
+        self.export_button = button(bar, s, "Export ranked CSV", self.export_current, "secondary")
         self.export_button.pack(side=tk.RIGHT)
         self.search_entry = rounded_entry(bar, s, self.search_var, width=26, size=10, outside=t.bg)
         self.search_entry.pack(side=tk.RIGHT, padx=10, ipady=5)
@@ -107,10 +118,22 @@ class BatchView:
         self.progress_bar.pack(side=tk.LEFT, padx=10)
         button(self.progress_row, s, "Cancel", self.ctx.worker.cancel, "secondary").pack(side=tk.LEFT)
 
+    def _build_view_row(self):
+        s, t = self.style, self.style.theme
+        self.view_row = tk.Frame(self.body, bg=t.bg)
+        self.view_row.pack(fill=tk.X, pady=(12, 0))
+        self.mode_var = tk.StringVar(self.frame, self.state.mode)
+        self.mode_control = Segmented(self.view_row, s, MODES, self.mode_var)
+        self.mode_control.pack(side=tk.LEFT)
+        self.mode_var.trace_add("write", lambda *_: self.set_mode(self.mode_var.get()))
+        self.mode_note = tk.Label(self.view_row, text="", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
+        self.mode_note.pack(side=tk.LEFT, padx=14, fill=tk.X, expand=True)
+
     def _build_counters(self):
         s, t = self.style, self.style.theme
         self.counter_row = tk.Frame(self.body, bg=t.bg)
         self.counter_row.pack(fill=tk.X, pady=12)
+        self.counter_row_pack = {"fill": tk.X, "pady": 12}
         self.counters = {}
         for key, label in FILTERS:
             box = tk.Frame(self.counter_row, bg=t.card, highlightthickness=2, highlightbackground=t.border,
@@ -137,10 +160,12 @@ class BatchView:
                         highlightcolor=t.border)
         wrap.pack(fill=tk.BOTH, expand=True)
         self.table_wrap = wrap
-        scroll = ttk.Scrollbar(wrap, orient=tk.VERTICAL)
+        self.findings_frame = tk.Frame(wrap, bg=t.card)
+        self.findings_frame.pack(fill=tk.BOTH, expand=True)
+        scroll = ttk.Scrollbar(self.findings_frame, orient=tk.VERTICAL)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.tree = ttk.Treeview(wrap, columns=[c[0] for c in COLUMNS], show="headings", selectmode="browse",
-                                 yscrollcommand=scroll.set, height=8)
+        self.tree = ttk.Treeview(self.findings_frame, columns=[c[0] for c in COLUMNS], show="headings",
+                                 selectmode="browse", yscrollcommand=scroll.set, height=8)
         scroll.configure(command=self.tree.yview)
         for key, title, width, anchor in COLUMNS:
             self.tree.heading(key, text=title, command=lambda k=key: self.sort_by(k))
@@ -151,6 +176,23 @@ class BatchView:
         round_corners(wrap, 10, t.border, t.bg, fill={"tl": t.border, "tr": t.card, "bl": t.card, "br": t.card})
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Configure>", self._fit_columns, add="+")
+        self._build_asset_table(wrap)
+
+    def _build_asset_table(self, wrap):
+        s, t = self.style, self.style.theme
+        self.assets_frame = tk.Frame(wrap, bg=t.card)       # shown instead of the findings table in "By asset" mode
+        scroll = ttk.Scrollbar(self.assets_frame, orient=tk.VERTICAL)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.asset_tree = ttk.Treeview(self.assets_frame, columns=[c[0] for c in ASSET_COLUMNS], show="headings",
+                                       selectmode="browse", yscrollcommand=scroll.set, height=8)
+        scroll.configure(command=self.asset_tree.yview)
+        for key, title, width, anchor in ASSET_COLUMNS:
+            self.asset_tree.heading(key, text=title, command=lambda k=key: self.sort_assets_by(k))
+            self.asset_tree.column(key, width=int(width * s.scale), anchor=anchor, stretch=key == "top", minwidth=40)
+        self.asset_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        for priority in ("NOW", "NEXT", "NEVER", "ERROR"):
+            self.asset_tree.tag_configure(priority, foreground=s.priority_text_color(priority))
+        self.asset_tree.bind("<<TreeviewSelect>>", self._on_select_asset)
 
     def _build_details(self):
         s, t = self.style, self.style.theme
@@ -269,6 +311,8 @@ class BatchView:
         state.path, state.items, state.data = path, items, data if any(i.cve for i in items) else None
         state.ranks = {id(item): rank for rank, item in enumerate((i for i in items if i.result), start=1)}
         state.sort_key, state.sort_desc, state.filter = "rank", False, "all"
+        state.summaries, state.unassigned = None, ()
+        state.asset_sort_key, state.asset_sort_desc = "rollup", False
         self.ctx.status_changed()
         if alive:
             self.refresh()
@@ -333,6 +377,10 @@ class BatchView:
     def refresh(self):
         """Redraw the counters, headings, table and details from the current state."""
         state, t = self.state, self.style.theme
+        self._show_mode()
+        if state.mode == "assets":
+            self._refresh_assets()
+            return
         counts = batch.summarize(state.items)
         counts["all"] = len(state.items)
         for key, (box, number) in self.counters.items():
@@ -360,22 +408,41 @@ class BatchView:
             self.tree.insert("", tk.END, iid=str(index), tags=(item.priority,),
                              values=(rank, item.id, item.asset_id, item.cve, item.name, f"{symbol} {item.priority}",
                                      score, cvss, source))
-        if state.items:
-            scored = next((i for i in state.items if i.result), None)
-            outdated = scored is not None and scored.result.profile != self.ctx.settings.describe()
-            self.file_label.configure(
-                text=f"{os.path.basename(state.path)}  ·  {len(state.items)} rows"
-                + (f"  ·  {state.data.versions()}" if state.data else "")
-                + ("  ·  scored with different scoring settings; open the file again to re-score" if outdated else ""),
-                fg=self.style.theme.warn if outdated else self.style.theme.muted)
-            self.count_label.configure(text=f"Showing {len(shown)} of {len(state.items)}")
-        else:
-            self.file_label.configure(text="No file loaded")
-            self.count_label.configure(text="")
+        self._update_file_label()
+        self.count_label.configure(text=f"Showing {len(shown)} of {len(state.items)}" if state.items else "")
         set_enabled(self.export_button, bool(state.items))
         self._clear_details()
         if shown:
             self.tree.selection_set(str(index_of[id(shown[0])]))
+
+    def _update_file_label(self):
+        """Describe the open file: its name, row count, the threat data used, and whether it is out of date."""
+        state = self.state
+        if not state.items:
+            self.file_label.configure(text="No file loaded")
+            return
+        scored = next((i for i in state.items if i.result), None)
+        outdated = scored is not None and scored.result.profile != self.ctx.settings.describe()
+        self.file_label.configure(
+            text=f"{os.path.basename(state.path)}  ·  {len(state.items)} rows"
+            + (f"  ·  {state.data.versions()}" if state.data else "")
+            + ("  ·  scored with different scoring settings; open the file again to re-score" if outdated else ""),
+            fg=self.style.theme.warn if outdated else self.style.theme.muted)
+
+    def _show_mode(self):
+        """Show the table, counters and button that belong to the current mode."""
+        state = self.state
+        assets = state.mode == "assets"
+        if assets:
+            self.findings_frame.pack_forget()
+            self.assets_frame.pack(fill=tk.BOTH, expand=True)
+            self.counter_row.pack_forget()
+        else:
+            self.assets_frame.pack_forget()
+            self.findings_frame.pack(fill=tk.BOTH, expand=True)
+            self.counter_row.pack(after=self.view_row, **self.counter_row_pack)
+            self.mode_note.configure(text="")
+        self.export_button.configure(text="Export asset roll-up" if assets else "Export ranked CSV")
 
     def _fit_columns(self, _event=None):
         """Share the room left over by the fixed-width columns between Name and Threat source, so the table always
@@ -454,6 +521,128 @@ class BatchView:
         if advisories:
             self.detail_adv_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
             self.detail_adv.pack(fill=tk.X, before=self.detail_text)
+
+    # ---- the per-asset roll-up ----
+    def set_mode(self, mode):
+        """Switch between the findings table and the per-asset roll-up."""
+        if mode not in dict(MODES):
+            return
+        self.state.mode = mode
+        if self.mode_var.get() != mode:
+            self.mode_var.set(mode)
+        self.refresh()
+
+    def sort_assets_by(self, key):
+        """Sort the asset table by a column; clicking the same column again reverses it."""
+        state = self.state
+        state.asset_sort_desc = (not state.asset_sort_desc) if state.asset_sort_key == key else False
+        state.asset_sort_key = key
+        self.refresh()
+
+    def _summaries(self):
+        state = self.state
+        if state.summaries is None:
+            state.summaries, state.unassigned = rollup.rollup(state.items)
+        return state.summaries
+
+    def visible_assets(self):
+        """Return the asset summaries matching the search, in display order."""
+        state = self.state
+        rows = [s for s in self._summaries()
+                if not state.search or state.search in s.asset_id.lower()
+                or any(state.search in _text(i) for i in s.items)]
+        keys = {"asset": lambda s: s.asset_id.casefold(), "worst": lambda s: -explain.URGENCY.get(s.worst, -1),
+                "now": lambda s: s.counts[batch.NOW], "next": lambda s: s.counts[batch.NEXT],
+                "never": lambda s: s.counts[batch.NEVER], "findings": lambda s: len(s.items),
+                "score": lambda s: -1.0 if s.top_score is None else s.top_score,
+                "top": lambda s: rollup.label(s.top).lower() if s.top else ""}
+        if state.asset_sort_key in keys:
+            rows.sort(key=keys[state.asset_sort_key], reverse=state.asset_sort_desc)
+        return rows
+
+    def _refresh_assets(self):
+        state = self.state
+        for key, title, _w, _a in ASSET_COLUMNS:
+            arrow = HEADING_ARROWS[state.asset_sort_desc] if key == state.asset_sort_key else ""
+            self.asset_tree.heading(key, text=title + arrow)
+        self.asset_tree.delete(*self.asset_tree.get_children())
+        shown = self.visible_assets()
+        summaries = self._summaries()
+        for index, summary in enumerate(shown):
+            counts, top = summary.counts, summary.top
+            self.asset_tree.insert(
+                "", tk.END, iid=str(index), tags=(summary.worst,),
+                values=(summary.asset_id, f"{PRIORITY_SYMBOLS[summary.worst]} {summary.worst}", counts[batch.NOW],
+                        counts[batch.NEXT], counts[batch.NEVER], len(summary.items),
+                        f"{summary.top_score:.2f}" if top else "", rollup.label(top) if top else "not scored"))
+        self._shown_assets = shown
+        self._update_file_label()
+        urgent = sum(1 for s in summaries if s.worst == batch.NOW)
+        note = f"{len(summaries)} assets · {urgent} with a NOW finding"
+        if state.unassigned:
+            count = len(state.unassigned)
+            note += f" · {count} row{' has' if count == 1 else 's have'} no asset id (see Findings)"
+        self.mode_note.configure(text=note if state.items else "")
+        self.count_label.configure(text=f"Showing {len(shown)} of {len(summaries)}" if state.items else "")
+        set_enabled(self.export_button, bool(summaries))
+        self._clear_details()
+        if shown:
+            self.asset_tree.selection_set("0")
+
+    def _on_select_asset(self, _event):
+        selection = self.asset_tree.selection()
+        if not selection or not getattr(self, "_shown_assets", None):
+            return
+        summary = self._shown_assets[int(selection[0])]
+        counts = summary.counts
+        self.detail_title.configure(text=f"Asset {summary.asset_id}: {len(summary.items)} finding"
+                                         f"{'s' if len(summary.items) != 1 else ''}")
+        chips = [chip(self.detail_chips, self.style, f"{counts[b]} {b}", d)
+                 for b, d in ((batch.NOW, "raise"), (batch.NEXT, "neutral"), (batch.NEVER, "neutral")) if counts[b]]
+        if counts["ERROR"]:
+            chips.append(chip(self.detail_chips, self.style, f"{counts['ERROR']} not scored", "error"))
+        self.detail_chips.set_items(chips)
+        visit = summary.visit_items
+        lines = []
+        if visit:
+            lines.append(f"Could be handled on one visit ({len(visit)} finding{'s' if len(visit) != 1 else ''}, "
+                         "most urgent first):")
+            ranks = self.state.ranks
+            lines += [f"• #{ranks.get(id(i), '?')}  {rollup.label(i)}  ({i.priority}, score {i.result.score:.2f})"
+                      for i in visit]
+        else:
+            lines.append("Nothing on this asset needs scheduling.")
+        if counts[batch.NEVER]:
+            more = "s" if counts[batch.NEVER] != 1 else ""
+            never = f"{counts[batch.NEVER]} more finding{more} NEVER: no scheduled fix, re-check if conditions change."
+            lines += ["", never]
+        self.detail_text.configure(text="\n".join(lines))
+        self._show_references(())
+        self._show_advisories(None)
+        self.detail_scroll.scroll_to_top()
+
+    def export_current(self):
+        """Export what the current view shows: the ranked findings or the per-asset roll-up."""
+        if self.state.mode == "assets":
+            self.export_assets()
+        else:
+            self.export()
+
+    def export_assets(self):
+        """Save the per-asset roll-up to a CSV file."""
+        summaries = self._summaries()
+        if not summaries:
+            return
+        out = self.ctx.save_file("Save the per-asset roll-up", "ot-triage-assets.csv",
+                                 [("CSV files", "*.csv"), ("All files", "*.*")])
+        if not out:
+            return
+        try:
+            rollup.write_rollup(out, summaries)
+        except OSError as error:
+            self.ctx.error("Export failed", str(error))
+            return
+        self.ctx.info("Exported", f"Saved {len(summaries)} assets to\n{out}")
 
     # ---- export ----
     def export(self):

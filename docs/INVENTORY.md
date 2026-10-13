@@ -50,3 +50,14 @@ The three requirement columns feed only the **CVSS environmental score** (see [C
 ## Safety
 
 The inventory is read like every other file: at most 5 MB and 20,000 rows, UTF-8 only, control and invisible characters removed from ids and names, and bad rows skipped and reported, never guessed at. Nothing is sent anywhere, and the inventory's path is not remembered between runs. The export gains two columns, `asset_id` and `from_inventory` (which values came from the inventory), and neutralises spreadsheet formulas as usual.
+
+## The per-asset view
+
+With a findings file that has an `asset_id` column (with or without an inventory), the Batch view's **By asset** button groups the findings by asset. OT assets are usually patched in short outage windows, so the question is often "what is on this asset?", not only "what is the worst finding?".
+
+- **The table:** one row per asset: its worst bucket, how many NOW, NEXT and NEVER findings it has, how many findings in all, the highest ordering score, and the top finding. Assets with a NOW finding come first, then those with more NOW and NEXT findings. Click a heading to sort; the search box matches asset ids and anything in their findings.
+- **Matching:** asset ids match without regard to letter case or surrounding white space; the first spelling seen is shown. Rows with no asset id are not merged into one made-up asset: the note above the table says how many there are, and they stay in the Findings view.
+- **The details:** selecting an asset lists the findings that call for action (NOW and NEXT) in ranked order, as the set that could be handled on one visit, and says how many are NEVER (no scheduled fix). A row that could not be scored (for example an `asset_id` that is not in the inventory) still counts toward its asset, as "not scored".
+- **Export:** **Export asset roll-up** saves one row per asset (`asset_id`, `worst_priority`, `now`, `next`, `never`, `errors`, `findings`, `visit_together`, `top_ordering_score`, `top_finding`, `finding_ids`). Like every export, text cells that could run as a spreadsheet formula are neutralised.
+- **Nothing in this view changes a priority.** It only groups rows that were already scored.
+

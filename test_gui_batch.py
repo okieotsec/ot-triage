@@ -13,6 +13,7 @@ import gui_batch
 import gui_widgets
 import icsadvisories
 import inventory
+import rollup
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
@@ -98,7 +99,7 @@ class BatchLoadTests(BatchViewTestCase):
         view = self.build()
         t = self.style.theme
         rgb = lambda colour: tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))  # noqa: E731
-        wrap = view.tree.master
+        wrap = view.table_wrap
         tl, tr, bl, br = (label.image for label in wrap.corner_labels)
         radius = tl.width()
         # the pixel of each corner image that lies deepest inside the table
@@ -874,6 +875,169 @@ class BatchAdvisoryTests(BatchViewTestCase):
         self.assertIn("ICSA-26-006-01: https://www.cisa.gov/news-events/ics-advisories/icsa-26-006-01",
                       rows["A"]["ics_advisories"])
         self.assertEqual(rows["B"]["ics_advisories"], "")
+
+
+class BatchByAssetTests(BatchViewTestCase):
+    FINDINGS = ("id,asset_id,name,cvss,threat\n"
+                "F1,PLC-01,Flaw one,9.0,active\nF2,PLC-01,Flaw two,7.5,public\nF3,PLC-01,Flaw three,3.0,none\n"
+                "F4,GW-01,Gateway flaw,3.0,none\nF5,GW-01,Another,3.5,none\nF6,,No asset id,8.0,active\n"
+                "F7,NOPE-9,Not in the inventory,2.0,none\n")
+
+    def prepare(self):
+        view = self.build()
+        path = self.write_csv("inventory.csv", INVENTORY)
+        self.ctx.open_file = mock.Mock(return_value=path)
+        view.load_inventory()
+        self.assertTrue(self.pump(10, until=lambda: view.state.inventory is not None
+                                  and not self.ctx.worker.running))
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        return view
+
+    def asset_rows(self, view):
+        return [view.asset_tree.item(i, "values") for i in view.asset_tree.get_children()]
+
+    def select_asset(self, view, name):
+        iid = next(i for i in view.asset_tree.get_children() if view.asset_tree.item(i, "values")[0] == name)
+        view.asset_tree.selection_set(iid)
+        view.asset_tree.focus(iid)
+        self.pump(0.1)
+
+    def test_the_toggle_starts_on_findings_and_by_asset_with_no_file_is_just_empty(self):
+        view = self.build()
+        self.assertEqual((view.state.mode, view.mode_var.get()), ("findings", "findings"))
+        view.set_mode("assets")
+        self.pump(0.2)
+        self.assertEqual(self.asset_rows(view), [])
+        self.assertEqual(str(view.export_button.cget("state")), "disabled")
+        view.set_mode("findings")
+        self.assertEqual(view.findings_frame.winfo_manager(), "pack")
+
+    def test_by_asset_lists_each_asset_once_worst_first_with_its_counts(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        self.pump(0.2)
+        rows = self.asset_rows(view)
+        names = [r[0] for r in rows]
+        self.assertEqual(sorted(names), ["GW-01", "NOPE-9", "PLC-01"])
+        self.assertEqual(names, ["PLC-01", "GW-01", "NOPE-9"])      # NEXT, NEVER, then the one that cannot be scored
+        plc = next(r for r in rows if r[0] == "PLC-01")
+        self.assertIn("NEXT", plc[1])
+        self.assertEqual((plc[2], plc[3], plc[4], plc[5]), ("0", "2", "1", "3"))
+        self.assertEqual(next(r for r in rows if r[0] == "NOPE-9")[7], "not scored")
+        self.assertEqual(view.assets_frame.winfo_manager(), "pack")
+        self.assertEqual(view.findings_frame.winfo_manager(), "")
+        self.assertEqual(view.counter_row.winfo_manager(), "")
+        self.assertIn("1 row has no asset id", view.mode_note.cget("text"))
+        self.assertEqual(view.export_button.cget("text"), "Export asset roll-up")
+        self.assertIn("findings.csv", view.file_label.cget("text"))
+
+    def test_switching_back_shows_the_findings_table_and_counters_again(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        view.set_mode("findings")
+        self.pump(0.2)
+        self.assertEqual((view.findings_frame.winfo_manager(), view.assets_frame.winfo_manager()), ("pack", ""))
+        self.assertEqual(view.counter_row.winfo_manager(), "pack")
+        self.assertEqual(view.export_button.cget("text"), "Export ranked CSV")
+        self.assertEqual(len(self.rows()), 7)
+
+    def test_the_segmented_control_drives_the_mode(self):
+        view = self.prepare()
+        view.mode_var.set("assets")
+        self.pump(0.2)
+        self.assertEqual(view.state.mode, "assets")
+        self.assertEqual(view.assets_frame.winfo_manager(), "pack")
+
+    def test_selecting_an_asset_lists_what_could_be_handled_on_one_visit_and_nothing_scheduled_for_never(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        self.pump(0.2)
+        self.select_asset(view, "PLC-01")
+        text = view.detail_text.cget("text")
+        self.assertIn("Could be handled on one visit (2 findings, most urgent first):", text)
+        self.assertIn("Flaw one", text)
+        self.assertIn("Flaw two", text)
+        self.assertIn("1 more finding NEVER", text)
+        self.assertIn("Asset PLC-01: 3 findings", view.detail_title.cget("text"))
+        self.select_asset(view, "GW-01")
+        self.assertIn("Nothing on this asset needs scheduling.", view.detail_text.cget("text"))
+
+    def test_clicking_a_heading_sorts_the_assets_and_clicking_again_reverses_it(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        view.sort_assets_by("asset")
+        self.pump(0.1)
+        ascending = [r[0] for r in self.asset_rows(view)]
+        self.assertEqual(ascending, sorted(ascending, key=str.lower))
+        view.sort_assets_by("asset")
+        self.pump(0.1)
+        self.assertEqual([r[0] for r in self.asset_rows(view)], list(reversed(ascending)))
+        self.assertIn("Asset", view.asset_tree.heading("asset", "text"))
+
+    def test_the_search_box_filters_assets_by_id_and_by_their_findings(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        view.search_var.set("gateway flaw")
+        view.apply_search()
+        self.pump(0.1)
+        self.assertEqual([r[0] for r in self.asset_rows(view)], ["GW-01"])
+        view.search_var.set("plc")
+        view.apply_search()
+        self.pump(0.1)
+        self.assertEqual([r[0] for r in self.asset_rows(view)], ["PLC-01"])
+
+    def test_the_mode_survives_a_rebuild_and_a_new_file_resets_the_roll_up(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        view.frame.destroy()
+        rebuilt = self.build()
+        self.pump(0.2)
+        self.assertEqual((rebuilt.mode_var.get(), rebuilt.assets_frame.winfo_manager()), ("assets", "pack"))
+        self.assertEqual(len(self.asset_rows(rebuilt)), 3)
+        self.reload_findings(rebuilt, "id,asset_id,cvss,threat\nZ1,ONLY-1,5.0,none\n")
+        self.assertEqual([r[0] for r in self.asset_rows(rebuilt)], ["ONLY-1"])
+
+    def reload_findings(self, view, text):
+        path = self.write_csv("second.csv", text)
+        view.load(path)
+        self.assertTrue(self.pump(15, until=lambda: not self.ctx.worker.running
+                                  and os.path.samefile(self.ctx.batch_state.path, path)))
+        self.pump(0.2)
+
+    def test_the_roll_up_export_writes_the_summary_and_the_findings_export_still_works(self):
+        view = self.prepare()
+        view.set_mode("assets")
+        target = self.work / "assets.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export_current()
+        self.pump(0.2)
+        with open(target, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["asset_id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual(set(rows), {"PLC-01", "GW-01", "NOPE-9"})
+        self.assertEqual((rows["PLC-01"]["findings"], rows["PLC-01"]["worst_priority"]), ("3", "NEXT"))
+        self.assertEqual(self.ctx.save_file.call_args[0][1], "ot-triage-assets.csv")
+        view.set_mode("findings")
+        findings_target = self.work / "findings.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(findings_target))
+        view.export_current()
+        self.pump(0.2)
+        with open(findings_target, newline="", encoding="utf-8-sig") as fh:
+            self.assertIn("rank", next(csv.reader(fh)))
+
+    def test_a_file_with_no_asset_ids_says_so_instead_of_showing_an_empty_table(self):
+        view = self.build()
+        self.load(SAMPLE)
+        view.set_mode("assets")
+        self.pump(0.2)
+        self.assertEqual(self.asset_rows(view), [])
+        self.assertIn("rows have no asset id", view.mode_note.cget("text"))
+
+    def test_the_roll_up_matches_the_rollup_module(self):
+        view = self.prepare()
+        expected, _unassigned = rollup.rollup(view.state.items)
+        view.set_mode("assets")
+        self.pump(0.2)
+        self.assertEqual([r[0] for r in self.asset_rows(view)], [s.asset_id for s in expected])
 
 
 if __name__ == "__main__":
