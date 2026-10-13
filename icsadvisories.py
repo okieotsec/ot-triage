@@ -13,6 +13,7 @@ import io
 import json
 import re
 import tarfile
+import unicodedata
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,7 +33,14 @@ ICS_MAX_CVES = 2_000               # per advisory
 ICS_MAX_INDEX_BYTES = 60 * MB
 MAX_TITLE_CHARS = 200
 MAX_VENDOR_CHARS = 80
-MAX_VENDORS = 5
+MAX_VENDORS = 10
+MAX_PRODUCTS = 30                  # product names kept per advisory, for matching an asset's vendor and product
+MAX_PRODUCT_CHARS = 120
+MAX_NAME_TOKENS = 12               # words of a vendor or product name that are used for matching
+MAX_TOKEN_CHARS = 40
+MAX_MATCH_CACHE = 5_000
+LEGAL_WORDS = frozenset({"inc", "llc", "ltd", "limited", "corp", "corporation", "co", "company", "gmbh", "ag", "sa",
+                         "plc", "bv", "nv", "kg", "oy", "ab", "as", "srl", "spa", "pty", "lp", "the"})
 MAX_TREE_NODES = 20_000
 MAX_TREE_DEPTH = 12
 MAX_SKIPPED = 10                   # unreadable advisories tolerated, or 5% of them if that is more
@@ -48,7 +56,7 @@ REMEDIATION_WORDS = {"F": "vendor fix available",
                      "M": "mitigation or workaround only"}
 REMEDIATION_CHIPS = {"F": "Vendor fix (CISA)", "P": "Partial fix (CISA)", "N": "No fix yet (CISA)",
                      "X": "No fix planned (CISA)", "M": "Mitigation only (CISA)"}
-INDEX_VERSION = 2
+INDEX_VERSION = 3
 
 ICS_FILE, ICS_META_FILE = "ics_advisories.json", "ics_meta.json"
 ID_RE = re.compile(r"^ICS(?:A|MA)-\d{2}-\d{3}-\d{2}[A-Z]?$")
@@ -65,6 +73,7 @@ class IcsAdvisory:
     published: str
     updated: str
     vendors: tuple = ()
+    products: tuple = ()        # product names the advisory lists (for matching an asset's vendor and product)
     fix: str = ""               # what this advisory says about fixing the looked-up CVE: a key of REMEDIATION_WORDS
 
     @property
@@ -84,6 +93,16 @@ class IcsAdvisory:
         return f"{self.id}: {self.title}"
 
 
+def name_tokens(text, drop_legal=False):
+    """The words of a vendor or product name, lower case, ignoring punctuation and accents (at most a dozen)."""
+    decomposed = unicodedata.normalize("NFKD", str(text))
+    plain = "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+    words = [w[:MAX_TOKEN_CHARS] for w in re.findall(r"[a-z0-9]+", plain)]
+    if drop_legal:
+        words = [w for w in words if w not in LEGAL_WORDS]
+    return tuple(words[:MAX_NAME_TOKENS])
+
+
 @dataclass(frozen=True)
 class IcsData:
     """A validated set of advisories and the CVEs each one names."""
@@ -92,6 +111,7 @@ class IcsData:
     advisories: dict            # advisory id -> IcsAdvisory
     by_cve: dict                # CVE id -> tuple of advisory ids, newest first
     fixes: dict = field(default_factory=dict)    # advisory id -> {CVE id: remediation letter}
+    _cache: dict = field(default_factory=dict, repr=False, compare=False)    # work done by match(), kept for reuse
 
     def lookup(self, cve):
         """Return the advisories that name this CVE, newest first (at most MAX_LISTED) and how many there are.
@@ -103,6 +123,56 @@ class IcsData:
         return tuple(dataclasses.replace(self.advisories[i], fix=self.fixes.get(i, {}).get(cve, ""))
                      for i in ids[:MAX_LISTED]), len(ids)
 
+    def _postings(self):
+        """Which advisories each vendor word and each product word appears in (built once, on first use)."""
+        if "postings" not in self._cache:
+            vendor_words, product_words = {}, {}
+            for ident, advisory in self.advisories.items():
+                for name in advisory.vendors:
+                    for word in name_tokens(name, drop_legal=True):
+                        vendor_words.setdefault(word, set()).add(ident)
+                for name in (*advisory.products, advisory.title):
+                    for word in name_tokens(name):
+                        product_words.setdefault(word, set()).add(ident)
+            self._cache["postings"] = (vendor_words, product_words)
+        return self._cache["postings"]
+
+    def match(self, vendor, product):
+        """Find the advisories that may apply to an asset made by this vendor and called this product.
+
+        An advisory matches when every word of the vendor appears in one of its vendor names and every word of the
+        product appears in one of its product names or its title. This is a pointer, not proof: it does not know
+        the asset's version. Returns (advisories newest first, at most MAX_LISTED; how many match in all; whether
+        any advisory names this vendor at all). Needs a vendor and a product word of at least three characters.
+        """
+        vendor_words, product_words = name_tokens(vendor, drop_legal=True), name_tokens(product)
+        if not vendor_words or not any(len(w) >= 3 for w in product_words):
+            return (), 0, False
+        key = (vendor_words, product_words)
+        found = self._cache.get(key)
+        if found is None:
+            found = self._find(vendor_words, product_words)
+            if len(self._cache) > MAX_MATCH_CACHE:
+                self._cache.clear()
+            self._cache[key] = found
+        ids, vendor_known = found
+        return tuple(self.advisories[i] for i in ids[:MAX_LISTED]), len(ids), vendor_known
+
+    def _find(self, vendor_words, product_words):
+        vendors, products = self._postings()
+        by_vendor = None
+        for word in vendor_words:
+            posting = vendors.get(word, frozenset())
+            by_vendor = posting if by_vendor is None else by_vendor & posting
+        vendor_known = bool(by_vendor)
+        ids = set(by_vendor or ())
+        for word in product_words:
+            if not ids:
+                break
+            ids &= products.get(word, frozenset())
+        ordered = sorted(ids, key=lambda i: (self.advisories[i].updated, i), reverse=True)
+        return tuple(ordered), vendor_known
+
 
 def _date(text, where):
     if not isinstance(text, str) or not DATE_RE.fullmatch(text[:10]) or not threatdata._valid_date(text[:10]):
@@ -112,6 +182,26 @@ def _date(text, where):
 
 def _clean(text, limit):
     return references.clean(text)[:limit]
+
+
+def _products(tree):
+    """Return the product names found in a CSAF product tree (bounded in depth and size)."""
+    found, stack, seen = [], [(tree, 0)], 0
+    while stack:
+        node, depth = stack.pop()
+        seen += 1
+        if seen > MAX_TREE_NODES or depth > MAX_TREE_DEPTH:
+            raise ValueError("the product tree is too large or too deeply nested")
+        if not isinstance(node, dict):
+            continue
+        if node.get("category") in ("product_name", "product_family") and isinstance(node.get("name"), str):
+            name = _clean(node["name"], MAX_PRODUCT_CHARS)
+            if name and name not in found and len(found) < MAX_PRODUCTS:
+                found.append(name)
+        children = node.get("branches")
+        if isinstance(children, list):
+            stack.extend((child, depth + 1) for child in reversed(children))
+    return tuple(found)
 
 
 def _vendors(tree):
@@ -190,7 +280,9 @@ def _read_advisory(raw, stem):
                 fixes[cve] = _remediation(item)
     tree = doc.get("product_tree")
     vendors = _vendors(tree) if isinstance(tree, dict) else ()
-    return IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors), cves, fixes
+    products = _products(tree) if isinstance(tree, dict) else ()
+    advisory = IcsAdvisory(ident.upper(), _clean(title, MAX_TITLE_CHARS), published, updated, vendors, products)
+    return advisory, cves, fixes
 
 
 def _assemble(triples):
@@ -272,7 +364,8 @@ def to_index(data):
         for ident in ids:
             names.setdefault(ident, []).append(cve)
     rows = [{"id": a.id, "title": a.title, "published": a.published, "updated": a.updated, "vendors": list(a.vendors),
-             "cves": sorted(names.get(a.id, ())), "fixes": dict(sorted(data.fixes.get(a.id, {}).items()))}
+             "products": list(a.products), "cves": sorted(names.get(a.id, ())),
+             "fixes": dict(sorted(data.fixes.get(a.id, {}).items()))}
             for a in sorted(data.advisories.values(), key=lambda a: a.id)]
     return json.dumps({"version": INDEX_VERSION, "feed_date": data.feed_date, "count": len(rows), "advisories": rows},
                       separators=(",", ":")).encode("utf-8")
@@ -302,9 +395,14 @@ def parse_index(raw):
 
 
 def _index_row(row):
-    if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "cves", "fixes"}:
+    if not isinstance(row, dict) or set(row) != {"id", "title", "published", "updated", "vendors", "products",
+                                                 "cves", "fixes"}:
         raise ValueError("unexpected fields")
     ident, title, vendors, cves, fixes = row["id"], row["title"], row["vendors"], row["cves"], row["fixes"]
+    products = row["products"]
+    if not isinstance(products, list) or len(products) > MAX_PRODUCTS or not all(
+            isinstance(p, str) and 0 < len(p) <= MAX_PRODUCT_CHARS and p == references.clean(p) for p in products):
+        raise ValueError("bad products")
     if not isinstance(ident, str) or not ID_RE.fullmatch(ident):
         raise ValueError("bad id")
     if not isinstance(title, str) or not title or len(title) > MAX_TITLE_CHARS or title != references.clean(title):
@@ -318,7 +416,7 @@ def _index_row(row):
     if not isinstance(fixes, dict) or not all(k in cves and v in REMEDIATION_WORDS for k, v in fixes.items()):
         raise ValueError("bad remediation list")
     return IcsAdvisory(ident, title, _date(row["published"], "published"), _date(row["updated"], "updated"),
-                       tuple(vendors)), cves, fixes
+                       tuple(vendors), tuple(products)), cves, fixes
 
 
 # ---- storage, update and import ---------------------------------------------

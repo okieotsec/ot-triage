@@ -209,7 +209,8 @@ class InventoryFuzzTests(unittest.TestCase):
         def test_any_text_as_an_inventory_loads_or_is_refused_cleanly(self, text):
             with tempfile.TemporaryDirectory() as folder:
                 path = Path(folder) / "i.csv"
-                path.write_text("asset_id,exposure,controls,name,confidentiality,integrity,availability\n" + text,
+                header = "asset_id,exposure,controls,name,confidentiality,integrity,availability,vendor,product\n"
+                path.write_text(header + text,
                                 encoding="utf-8", errors="replace")
                 try:
                     inv = inventory.load(path)
@@ -221,6 +222,37 @@ class InventoryFuzzTests(unittest.TestCase):
                     self.assertLessEqual(len(record.asset_id), inventory.MAX_KEY_CHARS)
                 inv.lookup(text)
                 inv.summary()
+
+
+class VendorProductTests(InventoryCase):
+    def test_the_vendor_and_product_columns_and_their_aliases_are_read(self):
+        inv = self.load("asset_id,Manufacturer,Model\nA,Siemens AG,S7-1500\n")
+        record = inv.lookup("A")[1]
+        self.assertEqual((record.vendor, record.product), ("Siemens AG", "S7-1500"))
+        inv = self.load("asset_id,vendor,product_name\nA,Acme,Widget\n")
+        self.assertEqual((inv.lookup("A")[1].vendor, inv.lookup("A")[1].product), ("Acme", "Widget"))
+        inv = self.load("asset_id,make,product\nA,Moxa,NPort 5110\n")
+        self.assertEqual(inv.lookup("A")[1].vendor, "Moxa")
+
+    def test_an_inventory_with_only_a_vendor_and_a_product_is_a_valid_inventory(self):
+        inv = self.load("asset_id,vendor,product\nA,Acme,Widget\nB,,\n")
+        self.assertEqual(len(inv), 2)
+        self.assertEqual(inv.lookup("B")[1].vendor, "")
+        self.assertEqual(inv.lookup("B")[1].values, {})
+
+    def test_blank_cells_leave_them_empty_and_text_is_cleaned_and_limited(self):
+        inv = self.load('asset_id,vendor,product\nA,"  Evil\x07 \u202e Co ","' + "p" * 500 + '"\n')
+        record = inv.lookup("A")[1]
+        self.assertTrue(record.vendor.isprintable() and "\u202e" not in record.vendor)
+        self.assertEqual(len(record.product), inventory.MAX_TEXT_CHARS)
+
+    def test_they_never_change_a_priority(self):
+        plain = self.load("asset_id,asset,exposure\nA,standard,high\n")
+        marked = self.load("asset_id,asset,exposure,vendor,product\nA,standard,high,Siemens,S7-1500\n")
+        path = self.write("f.csv", "id,asset_id,cvss,threat\nF,A,9.0,active\n")
+        one = batch.process_file(path, inventory=plain)[0]
+        two = batch.process_file(path, inventory=marked)[0]
+        self.assertEqual((one.priority, one.result.score), (two.priority, two.result.score))
 
 
 class SecurityRequirementTests(InventoryCase):
