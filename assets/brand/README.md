@@ -13,5 +13,15 @@ The logo, icons and colour tokens used by OT Triage, from the OkieOTSec brand ki
 To rebuild the PNGs from the SVGs: `rsvg-convert -w <size> -h <size> svg/okieotsec-app-tile.svg -o icons/tile-<size>.png`
 (and likewise for the shields by height and the lockups by width).
 
-**Rights.** The MIT licence of this repository covers the code. The OkieOTSec name, logo and brand assets are not
-offered under it: please ask before using them for anything other than referring to this project.
+## Rights
+
+The OkieOTSec name, logo and the other files in `assets/brand/` are © okieotsec and are **not** covered by the MIT
+licence, which applies to the code only.
+
+- You may use them, unmodified, to refer to or link to this project (for example in an article, a talk or a link to
+  the repository).
+- **Forks and modified versions may not use them.** If you fork or redistribute a changed version of OT Triage, remove
+  or replace the contents of `assets/brand/` and use your own name and logo, so that it cannot be mistaken for the
+  original or for something OkieOTSec endorses. The application starts normally without the folder.
+- The name and links shown in the window (`gui_brand.py`: the brand name, the tagline and the public links) belong to
+  the same brand, so a fork should change those too.

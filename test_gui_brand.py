@@ -57,6 +57,13 @@ class AssetTests(unittest.TestCase):
             for bad in ("<script", "onload", "onclick", "javascript:", "<foreignobject", "href=\"http", "@import"):
                 self.assertNotIn(bad, text, f"{path.name}: {bad}")
 
+    def test_the_rights_notice_says_the_licence_covers_the_code_and_forks_may_not_keep_the_logo(self):
+        notice = (gui_brand.ASSETS / "README.md").read_text(encoding="utf-8")
+        for needed in ("not** covered by the MIT", "Forks and modified versions may not use them", "assets/brand/"):
+            self.assertIn(needed, notice)
+        readme = (Path(__file__).parent / "README.md").read_text(encoding="utf-8")
+        self.assertIn("forks must not use them", readme)
+
     def test_the_nearest_size_is_chosen(self):
         self.assertEqual(gui_brand.nearest(gui_brand.HEADER_HEIGHTS, 40), 40)
         self.assertEqual(gui_brand.nearest(gui_brand.HEADER_HEIGHTS, 44), 40)

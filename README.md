@@ -181,4 +181,4 @@ Run `python3 -m unittest` for the test suite (see [docs/GUI_TESTING.md](docs/GUI
 
 ## License
 
-Released under the [MIT License](LICENSE). The CVSS v4.0 scoring tables come from FIRST under their own license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The code is released under the [MIT License](LICENSE). The OkieOTSec name and logo are not part of that licence: forks must not use them (see [assets/brand/README.md](assets/brand/README.md)). The CVSS v4.0 scoring tables come from FIRST under their own license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
