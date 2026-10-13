@@ -357,8 +357,12 @@ def _run(produce, source, data_dir, now):
     return SourceResult("ics", True, f"ICS advisories updated: {advisories:,} advisories naming {cves:,} CVEs.")
 
 
-def update_from_network(data_dir=None, fetcher=threatdata.fetch, now=None, cancel=None, progress=None):
-    """Download the CISA advisories archive and replace the stored index only if the new data validates."""
+def update_from_network(data_dir=None, fetcher=None, now=None, cancel=None, progress=None):
+    """Download the CISA advisories archive and replace the stored index only if the new data validates.
+
+    fetcher defaults to threatdata.fetch, looked up when called (so a test can replace it).
+    """
+    fetcher = fetcher or threatdata.fetch
     data_dir = data_dir or threatdata.default_data_dir()
     now = now or threatdata._now()
     if cancel is not None and cancel.is_set():

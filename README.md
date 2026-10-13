@@ -30,6 +30,7 @@ threat-data update that you start yourself.
 
 ```
 python3 ot_triage_gui.py            # the app (Python 3.12 or newer, with Tkinter)
+python3 ot_triage_cli.py findings.csv -o ranked.csv    # the same ranking on the command line (docs/CLI.md)
 python3 tools/headless_tests.py     # the tests, on an invisible display (no windows open on your screen)
 python3 -m unittest                 # the tests, the plain way (GUI tests open real windows)
 ```
@@ -108,7 +109,8 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
 - [docs/CVSS.md](docs/CVSS.md): pasting CVSS vectors, supported versions and how the scores were verified
 - [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV, EPSS and ICS advisory data, offline updates and safety checks
-- [docs/INVENTORY.md](docs/INVENTORY.md): the asset inventory, which fills in asset criticality, exposure and controls
+- [docs/CLI.md](docs/CLI.md): the command line, for scripts and scheduled jobs
+- [docs/INVENTORY.md](docs/INVENTORY.md): the asset inventory, which fills in asset criticality, exposure and controls, the per-asset view and comparing with a previous export
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned work, order and design decisions
@@ -136,8 +138,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP9 | What an ICS advisory says about a fix | [reports/cp9-ics-remediation](reports/cp9-ics-remediation/claude.md) |
 | CP10 | Per-asset roll-up | [reports/cp10-asset-rollup](reports/cp10-asset-rollup/claude.md) |
 | CP11 | Comparing with a previous export | [reports/cp11-compare](reports/cp11-compare/claude.md) |
+| CP12 | The command line | [reports/cp12-cli](reports/cp12-cli/claude.md) |
 
-Across the checkpoints 30 findings were recorded (3 Medium, 8 Low, 19 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 31 findings were recorded (3 Medium, 8 Low, 20 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 

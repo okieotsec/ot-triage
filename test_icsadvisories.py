@@ -524,6 +524,12 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(warnings, [])
         self.assertEqual(data.lookup("CVE-2025-61939")[1], 1)
 
+    def test_the_default_downloader_is_looked_up_when_called_so_it_can_be_replaced(self):
+        calls = []
+        with mock.patch("threatdata.fetch", lambda url, cap, hosts, **kw: calls.append(url) or good(advisory())):
+            self.assertTrue(ics.update_from_network(self.dir, now=self.NOW).ok)
+        self.assertEqual(calls, [ics.ICS_URL])
+
     def test_only_the_expected_https_host_is_allowed(self):
         self.assertTrue(ics.ICS_URL.startswith("https://codeload.github.com/"))
         self.assertEqual(ics.ICS_HOSTS, frozenset({"codeload.github.com"}))

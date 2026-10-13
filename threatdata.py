@@ -480,8 +480,12 @@ def _run(name, produce, source, data_dir, now):
     return SourceResult(name, True, f"{label} updated.")
 
 
-def update_from_network(data_dir=None, fetcher=fetch, now=None, cancel=None, progress=None):
-    """Download both sources, replacing each stored copy only if its new data validates."""
+def update_from_network(data_dir=None, fetcher=None, now=None, cancel=None, progress=None):
+    """Download both sources, replacing each stored copy only if its new data validates.
+
+    fetcher defaults to this module's fetch, looked up when called (so a test can replace it).
+    """
+    fetcher = fetcher or fetch
     data_dir = data_dir or default_data_dir()
     now = now or _now()
     specs = (("kev", "KEV", KEV_URL, KEV_MAX_BYTES, KEV_HOSTS), ("epss", "EPSS", EPSS_URL, EPSS_MAX_COMPRESSED,

@@ -689,6 +689,20 @@ class FetchTests(unittest.TestCase):
         self.assertFalse(data_dir.exists() and any(data_dir.iterdir()))
 
 
+class DefaultDownloaderTests(unittest.TestCase):
+    def test_the_default_downloader_is_looked_up_when_called_so_it_can_be_replaced(self):
+        calls = []
+
+        def fake(url, cap, hosts, **_kw):
+            calls.append(url)
+            return kev_bytes() if url == td.KEV_URL else epss_bytes()
+
+        with tempfile.TemporaryDirectory() as folder, mock.patch("threatdata.fetch", fake):
+            results = td.update_from_network(folder)
+        self.assertTrue(all(r.ok for r in results))
+        self.assertEqual(sorted(calls), sorted([td.KEV_URL, td.EPSS_URL]))
+
+
 class ExactMatchTests(unittest.TestCase):
     """Text from a downloaded file must match exactly: a trailing new line does not get past the checks."""
 
