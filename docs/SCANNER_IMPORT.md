@@ -47,7 +47,7 @@ A pipeline of four small steps, each testable on its own:
 4. **Write** a findings CSV and an inventory (new assets added, existing rows never overwritten), with the same
    atomic-write and no-overwrite rules as the command line.
 
-Rules that follow from the project's policy and its security stance:
+Rules that follow from the project's policy and its security stance (and the decisions below):
 
 * **Scoring is untouched.** An importer only fills the columns OT Triage reads. The scanner's own severity word is
   never used (Dragos, for one, has its own 0 to 5 scale, which is not a CVSS score and must not be read as one).
@@ -92,22 +92,24 @@ These are the real problems; the sample files are built to hit each one.
 9. **Exports change with the product version.** Match columns by name with aliases, report which columns were found,
    and refuse a file that lacks the ones that matter instead of guessing by position.
 
-## Decisions for you
+## Decisions
 
-None of these is made; each changes what the tool says, so they are yours.
+Agreed with the owner on 2026-10-13. Only the first changes what a result can say; it is off unless asked for.
 
-1. **A score for CVEs the export does not score.** The CISA advisory data already in the tool carries a CVSS score per
-   CVE. Using it as a fallback would score many more rows (a policy change: the number then comes from outside the
-   file). Default proposal: off, offered as an explicit option, and the row says where the score came from.
-2. **Vendor exploit intelligence.** Dragos says whether a flaw is actively exploited and has a proof of concept; Nozomi gives
-   a likelihood. Mapping that to the threat level would change results. Default proposal: not used for scoring, shown as
-   context like the CISA advisories.
-3. **Threat for findings with no CVE.** Leave it empty (the row is "not scored" until a person decides), or offer an
-   explicit `--default-threat none`. Default proposal: leave it empty.
-4. **A quality threshold for OpenVAS.** Greenbone's own default hides detections with a Quality of Detection below 70. Default
-   proposal: the same, and say how many rows were hidden.
-5. **Where merged data lives.** A new `aliases` column in the inventory, or a separate aliases file. Proposal: a separate
-   file at first, then an inventory column if it proves itself.
+1. **A score for CVEs the export does not score: opt-in.** The CISA advisory data already in the tool carries a CVSS score
+   per CVE. With the option on, it is used only for a row that has no score of its own (a score in the file is never
+   overridden), only when every advisory for that CVE gives the same score (if they disagree, the row stays not scored),
+   and the row's reasoning says where the number came from ("score taken from ICSA-..."). Off by default.
+2. **Vendor exploit intelligence is context only.** Dragos's exploit flags and Nozomi's likelihood are shown the way the CISA
+   advisories are (a chip and a line in the details) and never set the threat level. KEV and EPSS are public and can be
+   checked by anyone; a proprietary feed cannot, and it overlaps with KEV. Revisit with real exports.
+3. **Findings with no CVE stay not scored by default.** OT Triage already says a threat level is required. The import
+   summary says how many findings need one, and an explicit `--default-threat <level>` option (the value must be typed,
+   never assumed) is available for people who want one.
+4. **OpenVAS: follow Greenbone's own default** of hiding detections with a Quality of Detection below 70. The summary says how
+   many rows were hidden, and the threshold can be changed.
+5. **Aliases live in a separate file first** (`alias, asset_id`), so the inventory format people already use does not
+   change. An inventory column can follow if the file proves itself. Network scanners key devices by IP by default.
 
 ## Phases
 
