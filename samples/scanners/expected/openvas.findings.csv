@@ -1,0 +1,7 @@
+id,asset_id,name,cve,cvss,patch,source_tool
+openvas:r-0001:CVE-2023-38408,198.51.100.4,OpenSSH ssh-agent RCE (CVE-2023-38408),CVE-2023-38408,9.8,available,openvas
+openvas:r-0002:CVE-2021-41773,198.51.100.4,Apache HTTP Server multiple vulnerabilities,CVE-2021-41773,7.5,available,openvas
+openvas:r-0002:CVE-2021-42013,198.51.100.4,Apache HTTP Server multiple vulnerabilities,CVE-2021-42013,7.5,available,openvas
+openvas:r-0003:CVE-2011-3389,198.51.100.4,SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Protocol Detection,CVE-2011-3389,4.3,,openvas
+openvas:r-0003:CVE-2015-0204,198.51.100.4,SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Protocol Detection,CVE-2015-0204,4.3,,openvas
+openvas:r-0004:nocve,192.0.2.5,Default Credentials on Network Device (telnet),,9.0,,openvas

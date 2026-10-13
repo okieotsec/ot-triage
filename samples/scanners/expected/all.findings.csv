@@ -1,0 +1,30 @@
+id,asset_id,name,cve,cvss,patch,source_tool
+nessus:97833:192.0.2.21:CVE-2017-0144,192.0.2.21,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0144,8.1,,nessus
+nessus:97833:192.0.2.21:CVE-2017-0143,192.0.2.21,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0143,8.1,,nessus
+nessus:108797:192.0.2.22:CVE-2019-0708,192.0.2.22,Remote Desktop Services Remote Code Execution (BlueKeep),CVE-2019-0708,9.8,,nessus
+nessus:146855:192.0.2.21:CVE-2021-34527,192.0.2.21,Windows Print Spooler Remote Code Execution (PrintNightmare),CVE-2021-34527,8.8,,nessus
+nessus:181414:198.51.100.4:CVE-2023-38408,198.51.100.4,OpenSSH < 9.3p2 Remote Code Execution,CVE-2023-38408,9.8,,nessus
+nessus:95631:192.0.2.5:nocve,192.0.2.5,Default Credentials on Network Device (telnet),,9.0,,nessus
+nessus:41028:cc-sw-05.example.com:nocve,cc-sw-05.example.com,SNMP Agent Default Community Name (public),,7.5,,nessus-xml
+nessus:156860:cc-sw-05.example.com:CVE-2021-44228,cc-sw-05.example.com,Apache Log4Shell RCE (CVE-2021-44228),CVE-2021-44228,10.0,,nessus-xml
+nessus:97833:cc-hmi-03.example.com:CVE-2017-0143,cc-hmi-03.example.com,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0143,8.1,,nessus-xml
+nessus:97833:cc-hmi-03.example.com:CVE-2017-0144,cc-hmi-03.example.com,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0144,8.1,,nessus-xml
+tenable:151946:CC-HIST-01:CVE-2021-34527,CC-HIST-01,KB5004948: Windows Print Spooler Vulnerability,CVE-2021-34527,8.8,,tenable-vm
+tenable:125313:CC-ENG-02:CVE-2019-0708,CC-ENG-02,Remote Desktop Services Remote Code Execution (BlueKeep),CVE-2019-0708,9.8,,tenable-vm
+tenable:57608:CC-ENG-02:nocve,CC-ENG-02,SMB Signing not required,,,,tenable-vm
+tenable:140657:CC-HMI-03:CVE-2020-1472,CC-HMI-03,Netlogon Elevation of Privilege (Zerologon),CVE-2020-1472,10.0,,tenable-vm
+openvas:r-0001:CVE-2023-38408,198.51.100.4,OpenSSH ssh-agent RCE (CVE-2023-38408),CVE-2023-38408,9.8,available,openvas
+openvas:r-0002:CVE-2021-41773,198.51.100.4,Apache HTTP Server multiple vulnerabilities,CVE-2021-41773,7.5,available,openvas
+openvas:r-0002:CVE-2021-42013,198.51.100.4,Apache HTTP Server multiple vulnerabilities,CVE-2021-42013,7.5,available,openvas
+openvas:r-0003:CVE-2011-3389,198.51.100.4,SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Protocol Detection,CVE-2011-3389,4.3,,openvas
+openvas:r-0003:CVE-2015-0204,198.51.100.4,SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Protocol Detection,CVE-2015-0204,4.3,,openvas
+openvas:r-0004:nocve,192.0.2.5,Default Credentials on Network Device (telnet),,9.0,,openvas
+nozomi:nc-1001,CC-PLC-11,CVE-2023-28831 on CC-PLC-11,CVE-2023-28831,7.5,available,nozomi
+nozomi:nc-1002,CC-GW-31,CVE-2016-9361 on CC-GW-31,CVE-2016-9361,9.8,available,nozomi
+nozomi:nc-1003,CC-RTU-21,CVE-2024-2617 on CC-RTU-21,CVE-2024-2617,7.2,available,nozomi
+nozomi:nc-1004,CC-SCADA-41,CVE-2016-0854 on CC-SCADA-41,CVE-2016-0854,9.8,,nozomi
+nozomi:nc-1007,CC-FW-44,CVE-2022-31814 on CC-FW-44,CVE-2022-31814,9.8,,nozomi
+dragos:vd-as-3001,CC-PLC-12,Flaw in the CPU firmware (illustrative title),CVE-2023-28831,7.5,,dragos
+dragos:vd-as-3002,CC-RTU-22,Flaw in the RTU500 CMU firmware (illustrative title),CVE-2024-2617,7.2,,dragos
+dragos:vd-as-3003,CC-HMI-23,Flaw in the SCADA server (illustrative title),CVE-2016-0854,,,dragos
+dragos:vd-as-3005,CC-ENG-24,Legacy SMBv1 enabled,,,,dragos

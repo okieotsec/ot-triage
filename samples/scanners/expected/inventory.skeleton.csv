@@ -1,0 +1,19 @@
+asset_id,name,criticality,exposure,controls,vendor,product,version
+192.0.2.21,,,,,,,
+192.0.2.22,,,,,,,
+198.51.100.4,cc-dmz-04.example.com,,,,,,
+192.0.2.5,cc-sw-05.example.com,,,,,,
+cc-sw-05.example.com,cc-sw-05.example.com,,,,,,
+cc-hmi-03.example.com,cc-hmi-03.example.com,,,,,,
+CC-HIST-01,,,,,,,
+CC-ENG-02,,,,,,,
+CC-HMI-03,,,,,,,
+CC-PLC-11,CC-PLC-11,,,,Siemens,S7-1500,V2.9.2
+CC-GW-31,CC-GW-31,,,,Moxa,NPort 5110,2.6
+CC-RTU-21,CC-RTU-21,,,,Hitachi Energy,RTU500,13.2.5
+CC-SCADA-41,CC-SCADA-41,,,,Advantech,WebAccess,8.4.5
+CC-FW-44,CC-FW-44,,,,Netgate,pfSense,2.6.0
+CC-PLC-12,CC-PLC-12,,,,Siemens,S7-1500,V2.8.1
+CC-RTU-22,CC-RTU-22,,,,Hitachi Energy,RTU500,13.2.3
+CC-HMI-23,CC-HMI-23,,,,Advantech,WebAccess/HMI,8.4.5
+CC-ENG-24,CC-ENG-24,,,,Microsoft,Windows 10,21H2

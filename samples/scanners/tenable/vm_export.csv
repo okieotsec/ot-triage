@@ -1,0 +1,7 @@
+﻿Asset Name,IPv4 Address,Operating System,CVE,CVSSv3 Base Score,VPR,Severity,Plugin ID,Plugin Name,State,First Seen,Last Seen,Solution,Port,Protocol
+CC-HIST-01,192.0.2.21,Microsoft Windows Server 2016 Standard,CVE-2021-34527,8.8,9.6,High,151946,KB5004948: Windows Print Spooler Vulnerability,Active,2026-08-02T04:12:00Z,2026-10-11T04:09:00Z,Apply the Microsoft update KB5004948 or disable the Print Spooler service.,445,TCP
+CC-HIST-01,192.0.2.21,Microsoft Windows Server 2016 Standard,CVE-2017-0144,8.1,9.0,High,97833,MS17-010: Security Update for Microsoft Windows SMB Server,Fixed,2026-06-10T04:05:00Z,2026-09-30T04:07:00Z,Apply the appropriate Microsoft security update.,445,TCP
+CC-ENG-02,192.0.2.22,Microsoft Windows 10 Enterprise,CVE-2019-0708,9.8,9.7,Critical,125313,Remote Desktop Services Remote Code Execution (BlueKeep),New,2026-10-11T04:22:00Z,2026-10-11T04:22:00Z,Apply the Microsoft security update or disable Remote Desktop.,3389,TCP
+CC-ENG-02,192.0.2.22,Microsoft Windows 10 Enterprise,,,,Medium,57608,SMB Signing not required,Active,2026-07-01T04:00:00Z,2026-10-11T04:22:00Z,Enforce message signing in the host's configuration.,445,TCP
+CC-HMI-03,192.0.2.23,Microsoft Windows 10 IoT Enterprise,CVE-2020-1472,10.0,9.9,Critical,140657,Netlogon Elevation of Privilege (Zerologon),Resurfaced,2026-09-15T04:30:00Z,2026-10-11T04:30:00Z,Apply the August 2020 Microsoft update.,445,TCP
+CC-HMI-03,192.0.2.23,Microsoft Windows 10 IoT Enterprise,,,,Info,11936,OS Identification,Active,2026-01-01T04:00:00Z,2026-10-11T04:30:00Z,n/a,0,TCP

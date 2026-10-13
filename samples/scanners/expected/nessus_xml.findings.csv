@@ -1,0 +1,5 @@
+id,asset_id,name,cve,cvss,patch,source_tool
+nessus:41028:cc-sw-05.example.com:nocve,cc-sw-05.example.com,SNMP Agent Default Community Name (public),,7.5,,nessus-xml
+nessus:156860:cc-sw-05.example.com:CVE-2021-44228,cc-sw-05.example.com,Apache Log4Shell RCE (CVE-2021-44228),CVE-2021-44228,10.0,,nessus-xml
+nessus:97833:cc-hmi-03.example.com:CVE-2017-0143,cc-hmi-03.example.com,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0143,8.1,,nessus-xml
+nessus:97833:cc-hmi-03.example.com:CVE-2017-0144,cc-hmi-03.example.com,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0144,8.1,,nessus-xml

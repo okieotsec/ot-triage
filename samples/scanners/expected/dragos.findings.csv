@@ -1,0 +1,5 @@
+id,asset_id,name,cve,cvss,patch,source_tool
+dragos:vd-as-3001,CC-PLC-12,Flaw in the CPU firmware (illustrative title),CVE-2023-28831,7.5,,dragos
+dragos:vd-as-3002,CC-RTU-22,Flaw in the RTU500 CMU firmware (illustrative title),CVE-2024-2617,7.2,,dragos
+dragos:vd-as-3003,CC-HMI-23,Flaw in the SCADA server (illustrative title),CVE-2016-0854,,,dragos
+dragos:vd-as-3005,CC-ENG-24,Legacy SMBv1 enabled,,,,dragos
