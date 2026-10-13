@@ -1,4 +1,5 @@
 import csv
+import dataclasses
 import os
 import tempfile
 import time
@@ -444,9 +445,9 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh)
                 rows = list(reader)
-        self.assertEqual(reader.fieldnames[-9:], ["references", "forensic_triage", "asset_id", "from_inventory",
-                                                  "cvss_environmental", "ics_advisories", "ics_remediation", "change",
-                                                  "previous_priority"])
+        self.assertEqual(reader.fieldnames[-10:], ["references", "forensic_triage", "asset_id", "from_inventory",
+                                                   "cvss_environmental", "ics_advisories", "ics_remediation",
+                                                   "ics_remediation_steps", "change", "previous_priority"])
         by_cve = {r["cve"]: r for r in rows}
         kev_row = by_cve["CVE-2024-0001"]
         self.assertEqual(kev_row["forensic_triage"], "Yes")
@@ -575,6 +576,30 @@ class IcsAdvisoryBatchTests(unittest.TestCase):
             batch.write_results(path, [item], data)
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 self.assertEqual(next(csv.DictReader(fh))["ics_remediation"], "no fix available yet")
+
+    def test_a_row_carries_the_vendors_steps_from_the_newest_advisory(self):
+        steps = (ics.Step("F", "Upgrade to 3.11.1", "https://vendor.example/fw"), ics.Step("M", "=HYPERLINK(1)"))
+        long = (ics.Step("M", "x" * 400),) * 1 + tuple(ics.Step("M", f"{'y' * 300} {n}") for n in range(8))
+        newest = ics.IcsAdvisory("ICSA-26-281-01", "t", "2026-10-08", "2026-10-08", steps=steps)
+        older = ics.IcsAdvisory("ICSA-25-001-01", "t", "2025-01-01", "2025-01-01", steps=(ics.Step("M", "Old"),))
+        cases = {"": batch.BatchItem(2), "none": batch.BatchItem(2, advisories=(ics.IcsAdvisory(
+            "ICSA-26-281-01", "t", "2026-10-08", "2026-10-08"),), advisory_count=1)}
+        self.assertEqual(batch._steps_cell(cases[""]), "")
+        self.assertEqual(batch._steps_cell(cases["none"]), "")
+        item = batch.BatchItem(2, advisories=(newest, older), advisory_count=2)
+        self.assertEqual(batch._steps_cell(item), "ICSA-26-281-01: Fix: Upgrade to 3.11.1 (https://vendor.example/fw)"
+                                                  " | Mitigation: =HYPERLINK(1)")
+        cut = batch._steps_cell(batch.BatchItem(2, advisories=(dataclasses.replace(newest, steps=long),),
+                                                advisory_count=1))
+        self.assertLessEqual(len(cut), batch.MAX_STEPS_CELL + 40)
+        self.assertTrue(cut.endswith("\u2026"))
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, [item], None)
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                cell = next(csv.DictReader(fh))["ics_remediation_steps"]
+        self.assertTrue(cell.startswith("ICSA-26-281-01: Fix:"))
+        self.assertIn("| Mitigation: =HYPERLINK(1)", cell)      # a formula is only dangerous at the start of a cell
 
     def test_the_export_column_is_empty_without_advisories_and_formula_safe(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -808,9 +808,10 @@ class BatchAdvisoryTests(BatchViewTestCase):
     load_data = BatchThreatDataTests.load_data
     CSV = BatchThreatDataTests.CSV
 
-    def load_ics(self):
+    def load_ics(self, remediations=None):
         path = self.work / "csaf.tar.gz"
-        path.write_bytes(good(advisory("ICSA-26-006-01", "Acme Widget Controller", ("CVE-2024-0001",), "Acme")))
+        path.write_bytes(good(advisory("ICSA-26-006-01", "Acme Widget Controller", ("CVE-2024-0001",), "Acme",
+                                       remediations=remediations)))
         self.assertTrue(icsadvisories.import_from_file(path, self.ctx.data_dir).ok)
 
     def select(self, view, item_id):
@@ -840,6 +841,32 @@ class BatchAdvisoryTests(BatchViewTestCase):
         for other in ("B", "C", "D"):
             self.select(view, other)
             self.assertEqual((view.detail_adv.winfo_manager(), view.detail_adv_title.winfo_manager()), ("", ""))
+
+    def test_the_details_list_what_the_vendor_says_to_do_and_the_export_carries_it(self):
+        self.load_data()
+        self.load_ics({"CVE-2024-0001": [
+            {"category": "vendor_fix", "details": "Upgrade to 3.11.1", "url": "https://vendor.example/fw"}] + [
+            {"category": "mitigation", "details": f"Step {n}"} for n in range(6)]})
+        view = self.load(self.write_csv("cves.csv", self.CSV))
+        self.select(view, "A")
+        texts = [w.cget("text") for w in self.walk(view.detail_adv) if isinstance(w, tk.Label)]
+        self.assertIn("\u2022 Fix: Upgrade to 3.11.1", texts)
+        self.assertEqual(len([t for t in texts if t.startswith("\u2022 Mitigation")]), 3)    # four steps in all
+        self.assertIn("and 3 more steps (see the advisory on cisa.gov)", texts)
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-006-01", "vendor.example/fw"])
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
+            self.links(view)[1].event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://vendor.example/fw")
+        target = self.work / "out.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export()
+        self.pump(0.3)
+        with open(target, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["id"]: r for r in csv.DictReader(fh)}
+        self.assertTrue(rows["A"]["ics_remediation_steps"].startswith(
+            "ICSA-26-006-01: Fix: Upgrade to 3.11.1 (https://vendor.example/fw) | Mitigation: Step 0"))
+        self.assertEqual(rows["B"]["ics_remediation_steps"], "")
 
     def test_clicking_an_advisory_opens_the_address_built_from_its_number(self):
         self.load_data()

@@ -510,12 +510,14 @@ class ReferenceList(tk.Frame):
 class AdvisoryList(tk.Frame):
     """CISA ICS advisories that name a CVE: the advisory number is a link to cisa.gov, with its title, vendor and date.
 
-    The advisory data is untrusted, so only the address built from the validated advisory number is ever opened.
+    Under each advisory are the vendor's own steps for the CVE (a fix, mitigations). The advisory data is untrusted:
+    the steps are shown as plain text, and the only addresses ever opened are the advisory's own page, built from
+    the validated advisory number, and a step's plain https link, and only when the person clicks it.
     """
 
-    def __init__(self, parent, style, open_reference, compact=False):
+    def __init__(self, parent, style, open_reference, compact=False, max_steps=8):
         super().__init__(parent, bg=style.theme.card)
-        self.style, self.open_reference, self.compact = style, open_reference, compact
+        self.style, self.open_reference, self.compact, self.max_steps = style, open_reference, compact, max_steps
 
     def show(self, advisories, total=None):
         """Replace the list's contents; total is how many advisories name the CVE when more than these are given."""
@@ -525,22 +527,51 @@ class AdvisoryList(tk.Frame):
         for advisory in advisories:
             row = tk.Frame(self, bg=t.card)
             row.pack(fill=tk.X, pady=(0, 3 if self.compact else 8))
+            head = tk.Frame(row, bg=t.card)       # the advisory's own line; the vendor's steps go below it
+            head.pack(fill=tk.X)
             link = references.Reference(label=advisory.id, url=advisory.url)
-            LinkLabel(row, s, advisory.id, lambda r=link: self.open_reference(r)).pack(
+            LinkLabel(head, s, advisory.id, lambda r=link: self.open_reference(r)).pack(
                 side=tk.LEFT if self.compact else None, anchor="w")
             who = f" · {', '.join(advisory.vendors)}" if advisory.vendors else ""
             fix = f" · {advisory.fix_text}" if advisory.fix_text else ""
             text = f"{advisory.title}{who} · updated {advisory.updated}{fix}"
             if self.compact:
-                tk.Label(row, text="  " + text, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
+                tk.Label(head, text="  " + text, font=s.font(9), bg=t.card, fg=t.muted, anchor="w").pack(
                     side=tk.LEFT, anchor="w")
             else:
-                detail = tk.Label(row, text=text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w", justify="left")
+                detail = tk.Label(head, text=text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w", justify="left")
                 detail.pack(fill=tk.X)
                 wrap_to_width(detail)
+            self._show_steps(row, advisory)
         left_out = (total or len(advisories)) - len(advisories)
         if left_out > 0:
             tk.Label(self, text=f"and {left_out} more advisories name this CVE (see cisa.gov)", font=s.font(9),
+                     bg=t.card, fg=t.muted, anchor="w").pack(fill=tk.X)
+
+
+    def _show_steps(self, row, advisory):
+        """List what the vendor says to do about the CVE under an advisory: its kind and text, then any link."""
+        s, t = self.style, self.style.theme
+        if not advisory.steps:
+            return
+        steps = tk.Frame(row, bg=t.card)
+        steps.pack(fill=tk.X, padx=(14, 0), pady=(3, 0))
+        tk.Label(steps, text="What the vendor says to do", font=s.font(9, "bold"), bg=t.card, fg=t.muted,
+                 anchor="w").pack(fill=tk.X, pady=(0, 2))
+        for step in advisory.steps[:self.max_steps]:
+            line = tk.Frame(steps, bg=t.card)
+            line.pack(fill=tk.X, pady=(0, 2))
+            text = tk.Label(line, text=f"\u2022 {step.line}", font=s.font(9 if self.compact else 10), bg=t.card,
+                            fg=t.text, anchor="w", justify="left")
+            text.pack(fill=tk.X)
+            wrap_to_width(text)
+            if step.url:
+                reference = references.Reference(label=step.line, url=step.url)
+                LinkLabel(line, s, f"{reference.host}{_short_path(step.url)}",
+                          lambda r=reference: self.open_reference(r)).pack(anchor="w", padx=(12, 0))
+        left_out = len(advisory.steps) - self.max_steps
+        if left_out > 0:
+            tk.Label(steps, text=f"and {left_out} more steps (see the advisory on cisa.gov)", font=s.font(9),
                      bg=t.card, fg=t.muted, anchor="w").pack(fill=tk.X)
 
 

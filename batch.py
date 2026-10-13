@@ -303,8 +303,9 @@ OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cv
                   "threat", "asset",
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
-                  "from_inventory", "cvss_environmental", "ics_advisories", "ics_remediation", "change",
-                  "previous_priority"]
+                  "from_inventory", "cvss_environmental", "ics_advisories", "ics_remediation",
+                  "ics_remediation_steps", "change", "previous_priority"]
+MAX_STEPS_CELL = 1500
 
 
 def _change_cells(comparison, item):
@@ -320,6 +321,15 @@ def _advisory_cell(item):
     cell = " ; ".join(f"{a.id}: {a.url}" for a in item.advisories)
     left_out = item.advisory_count - len(item.advisories)
     return f"{cell} ; and {left_out} more" if left_out > 0 else cell
+
+
+def _steps_cell(item):
+    """What the newest advisory's vendor says to do, for an export cell: each step with its link, cut at a limit."""
+    if not item.advisories or not item.advisories[0].steps:
+        return ""
+    cell = " | ".join(f"{s.line} ({s.url})" if s.url else s.line for s in item.advisories[0].steps)
+    cell = cell if len(cell) <= MAX_STEPS_CELL else cell[:MAX_STEPS_CELL].rstrip() + "\u2026"
+    return f"{item.advisories[0].id}: {cell}"
 
 
 def write_results(path, items, threatdata=None, comparison=None):
@@ -343,6 +353,7 @@ def write_results(path, items, threatdata=None, comparison=None):
                    "cvss_environmental": "" if item.cvss_environmental is None else f"{item.cvss_environmental:.1f}",
                    "ics_advisories": _safe(_advisory_cell(item)),
                    "ics_remediation": _safe(item.advisories[0].fix_text if item.advisories else ""),
+                   "ics_remediation_steps": _safe(_steps_cell(item)),
                    **_change_cells(comparison, item)}
             if item.result:
                 rank += 1

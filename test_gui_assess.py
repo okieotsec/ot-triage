@@ -1024,6 +1024,69 @@ class AssessAdvisoryTests(AssessTestCase):
         self.assertEqual((self.ctx.assess_state.patch.get(), view.badge.cget("text"),
                           view.score_label.cget("text")), before)
 
+    def steps_doc(self, entries):
+        return advisory("ICSA-26-006-01", "Acme Widget Controller", (KEV_CVE,), "Acme",
+                        remediations={KEV_CVE: entries})
+
+    def test_the_card_lists_what_the_vendor_says_to_do_and_links_open_only_when_clicked(self):
+        self.load_data()
+        self.load_ics(self.steps_doc([
+            {"category": "vendor_fix", "details": "Upgrade to 3.11.1", "url": "https://vendor.example/fw/notes"},
+            {"category": "mitigation", "details": "Disable the web GUI"}]))
+        view = self.build()
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
+            self.fill("8.0", Threat.NONE)
+            self.lookup(KEV_CVE)
+            self.assertIn("\u2022 Fix: Upgrade to 3.11.1", self.texts(view))
+            self.assertIn("\u2022 Mitigation: Disable the web GUI", self.texts(view))
+            self.assertEqual([w.cget("text") for w in self.links(view)],
+                             ["ICSA-26-006-01", "vendor.example/fw/notes"])
+            opener.assert_not_called()
+            self.links(view)[1].event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://vendor.example/fw/notes")
+
+    def test_a_long_list_of_steps_is_cut_and_says_how_many_are_left(self):
+        self.load_data()
+        self.load_ics(self.steps_doc([{"category": "mitigation", "details": f"Step {n}"} for n in range(12)]))
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        shown = [t for t in self.texts(view) if t.startswith("\u2022 Mitigation: Step")]
+        self.assertEqual(len(shown), 8)
+        self.assertIn("and 4 more steps (see the advisory on cisa.gov)", self.texts(view))
+
+    def test_hostile_step_text_stays_plain_text_and_steps_change_nothing(self):
+        self.load_data()
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        before = (self.ctx.assess_state.patch.get(), view.badge.cget("text"), view.score_label.cget("text"))
+        hostile = "[click](https://evil.example) <b>x</b>\x07"
+        self.load_ics(self.steps_doc([{"category": "mitigation", "details": hostile, "url": "javascript:alert(1)"}]))
+        self.ctx.reload_threat_data()
+        self.lookup(KEV_CVE)
+        self.assertIn("\u2022 Mitigation: [click](https://evil.example) <b>x</b>", self.texts(view))
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-006-01"])
+        self.assertEqual((self.ctx.assess_state.patch.get(), view.badge.cget("text"),
+                          view.score_label.cget("text")), before)
+        view.copy_markdown()
+        markdown = self.ctx.copy.call_args[0][0]
+        self.assertNotIn("](https://evil.example)", markdown)
+        self.assertNotIn("\x07", markdown)
+
+    def test_the_copied_summaries_include_the_vendors_steps(self):
+        self.load_data()
+        self.load_ics(self.steps_doc([{"category": "vendor_fix", "details": "Upgrade to 3.11.1",
+                                       "url": "https://vendor.example/fw"}]))
+        view = self.build()
+        self.fill("8.0", Threat.NONE)
+        self.lookup(KEV_CVE)
+        view.copy_summary()
+        self.assertIn("  - Fix: Upgrade to 3.11.1 (https://vendor.example/fw)", self.ctx.copy.call_args[0][0])
+        view.copy_markdown()
+        self.assertIn("  - [Fix: Upgrade to 3.11.1](https://vendor.example/fw)", self.ctx.copy.call_args[0][0])
+
     def test_there_is_no_hint_when_the_advisory_says_nothing_about_a_fix_or_there_is_no_advisory(self):
         self.load_data()
         self.load_ics()

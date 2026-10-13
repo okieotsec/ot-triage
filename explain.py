@@ -116,6 +116,25 @@ def sorted_factors(factors):
     return sorted(factors, key=lambda f: order.get(f.direction, 3))
 
 
+SUMMARY_STEPS = 6      # the vendor's steps listed under each advisory in a copied summary
+
+
+def _step_notes(advisory, markdown):
+    """Lines (indented, as sub-items) for the vendor's steps under an advisory, and a note if some are left out."""
+    lines = []
+    for step in advisory.steps[:SUMMARY_STEPS]:
+        if markdown:
+            item = refs.markdown_item(refs.Reference(label=step.line, url=step.url) if step.url
+                                      else refs.Reference(text=step.line))
+        else:
+            item = "- " + (f"{step.line} ({step.url})" if step.url else step.line)
+        lines.append("  " + item)
+    left_out = len(advisory.steps) - SUMMARY_STEPS
+    if left_out > 0:
+        lines.append(f"  - and {left_out} more steps (see the advisory)")
+    return lines
+
+
 def summary_text(result, data_versions="", extra=(), references=(), advisories=()):
     """Return a plain-text summary of a result, with inputs and settings so it can be reproduced."""
     headline = HEADLINES[result.priority][0]
@@ -128,8 +147,9 @@ def summary_text(result, data_versions="", extra=(), references=(), advisories=(
     if references:
         lines += ["", "References (from the CISA KEV notes):", *[f"- {refs.describe(r)}" for r in references]]
     if advisories:
-        lines += ["", "CISA ICS advisories that name this CVE:",
-                  *[f"- {a.id}: {a.title} ({a.url})" for a in advisories]]
+        lines += ["", "CISA ICS advisories that name this CVE:"]
+        for a in advisories:
+            lines += [f"- {a.id}: {a.title} ({a.url})", *_step_notes(a, markdown=False)]
     return "\n".join(lines)
 
 
@@ -145,6 +165,7 @@ def markdown_summary(result, data_versions="", extra=(), references=(), advisori
     if references:
         lines += ["", "**References (from the CISA KEV notes)**", "", *[refs.markdown_item(r) for r in references]]
     if advisories:
-        lines += ["", "**CISA ICS advisories that name this CVE**", "",
-                  *[refs.markdown_item(refs.Reference(f"{a.id}: {a.title}", a.url)) for a in advisories]]
+        lines += ["", "**CISA ICS advisories that name this CVE**", ""]
+        for a in advisories:
+            lines += [refs.markdown_item(refs.Reference(f"{a.id}: {a.title}", a.url)), *_step_notes(a, markdown=True)]
     return "\n".join(lines)
