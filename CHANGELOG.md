@@ -1,8 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-10-13)
 
 - **Version-aware advisory matching:** the asset inventory can now have an optional `version` column (aliases `firmware`, `firmware_version`, `fw_version`, `software_version`, `sw_version`). With a vendor, a product and a version, the tool compares the version with the versions each matching CISA advisory lists as affected (for example `<=Firmware_3.11.0` or `>=4.0|<5.2`). In **By asset**, the details say how many advisories list your version as affected, how many list other versions only and how many could not be compared; the advisories that list your version come first, each with a *Version check* line. In Batch's Findings view, each advisory of a row whose asset has a vendor, product and version gets the same line. The roll-up export gains `version` and `listing_your_version` columns. The tool reads the common shapes (about 94% of the version text in today's advisories) and says it could not compare, rather than guessing, for anything else. It is a pointer to read, never a verdict, and it never changes a bucket or an ordering score. The stored advisory index is about 1 MB larger and its format changes, so update the ICS advisories once after upgrading (the app says so if it finds the old one). See docs/INVENTORY.md.
+
+### Upgrading from 0.7.0
+
+- **Update the ICS advisories once.** The stored advisory index has a new format (it also keeps the versions each advisory lists as affected), so the app will say the stored copy could not be used until you press **Update threat data** again (about 12 MB) or import the archive. Nothing else is lost; KEV and EPSS are untouched.
+- **Add a `version` column to your asset inventory if you want the comparison.** It is optional, and without it everything works as in 0.7.0. A version the tool cannot read as a number is reported as not compared.
+- **Nothing about scoring changed.** The version comparison is context: no priority or ordering score is different from 0.7.0, and it is never worded as safe.
+- **The roll-up export has two new columns,** `version` and `listing_your_version`, if a script reads that CSV by position rather than by name.
 
 ## 0.7.0 (2026-10-12)
 
