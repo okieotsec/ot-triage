@@ -20,7 +20,7 @@ FIELDS = ("asset", "exposure", "controls")
 # Optional per-asset security requirements (used only for the CVSS environmental score): column -> CVSS metric.
 REQUIREMENT_COLUMNS = {"confidentiality": "CR", "integrity": "IR", "availability": "AR"}
 # Optional free text, used only to point at CISA ICS advisories that may apply to the asset (never for scoring)
-TEXT_COLUMNS = ("vendor", "product")
+TEXT_COLUMNS = ("vendor", "product", "version")
 MAX_TEXT_CHARS = 100
 _REQUIREMENT_WORDS = {"l": "L", "low": "L", "m": "M", "med": "M", "medium": "M", "h": "H", "high": "H"}
 _NOT_SET = {"", "x", "not defined", "n/a", "na", "unset", "not set"}
@@ -28,7 +28,9 @@ _KEY_ALIASES = {"assetid": "asset_id", "asset_tag": "asset_id", "id": "asset_id"
                 "cr": "confidentiality", "confidentiality_requirement": "confidentiality",
                 "ir": "integrity", "integrity_requirement": "integrity",
                 "ar": "availability", "availability_requirement": "availability",
-                "manufacturer": "vendor", "make": "vendor", "model": "product", "product_name": "product"}
+                "manufacturer": "vendor", "make": "vendor", "model": "product", "product_name": "product",
+                "firmware": "version", "firmware_version": "version", "fw_version": "version",
+                "software_version": "version", "sw_version": "version"}
 
 
 def normalize_key(text):
@@ -52,6 +54,7 @@ class AssetRecord:
     requirements: dict = field(default_factory=dict)     # {"CR": "H", ...} the CVSS security requirements stated
     vendor: str = ""                                     # who makes the asset, as the inventory writes it
     product: str = ""                                    # what the asset is called, as the inventory writes it
+    version: str = ""                                    # the firmware or software version, as the inventory writes it
 
 
 @dataclass
@@ -112,7 +115,7 @@ def _load(path):
             raise ValueError(f"Duplicate column(s) in the inventory: {', '.join(repeated)}")
         if "asset_id" not in columns or not any(f in columns for f in (*FIELDS, *REQUIREMENT_COLUMNS, *TEXT_COLUMNS)):
             raise ValueError("The inventory needs an asset_id column and at least one of: asset (or criticality), "
-                             "exposure, controls, confidentiality, integrity, availability, vendor, product. "
+                             "exposure, controls, confidentiality, integrity, availability, vendor, product, version. "
                              f"Found: {', '.join(clean(h) for h in header)[:200]}")
         seen = {}
         count = 0
@@ -170,6 +173,6 @@ def _add_row(inventory, seen, line, row):
         requirements[metric] = _REQUIREMENT_WORDS[text]
     key = normalize_key(asset_id)
     seen.setdefault(key, []).append(line)
-    vendor, product = (clean(row.get(name, ""))[:MAX_TEXT_CHARS] for name in TEXT_COLUMNS)
+    vendor, product, version = (clean(row.get(name, ""))[:MAX_TEXT_CHARS] for name in TEXT_COLUMNS)
     inventory.records[key] = AssetRecord(asset_id, clean(row.get("name", ""))[:MAX_NAME_CHARS], values, line,
-                                         requirements, vendor, product)
+                                         requirements, vendor, product, version)

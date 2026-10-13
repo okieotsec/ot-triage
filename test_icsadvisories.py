@@ -26,9 +26,10 @@ ROOT = "CSAF-develop/csaf_files/OT/white"
 
 def advisory(ident="ICSA-26-006-01", title="Columbia Weather Systems MicroServer", cves=("CVE-2025-61939",),
              vendor="Columbia Weather Systems", published="2026-01-06T06:00:00.000000Z",
-             updated="2026-01-06T06:00:00.000000Z", fixes=None, products=None, remediations=None):
+             updated="2026-01-06T06:00:00.000000Z", fixes=None, products=None, remediations=None, versions=None):
     """Build a CSAF advisory; fixes maps a CVE id to the list of remediation categories to give it, products
-    lists product names to put under the vendor, and remediations maps a CVE id to ready-made remediation entries."""
+    lists product names to put under the vendor, remediations maps a CVE id to ready-made remediation entries, and
+    versions lists (product name, version text) pairs that every CVE lists as known affected."""
     doc = {
         "document": {"title": title, "tracking": {"id": ident, "initial_release_date": published,
                                                     "current_release_date": updated}},
@@ -39,6 +40,17 @@ def advisory(ident="ICSA-26-006-01", title="Columbia Weather Systems MicroServer
         doc["product_tree"]["branches"][0]["branches"] = [{"category": "product_name", "name": name,
                                                            "product": {"name": name, "product_id": f"CSAFPID-{n}"}}
                                                           for n, name in enumerate(products, start=1)]
+    if versions:
+        listed = []
+        for n, (name, text) in enumerate(versions, start=1):
+            ident = f"CSAFPID-V{n}"
+            listed.append(ident)
+            doc["product_tree"]["branches"][0]["branches"].append(
+                {"category": "product_name", "name": name, "branches": [
+                    {"category": "product_version_range", "name": text,
+                     "product": {"name": f"{name}: {text}", "product_id": ident}}]})
+        for item in doc["vulnerabilities"]:
+            item["product_status"] = {"known_affected": listed}
     for item in doc["vulnerabilities"]:
         if fixes and item["cve"] in fixes:
             item["remediations"] = [{"category": c, "details": "x", "product_ids": ["CSAFPID-0001"]}
@@ -500,6 +512,182 @@ class StepTests(unittest.TestCase):
         self.assertEqual(steps[0].text, "<script>alert(1)</script> $(rm -rf ~) %s {0}")
 
 
+class VersionCheckTests(unittest.TestCase):
+    """Comparing an asset's version with the versions an advisory lists as affected."""
+
+    def data(self, *docs):
+        return ics.parse_archive(good(*docs))
+
+    def one(self, versions, **kwargs):
+        return self.data(advisory(vendor="Red Lion Controls", title="Red Lion N-Tron 700 Series",
+                                  versions=versions, **kwargs))
+
+    def test_the_listed_affected_versions_are_kept_in_the_advisorys_words(self):
+        data = self.one([("700 Series", "<=Firmware_3.11.0"), ("700 Series", "<=Bootloader_2.0.6.1")])
+        self.assertEqual(data.advisories["ICSA-26-006-01"].affected, (
+            ics.Affected("700 Series", "<=Firmware_3.11.0"), ics.Affected("700 Series", "<=Bootloader_2.0.6.1")))
+
+    def test_only_products_the_vulnerabilities_list_as_known_affected_are_kept(self):
+        doc = advisory(vendor="Acme", versions=[("Widget", "<2.0"), ("Gadget", "<3.0")])
+        doc["vulnerabilities"][0]["product_status"] = {"known_affected": ["CSAFPID-V1"], "fixed": ["CSAFPID-V2"]}
+        self.assertEqual(self.data(doc).advisories["ICSA-26-006-01"].affected, (ics.Affected("Widget", "<2.0"),))
+
+    def test_a_product_with_no_version_branch_is_kept_without_a_version(self):
+        doc = advisory(vendor="Acme", products=("Widget",))
+        doc["vulnerabilities"][0]["product_status"] = {"known_affected": ["CSAFPID-1"]}
+        self.assertEqual(self.data(doc).advisories["ICSA-26-006-01"].affected, (ics.Affected("Widget", ""),))
+
+    def test_odd_product_status_data_is_ignored(self):
+        for odd in (None, "x", 5, [], {}, {"known_affected": None}, {"known_affected": "CSAFPID-V1"},
+                    {"known_affected": [None, 5, ["CSAFPID-V1"], {"a": 1}]}):
+            with self.subTest(odd=odd):
+                doc = advisory(vendor="Acme", versions=[("Widget", "<2.0")])
+                doc["vulnerabilities"][0]["product_status"] = odd
+                self.assertEqual(self.data(doc).advisories["ICSA-26-006-01"].affected, ())
+
+    def test_text_is_cleaned_limited_and_not_repeated(self):
+        long_product, long_version = "p" * 300, "<" + "1" * 300
+        data = self.data(advisory(vendor="Acme", versions=[("Widget\x1b[31m", "<2.0\n"), ("Widget[31m", "<2.0"),
+                                                          (long_product, long_version)]))
+        found = data.advisories["ICSA-26-006-01"].affected
+        self.assertEqual(found[0], ics.Affected("Widget[31m", "<2.0"))
+        self.assertEqual(len(found), 2)
+        self.assertEqual((len(found[1].product), len(found[1].versions)),
+                         (ics.MAX_PRODUCT_CHARS, ics.MAX_VERSION_CHARS))
+
+    def test_only_a_limited_number_of_entries_is_kept(self):
+        data = self.data(advisory(vendor="Acme", versions=[("Widget", f"<{n}.0") for n in range(1, 80)]))
+        self.assertEqual(len(data.advisories["ICSA-26-006-01"].affected), ics.MAX_AFFECTED)
+        ics.parse_index(ics.to_index(data))
+
+    def check(self, data, version, vendor="Red Lion", product="700 Series", ident="ICSA-26-006-01"):
+        return data.check_advisory(ident, vendor, product, version)
+
+    def test_a_version_inside_a_listed_range_is_reported_as_listed(self):
+        data = self.one([("700 Series", "<=Firmware_3.11.0"), ("700 Series", "<=Bootloader_2.0.6.1")])
+        found = self.check(data, "3.8")
+        self.assertEqual((found.status, found.ranges), ("A", ("<=Firmware_3.11.0",)))
+        self.assertIn("your version 3.8 is inside a listed affected range (<=Firmware_3.11.0)", found.note("3.8"))
+
+    def test_a_version_outside_every_listed_range_is_reported_as_outside_and_never_as_safe(self):
+        data = self.one([("700 Series", "<=Firmware_3.11.0"), ("700 Series", "<=Bootloader_2.0.6.1")])
+        found = self.check(data, "3.12")
+        self.assertEqual(found.status, "O")
+        note = found.note("3.12")
+        self.assertIn("outside the listed affected versions (<=Firmware_3.11.0; <=Bootloader_2.0.6.1)", note)
+        self.assertIn("read the advisory anyway", note)
+        self.assertNotIn("safe", note.replace("never", ""))
+
+    def test_text_that_is_not_understood_means_cannot_be_compared(self):
+        data = self.one([("700 Series", "7_until_7.1.2")])
+        found = self.check(data, "7.1")
+        self.assertEqual((found.status, found.ranges), ("U", ("7_until_7.1.2",)))
+        self.assertIn("could not be compared", found.note("7.1"))
+
+    def test_one_understood_range_that_holds_wins_over_one_that_is_not_understood(self):
+        data = self.one([("700 Series", "7_until_7.1.2"), ("700 Series", "<8")])
+        self.assertEqual(self.check(data, "7.1").status, "A")
+
+    def test_all_versions_and_the_vers_prefix_are_read_and_shown_plainly(self):
+        data = self.one([("700 Series", "vers:all/*"), ("700 Series", "vers:intdot/<2.9.9")])
+        found = self.check(data, "9.9")
+        self.assertEqual((found.status, found.ranges), ("A", ("all versions",)))
+        data = self.one([("700 Series", "vers:intdot/>=4.0|<5.2")])
+        self.assertEqual(self.check(data, "5.2").ranges, (">=4.0|<5.2",))
+
+    def test_nothing_is_said_when_the_vendor_product_or_version_does_not_fit(self):
+        data = self.one([("700 Series", "<9")])
+        self.assertIsNone(self.check(data, "3.8", vendor="Siemens"))
+        self.assertIsNone(self.check(data, "3.8", product="Other Product"))
+        self.assertIsNone(self.check(data, "banana"))
+        self.assertIsNone(self.check(data, ""))
+        self.assertIsNone(self.check(data, "3.8", vendor=""))
+        self.assertIsNone(self.check(data, "3.8", product=""))
+        self.assertIsNone(self.check(data, "3.8", ident="ICSA-99-999-99"))
+
+    def test_every_word_of_the_product_must_be_in_the_listed_product(self):
+        data = self.data(advisory(vendor="Red Lion Controls", title="Red Lion Widget Lite",
+                                  versions=[("Widget Lite", "<9")]))
+        self.assertIsNone(self.check(data, "3.8", product="Widget Pro"))
+        self.assertEqual(self.check(data, "3.8", product="Widget Lite").status, "A")
+
+    def test_a_range_that_could_not_be_read_means_cannot_be_compared_even_if_another_says_outside(self):
+        data = self.one([("700 Series", "<2"), ("700 Series", "7_until_7.1.2")])
+        self.assertEqual(self.check(data, "3.8").status, "U")
+
+    def test_at_most_a_few_ranges_are_named_and_the_same_one_is_named_once(self):
+        data = self.one([("700 Series", f"<{n}") for n in range(5, 12)])
+        self.assertEqual(self.check(data, "3.8").ranges, ("<5", "<6", "<7"))
+        data = self.one([("700 Series", "vers:all/*"), ("700 Series", "*"), ("700 Series", "All versions")])
+        self.assertEqual(self.check(data, "3.8").ranges, ("all versions",))
+
+    def test_those_listing_the_version_come_first_newest_first_then_the_others_newest_first(self):
+        docs = [advisory(f"ICSA-25-{n:03d}-01", "Red Lion N-Tron 700 Series", (f"CVE-2025-{n:04d}",),
+                         "Red Lion Controls", updated=f"2025-02-{n:02d}T00:00:00Z",
+                         versions=[("700 Series", "<9" if n in (1, 3, 5) else "<1")]) for n in range(1, 7)]
+        found = self.data(*docs).check("Red Lion", "700 Series", "3.8")
+        self.assertEqual([a.id for a in found.advisories],
+                         ["ICSA-25-005-01", "ICSA-25-003-01", "ICSA-25-001-01", "ICSA-25-006-01", "ICSA-25-004-01"])
+
+    def test_the_product_must_be_one_the_advisory_lists_not_just_one_in_its_title(self):
+        data = self.one([("Other Model", "<9")])
+        self.assertIsNone(self.check(data, "3.8"))
+
+    def test_the_note_is_bounded_and_names_the_version_that_was_checked(self):
+        data = self.one([("700 Series", "<=" + "9" * 70)])
+        note = self.check(data, "3.8").note("3" + ".1" * 60)
+        self.assertLessEqual(len(note), ics.MAX_VERSION_NOTE_CHARS)
+
+    def test_the_advisories_for_an_asset_are_counted_and_those_listing_its_version_come_first(self):
+        old = advisory("ICSA-25-001-01", "Red Lion N-Tron 700 Series", ("CVE-2025-0001",), "Red Lion Controls",
+                       updated="2025-01-01T00:00:00Z", versions=[("700 Series", "<=3.11.0")])
+        mid = advisory("ICSA-25-002-01", "Red Lion N-Tron 700 Series", ("CVE-2025-0002",), "Red Lion Controls",
+                       updated="2025-06-01T00:00:00Z", versions=[("700 Series", "7_until_7.1.2")])
+        new = advisory("ICSA-26-001-01", "Red Lion N-Tron 700 Series", ("CVE-2026-0001",), "Red Lion Controls",
+                       updated="2026-01-01T00:00:00Z", versions=[("700 Series", ">=4.0")])
+        found = self.data(old, mid, new).check("Red Lion", "700 Series", "3.8")
+        self.assertEqual((found.total, found.affected, found.outside, found.unknown, found.readable),
+                         (3, 1, 1, 1, True))
+        self.assertEqual([a.id for a in found.advisories], ["ICSA-25-001-01", "ICSA-25-002-01", "ICSA-26-001-01"])
+        self.assertEqual(found.newest, "ICSA-26-001-01")
+        self.assertIn("inside a listed affected range", found.advisories[0].version_note)
+        self.assertIn("could not be compared", found.advisories[1].version_note)
+        self.assertIn("outside the listed affected versions", found.advisories[2].version_note)
+
+    def test_an_advisory_that_lists_nothing_comparable_counts_as_could_not_be_compared(self):
+        doc = advisory("ICSA-25-001-01", "Red Lion N-Tron 700 Series", ("CVE-2025-0001",), "Red Lion Controls")
+        found = self.data(doc).check("Red Lion", "700 Series", "3.8")
+        self.assertEqual((found.total, found.affected, found.unknown), (1, 0, 1))
+        self.assertEqual(found.advisories[0].version_note, "")
+
+    def test_a_version_that_cannot_be_read_is_not_compared_and_says_so(self):
+        data = self.one([("700 Series", "<9")])
+        found = self.data(advisory(vendor="Red Lion Controls", title="Red Lion N-Tron 700 Series",
+                                   versions=[("700 Series", "<9")])).check("Red Lion", "700 Series", "banana")
+        self.assertEqual((found.readable, found.total, found.affected, found.unknown), (False, 1, 0, 1))
+        self.assertEqual(found.advisories[0].version_note, "")
+        self.assertTrue(data)
+
+    def test_only_the_newest_few_are_returned_but_the_counts_cover_all_of_them(self):
+        docs = [advisory(f"ICSA-25-{n:03d}-01", "Red Lion N-Tron 700 Series", (f"CVE-2025-{n:04d}",),
+                         "Red Lion Controls", updated=f"2025-02-{n:02d}T00:00:00Z",
+                         versions=[("700 Series", "<=3.11.0" if n % 2 else "<1.0")]) for n in range(1, 11)]
+        found = self.data(*docs).check("Red Lion", "700 Series", "3.8")
+        self.assertEqual((found.total, found.affected, found.outside, len(found.advisories)),
+                         (10, 5, 5, ics.MAX_LISTED))
+        self.assertTrue(all("inside" in a.version_note for a in found.advisories))
+
+    def test_the_result_does_not_change_when_asked_again(self):
+        data = self.one([("700 Series", "<=3.11.0")])
+        self.assertEqual(data.check("Red Lion", "700 Series", "3.8"), data.check("Red Lion", "700 Series", "3.8"))
+
+    def test_the_listed_versions_survive_the_stored_index(self):
+        data = self.one([("700 Series", "vers:intdot/>=4.0|<5.2"), ("700 Series", "<=Firmware_3.11.0")])
+        again = ics.parse_index(ics.to_index(data))
+        self.assertEqual(again.advisories["ICSA-26-006-01"].affected, data.advisories["ICSA-26-006-01"].affected)
+        self.assertEqual(again.check("Red Lion", "700 Series", "4.5"), data.check("Red Lion", "700 Series", "4.5"))
+
+
 class IndexTests(unittest.TestCase):
     def setUp(self):
         self.data = ics.parse_archive(good(
@@ -526,8 +714,25 @@ class IndexTests(unittest.TestCase):
             return doc
 
         cases = {
-            "unknown version": mutate(lambda d: d.update(version=5)),
-            "old version": mutate(lambda d: d.update(version=3)),
+            "unknown version": mutate(lambda d: d.update(version=6)),
+            "old version": mutate(lambda d: d.update(version=4)),
+            "affected not a list": mutate(lambda d: d["advisories"][0].update(affected="3.1")),
+            "too many affected entries": mutate(lambda d: d["advisories"][0].update(
+                affected=[[f"P{n}", "<1"] for n in range(41)])),
+            "affected entry not a list": mutate(lambda d: d["advisories"][0].update(affected=["P"])),
+            "affected entry of three parts": mutate(lambda d: d["advisories"][0].update(affected=[["P", "<1", "x"]])),
+            "affected part not text": mutate(lambda d: d["advisories"][0].update(affected=[["P", 5]])),
+            "affected product empty": mutate(lambda d: d["advisories"][0].update(affected=[["", "<1"]])),
+            "affected product too long": mutate(lambda d: d["advisories"][0].update(affected=[["p" * 121, "<1"]])),
+            "affected version too long": mutate(lambda d: d["advisories"][0].update(affected=[["P", "1" * 81]])),
+            "affected product with control characters": mutate(lambda d: d["advisories"][0].update(
+                affected=[["a\x1bb", "<1"]])),
+            "affected version with control characters": mutate(lambda d: d["advisories"][0].update(
+                affected=[["P", "<1\x00"]])),
+            "affected version with a space at the end": mutate(lambda d: d["advisories"][0].update(
+                affected=[["P", "<1 "]])),
+            "affected entry repeated": mutate(lambda d: d["advisories"][0].update(affected=[["P", "<1"], ["P", "<1"]])),
+            "missing affected": mutate(lambda d: d["advisories"][0].pop("affected")),
             "steps not a list": mutate(lambda d: d["advisories"][0].update(steps="Upgrade")),
             "too many different steps": mutate(lambda d: d["advisories"][0].update(
                 steps=[["M", f"step {n}", ""] for n in range(101)], applies={})),

@@ -1309,5 +1309,109 @@ class BatchPossibleAdvisoryTests(BatchViewTestCase):
         self.assertEqual(rows["HMI-4"]["possible_advisories"], "")
 
 
+
+class BatchVersionTests(BatchViewTestCase):
+    """Comparing an asset's version (from the inventory) with the versions the advisories list."""
+
+    load_data = BatchThreatDataTests.load_data
+    prepare = BatchPossibleAdvisoryTests.prepare
+    select = BatchPossibleAdvisoryTests.select
+    links = BatchPossibleAdvisoryTests.links
+    walk = BatchPossibleAdvisoryTests.walk
+    INVENTORY = ("asset_id,name,criticality,exposure,controls,vendor,product,version\n"
+                 "PLC-1,Packaging PLC,standard,low,partial,Siemens AG,S7-1500,V2.9.4\n"
+                 "PLC-2,Spare PLC,standard,low,partial,Siemens AG,S7-1500,banana\n"
+                 "PLC-3,Old PLC,standard,low,partial,Siemens AG,S7-1500,\n")
+    FINDINGS = ("id,asset_id,name,cvss,threat\nF1,PLC-1,Flaw,9.0,active\nF2,PLC-2,Flaw,7.0,none\n"
+                "F3,PLC-3,Flaw,5.0,none\n")
+
+    def load_ics(self):
+        path = self.work / "csaf.tar.gz"
+        path.write_bytes(good(
+            advisory("ICSA-26-001-01", "Siemens SIMATIC S7-1500 CPU", ("CVE-2024-0001",), "Siemens",
+                     versions=[("SIMATIC S7-1500 CPU", "<2.0")], updated="2026-03-01T00:00:00Z"),
+            advisory("ICSA-26-002-01", "Siemens SIMATIC S7-1500 CPU", ("CVE-2024-0002",), "Siemens",
+                     versions=[("SIMATIC S7-1500 CPU", "vers:intdot/<2.9.9")], updated="2026-01-01T00:00:00Z")))
+        self.assertTrue(icsadvisories.import_from_file(path, self.ctx.data_dir).ok)
+
+    def labels(self, view):
+        return [w.cget("text") for w in self.walk(view.detail_adv) if isinstance(w, tk.Label)]
+
+    def test_with_a_version_the_asset_details_count_the_advisories_and_list_the_ones_naming_it_first(self):
+        view = self.prepare()
+        self.select(view, "PLC-1")
+        text = view.detail_text.cget("text")
+        self.assertIn("2 CISA advisories name that vendor and product. For version V2.9.4: 1 list it as affected, "
+                      "1 list other versions only, 0 could not be compared. Those that list it come first.", text)
+        self.assertIn("does not mean the asset is safe", text)
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-002-01", "ICSA-26-001-01"])
+        notes = [t for t in self.labels(view) if t.startswith("Version check:")]
+        self.assertEqual(len(notes), 2)
+        self.assertIn("your version V2.9.4 is inside a listed affected range (<2.9.9)", notes[0])
+        self.assertIn("outside the listed affected versions (<2.0)", notes[1])
+
+    def test_a_version_that_cannot_be_read_is_said_not_compared(self):
+        view = self.prepare()
+        self.select(view, "PLC-2")
+        text = view.detail_text.cget("text")
+        self.assertIn("The version 'banana' could not be read as a version number, so it was not compared", text)
+        self.assertFalse([t for t in self.labels(view) if t.startswith("Version check:")])
+
+    def test_without_a_version_it_says_what_to_add_and_checks_nothing(self):
+        view = self.prepare()
+        self.select(view, "PLC-3")
+        text = view.detail_text.cget("text")
+        self.assertIn("This does not know the version you run (add a version column to the inventory)", text)
+        self.assertFalse([t for t in self.labels(view) if t.startswith("Version check:")])
+
+    def test_a_finding_shows_whether_its_assets_version_is_inside_the_listed_versions(self):
+        self.load_data()
+        self.load_ics()
+        view = self.build()
+        self.ctx.open_file = mock.Mock(return_value=self.write_csv("inventory.csv", self.INVENTORY))
+        view.load_inventory()
+        self.assertTrue(self.pump(10, until=lambda: view.state.inventory is not None and not self.ctx.worker.running))
+        self.load(self.write_csv("findings.csv", "id,asset_id,name,cve,cvss,threat\n"
+                                 "F1,PLC-1,Flaw,CVE-2024-0001,9.0,none\nF2,PLC-1,Flaw,CVE-2024-0002,9.0,none\n"
+                                 "F3,PLC-3,Flaw,CVE-2024-0002,9.0,none\nF4,,Flaw,CVE-2024-0002,9.0,none\n"))
+        shown = {}
+        for iid in view.tree.get_children():
+            view.tree.selection_set(iid)
+            view.tree.focus(iid)
+            self.pump(0.1)
+            shown[view.tree.item(iid, "values")[COL["id"]]] = [
+                t for t in self.labels(view) if t.startswith("Version check:")]
+        outside = ("Version check: your version V2.9.4 is outside the listed affected versions (<2.0); "
+                   "read the advisory anyway")
+        self.assertEqual(shown["F1"], [outside])
+        self.assertEqual(len(shown["F2"]), 1)
+        self.assertIn("inside a listed affected range (<2.9.9)", shown["F2"][0])
+        self.assertEqual((shown["F3"], shown["F4"]), ([], []))      # no version in the inventory, or no asset at all
+
+    def test_the_comparison_never_changes_a_priority_or_the_order(self):
+        with_ics = self.prepare()
+        shown = [with_ics.asset_tree.item(i, "values") for i in with_ics.asset_tree.get_children()]
+        for child in list(self.holder.winfo_children()):
+            child.destroy()
+        self.ctx.batch_state = None
+        self.view = None
+        self.INVENTORY = self.INVENTORY.replace("V2.9.4", "").replace("banana", "")
+        again = self.prepare()
+        self.assertEqual(shown, [again.asset_tree.item(i, "values") for i in again.asset_tree.get_children()])
+
+    def test_the_roll_up_export_has_the_version_and_how_many_list_it(self):
+        view = self.prepare()
+        target = self.work / "assets.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export_assets()
+        self.pump(0.3)
+        with open(target, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["asset_id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["PLC-1"]["version"], rows["PLC-1"]["listing_your_version"],
+                          rows["PLC-1"]["newest_possible_advisory"]), ("V2.9.4", "1", "ICSA-26-001-01"))
+        self.assertEqual((rows["PLC-2"]["version"], rows["PLC-2"]["listing_your_version"]), ("banana", ""))
+        self.assertEqual((rows["PLC-3"]["version"], rows["PLC-3"]["listing_your_version"]), ("", ""))
+
+
 if __name__ == "__main__":
     unittest.main()

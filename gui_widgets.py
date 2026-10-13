@@ -542,6 +542,11 @@ class AdvisoryList(tk.Frame):
                 detail = tk.Label(head, text=text, font=s.font(10), bg=t.card, fg=t.muted, anchor="w", justify="left")
                 detail.pack(fill=tk.X)
                 wrap_to_width(detail)
+            if advisory.version_note:
+                note = tk.Label(row, text="Version check: " + advisory.version_note, bg=t.card, fg=t.text, anchor="w",
+                                font=s.font(9 if self.compact else 10), justify="left")
+                note.pack(fill=tk.X, padx=(14, 0), pady=(2, 0))
+                wrap_to_width(note)
             self._show_steps(row, advisory)
         left_out = (total or len(advisories)) - len(advisories)
         if left_out > 0:

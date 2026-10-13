@@ -164,6 +164,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP14 | The portable bundle and launcher | [reports/cp14-bundle](reports/cp14-bundle/claude.md) |
 | CP15 | The OkieOTSec brand kit in the application | [reports/cp15-brand-kit](reports/cp15-brand-kit/claude.md) |
 | CP16 | What the vendor says to do (the advisories' remediation text) | [reports/cp16-vendor-steps](reports/cp16-vendor-steps/claude.md) |
+| CP17 | Version-aware advisory matching | [reports/cp17-version-aware](reports/cp17-version-aware/claude.md) |
 
 Across the checkpoints 37 findings were recorded (3 Medium, 12 Low, 22 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 

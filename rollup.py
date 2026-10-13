@@ -87,8 +87,8 @@ def label(item):
 
 
 COLUMNS = ["asset_id", "worst_priority", "now", "next", "never", "errors", "findings", "visit_together",
-           "top_ordering_score", "top_finding", "finding_ids", "vendor", "product", "possible_advisories",
-           "newest_possible_advisory"]
+           "top_ordering_score", "top_finding", "finding_ids", "vendor", "product", "version", "possible_advisories",
+           "listing_your_version", "newest_possible_advisory"]
 
 
 @dataclass(frozen=True)
@@ -100,6 +100,32 @@ class PossibleAdvisories:
     advisories: tuple = ()      # the newest few
     count: int = 0              # how many match in all
     vendor_known: bool = False  # whether any advisory names this vendor at all
+    version: str = ""           # the version from the inventory, if it has one
+    compared: bool = False      # whether the version was compared with the advisories' listed versions
+    affected: int = 0           # how many advisories list the version as affected (when compared)
+    outside: int = 0            # how many list other versions only
+    unknown: int = 0            # how many could not be compared
+    newest: str = ""            # the id of the newest advisory that matches
+
+
+def possible_for_record(record, ics):
+    """The advisories that may apply to one inventory record, or None without a vendor and a product.
+
+    With a version in the record the advisories are also compared with it, and those listing the version as affected
+    come first. Without advisory data (ics is None) the counts are -1.
+    """
+    if not record.vendor or not record.product:
+        return None
+    if ics is None:
+        return PossibleAdvisories(record.vendor, record.product, (), -1, False, record.version)
+    if record.version:
+        found = ics.check(record.vendor, record.product, record.version)
+        return PossibleAdvisories(record.vendor, record.product, found.advisories, found.total, found.vendor_known,
+                                  record.version, found.readable, found.affected, found.outside, found.unknown,
+                                  found.newest)
+    advisories, count, known = ics.match(record.vendor, record.product)
+    return PossibleAdvisories(record.vendor, record.product, advisories, count, known, "", False, 0, 0, 0,
+                              advisories[0].id if advisories else "")
 
 
 def possible_advisories(summaries, inventory_data, ics):
@@ -113,10 +139,9 @@ def possible_advisories(summaries, inventory_data, ics):
         return found
     for summary in summaries:
         status, record = inventory_data.lookup(summary.asset_id)
-        if status != "found" or not record.vendor or not record.product:
-            continue
-        advisories, count, known = ics.match(record.vendor, record.product)
-        found[summary.asset_id] = PossibleAdvisories(record.vendor, record.product, advisories, count, known)
+        possible = possible_for_record(record, ics) if status == "found" else None
+        if possible is not None:
+            found[summary.asset_id] = possible
     return found
 
 
@@ -143,8 +168,10 @@ def write_rollup(path, summaries, possible=None):
             match = possible.get(summary.asset_id)
             writer.writerow({
                 "vendor": _safe(match.vendor) if match else "", "product": _safe(match.product) if match else "",
+                "version": _safe(match.version) if match else "",
                 "possible_advisories": match.count if match else "",
-                "newest_possible_advisory": _safe(match.advisories[0].id) if match and match.advisories else "",
+                "listing_your_version": match.affected if match and match.compared else "",
+                "newest_possible_advisory": _safe(match.newest) if match else "",
                 "asset_id": _safe(summary.asset_id), "worst_priority": summary.worst, "now": counts[NOW],
                 "next": counts[NEXT], "never": counts[NEVER], "errors": counts["ERROR"],
                 "findings": len(summary.items), "visit_together": len(summary.visit_items),
