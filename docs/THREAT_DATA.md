@@ -128,6 +128,11 @@ Import-Certificate -FilePath $env:TEMP\SFSRootCAG2.cer -CertStoreLocation Cert:\
 
 Then restart the app and update again. If it still fails, repeat with `AmazonRootCA1.cer` (SHA-256 `8ECDE6884F3D87B1125BA31AC3FCB13D7016DE7F57CC904FE1CB97C6AE98196E`). Both certificates are Amazon Trust's published root certificates (https://www.amazontrust.com/repository/). Importing them needs administrator rights; an ordinary Windows PC that has been used and updated normally usually already has them.
 
+The ICS advisories come from a third host, `codeload.github.com`, and the same thing can happen there on a fresh Windows install: its certificate chain ends at Sectigo's *USERTrust ECC Certification Authority* root. Two ways around it, neither of which turns certificate checking off:
+
+- **No administrator rights:** open https://codeload.github.com/cisagov/CSAF/tar.gz/refs/heads/develop in a browser, save the file, and use **Import from files…** in the Threat data view (cancel the KEV and EPSS questions, and choose the saved file when it asks for the CISA CSAF repository archive). The archive is checked exactly like a download.
+- **Refresh Windows' trusted roots from Windows Update** (Microsoft's own method; in an **Administrator** PowerShell): `certutil -generateSSTFromWU $env:TEMP\roots.sst`, then `Import-Certificate -FilePath $env:TEMP\roots.sst -CertStoreLocation Cert:\LocalMachine\Root`. Restart the app and update again.
+
 ## Where the data is stored
 
 | System | Location |

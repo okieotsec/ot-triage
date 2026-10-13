@@ -20,6 +20,7 @@
 
 - **The ICS advisories are new and are not downloaded until you ask.** Open Threat data and press **Update threat data** to fetch them (about 12 MB, three hosts now: `www.cisa.gov`, `epss.empiricalsecurity.com` and `codeload.github.com`). If you allow only specific hosts, add the third.
 - **NEVER is now grey, not green,** and buttons are Oklahoma blue, to follow the OkieOTSec brand guide. Buckets, scores and rules are unchanged.
+- **On a brand-new Windows install** the ICS advisories download can fail with "unable to get local issuer certificate" (Windows adds some trusted roots only when first needed). Certificate checking is never turned off; docs/THREAT_DATA.md has two ways around it, including importing the archive from a file.
 - **Nothing about scoring changed.** The ICS advisory data, the By asset view, the comparison with an earlier export and the vendor and product matching are context and presentation: no priority or ordering score is different from 0.6.0.
 - **Forks:** the OkieOTSec name and logo are not part of the MIT license; replace `assets/brand/` and the brand text in `gui_brand.py` in your own copy.
 
