@@ -12,7 +12,7 @@ import uiprefs
 from gui_about import AboutView
 from gui_assess import AssessView
 from gui_batch import BatchView
-from gui_brand import BRAND_NAME, app_icon, wordmark
+from gui_brand import BRAND_NAME, app_icon, header_logo, wordmark
 from gui_context import Context
 from gui_round import shape_label
 from gui_settings import SettingsView
@@ -104,8 +104,11 @@ class App:
         self.header = tk.Frame(parent, bg=t.header)
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew")
         tk.Frame(self.header, bg=t.copper, height=3).pack(side=tk.BOTTOM, fill=tk.X)
+        self.header_logo = header_logo(self.header, s, t.header)
+        if self.header_logo is not None:
+            self.header_logo.pack(side=tk.LEFT, padx=(20, 0), pady=10)
         text = tk.Frame(self.header, bg=t.header)
-        text.pack(side=tk.LEFT, padx=20, pady=12)
+        text.pack(side=tk.LEFT, padx=(14 if self.header_logo is not None else 20, 20), pady=12)
         tk.Label(text, text="OT Triage", font=s.font(18, "bold", "title"), bg=t.header, fg=t.text).pack(
             anchor="w")
         subtitle = tk.Label(text, text=SUBTITLE, font=s.font(9), bg=t.header, fg=t.muted, anchor="w", justify="left")

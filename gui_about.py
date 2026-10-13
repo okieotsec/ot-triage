@@ -2,7 +2,7 @@
 import tkinter as tk
 
 from gui_assess import EXPOSURE_HELP
-from gui_brand import BRAND_NAME, LINKS, TAGLINE, wordmark
+from gui_brand import BRAND_NAME, LINKS, TAGLINE, lockup
 from gui_widgets import LinkLabel, ScrollFrame, card, wrap_to_width
 from references import Reference
 from version import __version__
@@ -33,11 +33,11 @@ class AboutView:
         scroll.pack(fill=tk.BOTH, expand=True)
         scroll.body.configure(padx=28, pady=24)
         about = card(scroll.body, self.style, "About")
-        byline = tk.Frame(about, bg=t.card)
-        byline.pack(fill=tk.X, pady=(0, 8))
-        tk.Label(byline, text=f"OT Triage {__version__}  by", font=self.style.font(11, "bold"), bg=t.card, fg=t.text,
-                 padx=0).pack(side=tk.LEFT)
-        wordmark(byline, self.style, t.card, size=11).pack(side=tk.LEFT, padx=(5, 0))
+        self.lockup = lockup(about, self.style, t.card)
+        if self.lockup is not None:
+            self.lockup.pack(anchor="w", pady=(0, 10))
+        tk.Label(about, text=f"OT Triage {__version__}, an OkieOTSec project", font=self.style.font(11, "bold"),
+                 bg=t.card, fg=t.text, anchor="w").pack(fill=tk.X, pady=(0, 8))
         self._paragraphs(about, [
             (("Rule-based Now / Next / Never triage. It works fully offline; the only network access is a "
               "threat-data update that you start yourself."), False),

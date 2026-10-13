@@ -35,20 +35,20 @@ class Theme:
     warn: str
 
 
-# The OkieOTSec brand guide (v1.1): Oklahoma blue #2E6CB5, navy #14365C, sky #6BB0EC, copper #C56A33 (on dark
+# The OkieOTSec brand kit (v1.1, tokens.json): Oklahoma blue #2E6CB5, navy #14365C, sky #6BB0EC, copper #C56A33 (on dark
 # #E08A4E), cream #FAF4E8, ink #13202E, dark surface #0D1520. Risk colours are not brand colours: NOW #D7263D,
 # NEXT #E9A23B, NEVER #6B7682. Blue means navigation and action, copper is decoration only, and buttons are blue
 # with white text.
-DARK = Theme("dark", bg="#0d1520", header="#14365c", card="#13202e", field="#0d1520", border="#2c4258",
-             text="#faf4e8", muted="#a9b8c9", accent="#6bb0ec", on_accent="#0d1520", primary="#2e6cb5",
+DARK = Theme("dark", bg="#0d1520", header="#14365c", card="#141f2c", field="#0d1520", border="#263445",
+             text="#e8edf2", muted="#9aa8b6", accent="#6bb0ec", on_accent="#0d1520", primary="#2e6cb5",
              on_primary="#ffffff", copper="#e08a4e", error="#ff8b8b",
              now="#d7263d", on_now="#ffffff", next="#e9a23b", on_next="#13202e", never="#6b7682", on_never="#ffffff",
-             raise_="#ff8b8b", lower="#4ade80", neutral="#a9b8c9", ok="#4ade80", warn="#fbbf24")
-LIGHT = Theme("light", bg="#faf4e8", header="#ffffff", card="#ffffff", field="#fbf7ee", border="#d6c9ae",
-              text="#13202e", muted="#4a5868", accent="#2e6cb5", on_accent="#ffffff", primary="#2e6cb5",
+             raise_="#ff8b8b", lower="#4ade80", neutral="#9aa8b6", ok="#4ade80", warn="#fbbf24")
+LIGHT = Theme("light", bg="#faf4e8", header="#fffdf8", card="#fffdf8", field="#fbf7ee", border="#e6dcc8",
+              text="#13202e", muted="#5b6672", accent="#2e6cb5", on_accent="#ffffff", primary="#2e6cb5",
               on_primary="#ffffff", copper="#c56a33", error="#b91c1c",
               now="#d7263d", on_now="#ffffff", next="#e9a23b", on_next="#13202e", never="#6b7682", on_never="#ffffff",
-              raise_="#b91c1c", lower="#166534", neutral="#4a5868", ok="#166534", warn="#92400e")
+              raise_="#b91c1c", lower="#166534", neutral="#5b6672", ok="#166534", warn="#92400e")
 THEMES = {"dark": DARK, "light": LIGHT}
 
 # Body text: the brand's IBM Plex Sans when it is installed, then a good system font. Titles use Space Grotesk and

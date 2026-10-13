@@ -1,4 +1,13 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/readme/okieotsec-lockup-dark-1200.png">
+    <img src="assets/brand/readme/okieotsec-lockup-1200.png" alt="OkieOTSec" width="420">
+  </picture>
+</p>
+
 # OT Triage
+
+*OT Triage, an [OkieOTSec](https://okieotsec.com) project.*
 
 [![CI](https://github.com/okieotsec/ot-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/okieotsec/ot-triage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -17,12 +26,20 @@ threat-data update that you start yourself.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/batch-dark.png" alt="The Batch view ranking six findings, with the selected row's reasons and CISA references"></td>
-    <td width="50%"><img src="docs/images/assess-light.png" alt="The Assess view in the light theme"></td>
+    <td width="50%"><img src="docs/images/batch-dark.png" alt="The Batch view ranking fifteen findings, with the selected row's reasons, CISA references and the ICS advisories that name its CVE"></td>
+    <td width="50%"><img src="docs/images/batch-assets-dark.png" alt="The Batch view grouped by asset: the worst bucket on each asset and what could be handled on one outage window"></td>
   </tr>
   <tr>
     <td align="center"><em>Batch: rank a whole CSV, filter by bucket, see the references behind a row</em></td>
+    <td align="center"><em>By asset: the worst thing on each asset, and what to handle on one visit</em></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/assess-light.png" alt="The Assess view in the light theme"></td>
+    <td width="50%"><img src="docs/images/about-dark.png" alt="The About view with the OkieOTSec logo"></td>
+  </tr>
+  <tr>
     <td align="center"><em>A light theme, a text-size setting, and keyboard shortcuts throughout</em></td>
+    <td align="center"><em>An OkieOTSec project</em></td>
   </tr>
 </table>
 
@@ -145,6 +162,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP12 | The command line | [reports/cp12-cli](reports/cp12-cli/claude.md) |
 | CP13 | Advisories that may apply to an asset (vendor and product) | [reports/cp13-asset-advisories](reports/cp13-asset-advisories/claude.md) |
 | CP14 | The portable bundle and launcher | [reports/cp14-bundle](reports/cp14-bundle/claude.md) |
+| CP15 | The OkieOTSec brand kit in the application | [reports/cp15-brand-kit](reports/cp15-brand-kit/claude.md) |
 
 Across the checkpoints 32 findings were recorded (3 Medium, 9 Low, 20 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
