@@ -41,6 +41,12 @@ threat-data update that you start yourself.
     <td align="center"><em>A light theme, a text-size setting, and keyboard shortcuts throughout</em></td>
     <td align="center"><em>An OkieOTSec project</em></td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/advisory-steps-dark.png" alt="The Assess view for an actively exploited firewall flaw on a crown-jewel asset, with the CISA ICS advisory that names it and what the vendor says to do: mitigations and a fix, in the vendor's own words"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><em>CISA's ICS advisory for the CVE, with what the vendor says to do about it (here: CVE-2024-3400, from the advisory for a Siemens RUGGEDCOM device)</em></td>
+  </tr>
 </table>
 
 ## Run
