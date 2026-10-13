@@ -1172,5 +1172,115 @@ class BatchCompareTests(BatchViewTestCase):
         self.assertIn("change", view.tree.cget("displaycolumns"))
 
 
+class BatchPossibleAdvisoryTests(BatchViewTestCase):
+    INVENTORY = ("asset_id,name,criticality,exposure,controls,vendor,product\n"
+                 "PLC-1,Packaging PLC,standard,low,partial,Siemens AG,S7-1500\n"
+                 "RTU-2,Tank RTU,standard,low,none,Allen-Bradley,MicroLogix 1400\n"
+                 "GW-3,Gateway,standard,low,none,Siemens,Totally Unknown Gadget\n"
+                 "HMI-4,Panel,standard,low,none,,\n")
+    FINDINGS = ("id,asset_id,name,cvss,threat\nF1,PLC-1,Flaw,9.0,active\nF2,RTU-2,Flaw,7.0,none\n"
+                "F3,GW-3,Flaw,5.0,none\nF4,HMI-4,Flaw,5.0,none\n")
+
+    def load_ics(self):
+        path = self.work / "csaf.tar.gz"
+        path.write_bytes(good(advisory("ICSA-26-001-01", "Siemens SIMATIC S7-1500 CPU", ("CVE-2026-0001",), "Siemens",
+                                       products=["SIMATIC S7-1500 CPU 1511-1 PN"])))
+        self.assertTrue(icsadvisories.import_from_file(path, self.ctx.data_dir).ok)
+
+    def prepare(self, with_ics=True):
+        if with_ics:
+            self.load_ics()
+        view = self.build()
+        path = self.write_csv("inventory.csv", self.INVENTORY)
+        self.ctx.open_file = mock.Mock(return_value=path)
+        view.load_inventory()
+        self.assertTrue(self.pump(10, until=lambda: view.state.inventory is not None
+                                  and not self.ctx.worker.running))
+        self.load(self.write_csv("findings.csv", self.FINDINGS))
+        view.set_mode("assets")
+        self.pump(0.2)
+        return view
+
+    def select(self, view, name):
+        iid = next(i for i in view.asset_tree.get_children() if view.asset_tree.item(i, "values")[0] == name)
+        view.asset_tree.selection_set(iid)
+        view.asset_tree.focus(iid)
+        self.pump(0.2)
+
+    def links(self, view):
+        return [w for w in self.walk(view.detail_adv) if isinstance(w, gui_widgets.LinkLabel)]
+
+    def walk(self, widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from self.walk(child)
+
+    def test_an_asset_with_a_vendor_and_product_lists_the_advisories_that_may_apply(self):
+        view = self.prepare()
+        self.select(view, "PLC-1")
+        text = view.detail_text.cget("text")
+        self.assertIn("The inventory says this is a Siemens AG S7-1500. 1 CISA advisory name that vendor and product "
+                      "and may apply.", text)
+        self.assertIn("does not know the version you run", text)
+        self.assertEqual([w.cget("text") for w in self.links(view)], ["ICSA-26-001-01"])
+        self.assertEqual(view.detail_adv_title.cget("text"), gui_batch.POSSIBLE_TITLE)
+        self.assertEqual(view.detail_adv.winfo_manager(), "pack")
+
+    def test_clicking_it_opens_the_cisa_page_built_from_the_advisory_number(self):
+        view = self.prepare()
+        self.select(view, "PLC-1")
+        with mock.patch("gui_context.webbrowser.open", return_value=True) as opener:
+            self.links(view)[0].event_generate("<Button-1>")
+            self.pump()
+        opener.assert_called_once_with("https://www.cisa.gov/news-events/ics-advisories/icsa-26-001-01")
+
+    def test_a_vendor_cisa_does_not_name_says_so_and_a_vendor_with_no_product_match_says_that(self):
+        view = self.prepare()
+        self.select(view, "RTU-2")
+        self.assertIn("No CISA advisory names the vendor 'Allen-Bradley'; CISA may list it under another name.",
+                      view.detail_text.cget("text"))
+        self.assertEqual(view.detail_adv.winfo_manager(), "")
+        self.select(view, "GW-3")
+        self.assertIn("No CISA advisory names both that vendor and that product.", view.detail_text.cget("text"))
+
+    def test_an_asset_without_a_vendor_and_product_shows_nothing_extra(self):
+        view = self.prepare()
+        self.select(view, "HMI-4")
+        self.assertNotIn("The inventory says", view.detail_text.cget("text"))
+        self.assertEqual((view.detail_adv.winfo_manager(), view.detail_adv_title.winfo_manager()), ("", ""))
+
+    def test_without_the_advisories_loaded_it_says_to_update_them(self):
+        view = self.prepare(with_ics=False)
+        self.select(view, "PLC-1")
+        self.assertIn("The CISA ICS advisories are not loaded, so it cannot be checked: update them in Threat data.",
+                      view.detail_text.cget("text"))
+
+    def test_matching_never_changes_a_priority_or_the_table(self):
+        with_ics = self.prepare()
+        shown = [(r[0], r[1], r[5], r[6]) for r in (with_ics.asset_tree.item(i, "values")
+                                                    for i in with_ics.asset_tree.get_children())]
+        for child in list(self.holder.winfo_children()):
+            child.destroy()
+        self.ctx.batch_state = None
+        self.view = None
+        without = self.prepare(with_ics=False)
+        again = [(r[0], r[1], r[5], r[6]) for r in (without.asset_tree.item(i, "values")
+                                                    for i in without.asset_tree.get_children())]
+        self.assertEqual(shown, again)
+
+    def test_the_roll_up_export_has_the_vendor_product_and_advisory_columns(self):
+        view = self.prepare()
+        target = self.work / "assets.csv"
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export_assets()
+        self.pump(0.2)
+        with open(target, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["asset_id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["PLC-1"]["vendor"], rows["PLC-1"]["product"], rows["PLC-1"]["possible_advisories"],
+                          rows["PLC-1"]["newest_possible_advisory"]), ("Siemens AG", "S7-1500", "1", "ICSA-26-001-01"))
+        self.assertEqual(rows["RTU-2"]["possible_advisories"], "0")
+        self.assertEqual(rows["HMI-4"]["possible_advisories"], "")
+
+
 if __name__ == "__main__":
     unittest.main()

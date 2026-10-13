@@ -11,8 +11,11 @@ except ImportError:  # hypothesis is an optional test dependency
     st = None
 
 import batch
+import icsadvisories as ics
+import inventory
 import rollup
 from prioritizer import NEVER, NEXT, NOW
+from test_icsadvisories import advisory, good
 
 # Each row is scored with a fixed asset, exposure and patch status, so cvss and threat decide the bucket
 COMMON = {"asset": "standard", "exposure": "high", "patch": "available"}
@@ -142,6 +145,56 @@ class RollupExportTests(unittest.TestCase):
         _fields, rows = self.write(row("BROKEN", BAD_ROW, "1"))
         self.assertEqual((rows[0]["worst_priority"], rows[0]["top_ordering_score"], rows[0]["top_finding"]),
                          ("ERROR", "", ""))
+
+
+class PossibleAdvisoriesTests(unittest.TestCase):
+    INVENTORY = ("asset_id,vendor,product\nPLC-1,Siemens AG,S7-1500\nRTU-2,Allen-Bradley,MicroLogix 1400\n"
+                 "HMI-3,Siemens,\nGW-4,Siemens,PROFINET\n")
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        (self.dir / "i.csv").write_text(self.INVENTORY, encoding="utf-8")
+        self.inventory = inventory.load(self.dir / "i.csv")
+        docs = [advisory("ICSA-26-001-01", "Siemens SIMATIC S7-1500 CPU", ("CVE-2026-0001",), "Siemens",
+                         products=["SIMATIC S7-1500 CPU 1511-1 PN"]),
+                advisory("ICSA-26-002-01", "Siemens PROFINET Devices", ("CVE-2026-0002",), "Siemens",
+                         products=["PROFINET Driver"])]
+        self.ics = ics.parse_archive(good(*docs))
+        rows = [row(a, NEVER_ROW, a) for a in ("PLC-1", "RTU-2", "HMI-3", "GW-4", "NOT-LISTED")]
+        self.summaries, _ = rollup.rollup(scored(*rows))
+
+    def test_each_asset_with_a_vendor_and_a_product_is_matched(self):
+        found = rollup.possible_advisories(self.summaries, self.inventory, self.ics)
+        self.assertEqual(set(found), {"PLC-1", "RTU-2", "GW-4"})
+        self.assertEqual([a.id for a in found["PLC-1"].advisories], ["ICSA-26-001-01"])
+        self.assertEqual((found["PLC-1"].vendor, found["PLC-1"].product), ("Siemens AG", "S7-1500"))
+        self.assertEqual((found["RTU-2"].count, found["RTU-2"].vendor_known), (0, False))
+        self.assertEqual([a.id for a in found["GW-4"].advisories], ["ICSA-26-002-01"])
+
+    def test_nothing_is_matched_without_an_inventory_or_advisory_data(self):
+        self.assertEqual(rollup.possible_advisories(self.summaries, None, self.ics), {})
+        self.assertEqual(rollup.possible_advisories(self.summaries, self.inventory, None), {})
+
+    def test_the_export_carries_the_vendor_product_and_the_newest_advisory(self):
+        found = rollup.possible_advisories(self.summaries, self.inventory, self.ics)
+        path = self.dir / "assets.csv"
+        rollup.write_rollup(path, self.summaries, found)
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            rows = {r["asset_id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["PLC-1"]["vendor"], rows["PLC-1"]["product"], rows["PLC-1"]["possible_advisories"],
+                          rows["PLC-1"]["newest_possible_advisory"]), ("Siemens AG", "S7-1500", "1", "ICSA-26-001-01"))
+        self.assertEqual(rows["RTU-2"]["possible_advisories"], "0")
+        self.assertEqual((rows["HMI-3"]["vendor"], rows["HMI-3"]["possible_advisories"]), ("", ""))
+
+    def test_the_vendor_and_product_cells_cannot_run_as_formulas(self):
+        found = {"PLC-1": rollup.PossibleAdvisories("=cmd", "+SUM", (), 0, False)}
+        path = self.dir / "assets.csv"
+        rollup.write_rollup(path, self.summaries, found)
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            row = next(r for r in csv.DictReader(fh) if r["asset_id"] == "PLC-1")
+        self.assertTrue(row["vendor"].startswith("'") and row["product"].startswith("'"))
 
 
 @unittest.skipIf(st is None, "hypothesis is not installed")

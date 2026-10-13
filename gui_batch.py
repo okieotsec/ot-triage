@@ -25,6 +25,8 @@ from gui_widgets import (
     wrap_to_width,
 )
 
+ADVISORIES_TITLE = "ICS ADVISORIES FROM CISA"
+POSSIBLE_TITLE = "ICS ADVISORIES THAT MAY APPLY (MATCHED ON VENDOR AND PRODUCT)"
 REFERENCE_LIMIT = 5
 DETAILS_MAX_HEIGHT = 190
 FILTERS = [("all", "All"), ("NOW", "Now"), ("NEXT", "Next"), ("NEVER", "Never"), ("ERROR", "Error")]
@@ -543,12 +545,15 @@ class BatchView:
             self.detail_refs_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
             self.detail_refs.pack(fill=tk.X, before=self.detail_text)
 
-    def _show_advisories(self, item):
-        """Show the CISA ICS advisories that name the selected row's CVE, or nothing when there are none."""
+    def _show_advisories(self, item, advisories=None, total=None, title=ADVISORIES_TITLE):
+        """Show the CISA ICS advisories that name the selected row's CVE (or the ones given, for an asset)."""
         self.detail_adv_title.pack_forget()
         self.detail_adv.pack_forget()
-        advisories = item.advisories if item is not None else ()
-        self.detail_adv.show(advisories, item.advisory_count if item is not None else None)
+        if advisories is None:
+            advisories = item.advisories if item is not None else ()
+            total = item.advisory_count if item is not None else None
+        self.detail_adv_title.configure(text=title)
+        self.detail_adv.show(advisories, total)
         if advisories:
             self.detail_adv_title.pack(fill=tk.X, pady=(10, 4), before=self.detail_text)
             self.detail_adv.pack(fill=tk.X, before=self.detail_text)
@@ -732,10 +737,43 @@ class BatchView:
             more = "s" if counts[batch.NEVER] != 1 else ""
             never = f"{counts[batch.NEVER]} more finding{more} NEVER: no scheduled fix, re-check if conditions change."
             lines += ["", never]
+        possible = self._possible_for(summary)
+        shown = ()
+        if possible is not None:
+            lines += ["", *self._possible_lines(possible)]
+            shown = possible.advisories
         self.detail_text.configure(text="\n".join(lines))
         self._show_references(())
-        self._show_advisories(None)
+        self._show_advisories(None, shown, possible.count if possible is not None else None, POSSIBLE_TITLE)
         self.detail_scroll.scroll_to_top()
+
+    def _possible_for(self, summary):
+        """The advisories that may apply to an asset, from its vendor and product in the inventory (or a message)."""
+        inv = self.state.inventory
+        status, record = inv.lookup(summary.asset_id) if inv is not None else ("missing", None)
+        if status != "found" or not record.vendor or not record.product:
+            return None
+        ics = self.ctx.get_threat_data().ics
+        if ics is None:
+            return rollup.PossibleAdvisories(record.vendor, record.product, (), -1, False)
+        advisories, count, known = ics.match(record.vendor, record.product)
+        return rollup.PossibleAdvisories(record.vendor, record.product, advisories, count, known)
+
+    @staticmethod
+    def _possible_lines(possible):
+        who = f"{possible.vendor} {possible.product}"
+        head = f"The inventory says this is a {who}. "
+        if possible.count < 0:
+            return [head + "The CISA ICS advisories are not loaded, so it cannot be checked: update them in Threat "
+                    "data."]
+        if not possible.vendor_known:
+            return [head + f"No CISA advisory names the vendor '{possible.vendor}'; CISA may list it under another "
+                    "name."]
+        if not possible.count:
+            return [head + "No CISA advisory names both that vendor and that product."]
+        plural = "advisories" if possible.count != 1 else "advisory"
+        return [head + f"{possible.count} CISA {plural} name that vendor and product and may apply. This does not "
+                "know the version you run, so read each one."]
 
     def export_current(self):
         """Export what the current view shows: the ranked findings or the per-asset roll-up."""
@@ -754,7 +792,11 @@ class BatchView:
         if not out:
             return
         try:
-            rollup.write_rollup(out, summaries)
+            possible = {}
+            if self.state.inventory is not None:
+                possible = rollup.possible_advisories(summaries, self.state.inventory,
+                                                      self.ctx.get_threat_data().ics)
+            rollup.write_rollup(out, summaries, possible)
         except OSError as error:
             self.ctx.error("Export failed", str(error))
             return

@@ -6,6 +6,7 @@ import sys
 import tarfile
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -25,14 +26,19 @@ ROOT = "CSAF-develop/csaf_files/OT/white"
 
 def advisory(ident="ICSA-26-006-01", title="Columbia Weather Systems MicroServer", cves=("CVE-2025-61939",),
              vendor="Columbia Weather Systems", published="2026-01-06T06:00:00.000000Z",
-             updated="2026-01-06T06:00:00.000000Z", fixes=None):
-    """Build a CSAF advisory; fixes maps a CVE id to the list of remediation categories to give it."""
+             updated="2026-01-06T06:00:00.000000Z", fixes=None, products=None):
+    """Build a CSAF advisory; fixes maps a CVE id to the list of remediation categories to give it, and products
+    lists product names to put under the vendor."""
     doc = {
         "document": {"title": title, "tracking": {"id": ident, "initial_release_date": published,
                                                     "current_release_date": updated}},
         "product_tree": {"branches": [{"category": "vendor", "name": vendor, "branches": []}]},
         "vulnerabilities": [{"cve": c} for c in cves],
     }
+    if products:
+        doc["product_tree"]["branches"][0]["branches"] = [{"category": "product_name", "name": name,
+                                                           "product": {"name": name, "product_id": f"CSAFPID-{n}"}}
+                                                          for n, name in enumerate(products, start=1)]
     for item in doc["vulnerabilities"]:
         if fixes and item["cve"] in fixes:
             item["remediations"] = [{"category": c, "details": "x", "product_ids": ["CSAFPID-0001"]}
@@ -322,7 +328,7 @@ class RemediationTests(unittest.TestCase):
 
     def test_the_words_are_plain_and_each_status_has_some(self):
         def words_for(letter):
-            return ics.IcsAdvisory("ICSA-26-006-01", "t", "2026-01-01", "2026-01-01", (), letter).fix_text
+            return ics.IcsAdvisory("ICSA-26-006-01", "t", "2026-01-01", "2026-01-01", fix=letter).fix_text
 
         words = {letter: words_for(letter) for letter in "FPNXM"}
         self.assertEqual(words, {"F": "vendor fix available",
@@ -390,8 +396,14 @@ class IndexTests(unittest.TestCase):
             return doc
 
         cases = {
-            "unknown version": mutate(lambda d: d.update(version=3)),
-            "old version": mutate(lambda d: d.update(version=1)),
+            "unknown version": mutate(lambda d: d.update(version=4)),
+            "old version": mutate(lambda d: d.update(version=2)),
+            "products not a list": mutate(lambda d: d["advisories"][0].update(products="Widget")),
+            "too many products": mutate(lambda d: d["advisories"][0].update(products=["p"] * 31)),
+            "product with control characters": mutate(lambda d: d["advisories"][0].update(products=["a\x00b"])),
+            "product too long": mutate(lambda d: d["advisories"][0].update(products=["p" * 121])),
+            "product not text": mutate(lambda d: d["advisories"][0].update(products=[5])),
+            "missing products": mutate(lambda d: d["advisories"][0].pop("products")),
             "remediation for a CVE the advisory does not name": mutate(
                 lambda d: d["advisories"][0].update(fixes={"CVE-2020-0001": "F"})),
             "unknown remediation letter": mutate(lambda d: d["advisories"][0].update(fixes={"CVE-2025-61939": "Z"})),
@@ -410,7 +422,7 @@ class IndexTests(unittest.TestCase):
             "title with control characters": mutate(lambda d: d["advisories"][0].update(title="a\x00b")),
             "title not text": mutate(lambda d: d["advisories"][0].update(title=7)),
             "vendors not a list": mutate(lambda d: d["advisories"][0].update(vendors="Acme")),
-            "too many vendors": mutate(lambda d: d["advisories"][0].update(vendors=["a"] * 9)),
+            "too many vendors": mutate(lambda d: d["advisories"][0].update(vendors=["a"] * 11)),
             "same advisory twice": mutate(lambda d: d["advisories"].append(dict(d["advisories"][0])) or
                                           d.update(count=3)),
             "row not an object": mutate(lambda d: d["advisories"].__setitem__(0, 5)),
@@ -489,6 +501,137 @@ class IcsFuzzTests(unittest.TestCase):
             self.assertEqual((again.advisories, again.by_cve), (data.advisories, data.by_cve))
             for found in data.advisories.values():
                 self.assertTrue(found.title.isprintable() and all(v.isprintable() for v in found.vendors))
+
+
+class MatchingTests(unittest.TestCase):
+    def data(self, *docs):
+        return ics.parse_archive(good(*docs))
+
+    def pair(self, ident, vendor, products, title=None, updated="2026-01-06T00:00:00Z", cve="CVE-2026-0001"):
+        return advisory(ident, title or f"{vendor} {products[0]}", (cve,), vendor, updated=updated, products=products)
+
+    def test_words_ignore_case_punctuation_accents_and_legal_endings(self):
+        self.assertEqual(ics.name_tokens("S7-1500 / CPU_1511-1 PN"), ("s7", "1500", "cpu", "1511", "1", "pn"))
+        self.assertEqual(ics.name_tokens("Sch\u00fcco International KG"), ("schuco", "international", "kg"))
+        self.assertEqual(ics.name_tokens("Siemens AG", drop_legal=True), ("siemens",))
+        self.assertEqual(ics.name_tokens("The Foo Company, Inc.", drop_legal=True), ("foo",))
+        self.assertEqual(ics.name_tokens("!!! ---"), ())
+        self.assertEqual(len(ics.name_tokens(" ".join(["word"] * 50))), ics.MAX_NAME_TOKENS)
+        self.assertEqual(len(ics.name_tokens("x" * 500)[0]), ics.MAX_TOKEN_CHARS)
+
+    def test_products_are_read_from_the_tree_cleaned_and_limited(self):
+        names = ["Widget " + str(n) for n in range(ics.MAX_PRODUCTS + 5)]
+        found = self.data(self.pair("ICSA-26-001-01", "Acme", names)).advisories["ICSA-26-001-01"].products
+        self.assertEqual(len(found), ics.MAX_PRODUCTS)
+        hostile = self.data(self.pair("ICSA-26-001-01", "Acme", ["Evil\x00\u202e Widget " + "y" * 300]))
+        product = hostile.advisories["ICSA-26-001-01"].products[0]
+        self.assertTrue(product.isprintable())
+        self.assertLessEqual(len(product), ics.MAX_PRODUCT_CHARS)
+
+    def test_text_cut_at_a_limit_never_ends_in_a_space_so_the_stored_index_reads_back(self):
+        cut_inside_a_gap = {"title": ("T" * 199 + " tail", ics.MAX_TITLE_CHARS),
+                            "vendor": ("V" * 79 + " tail", ics.MAX_VENDOR_CHARS),
+                            "product": ("P" * 119 + " tail", ics.MAX_PRODUCT_CHARS)}
+        for label, (text, limit) in cut_inside_a_gap.items():
+            self.assertFalse(ics._clean(text, limit).endswith(" "), label)
+        doc = advisory("ICSA-26-001-01", cut_inside_a_gap["title"][0], ("CVE-2026-0001",),
+                       cut_inside_a_gap["vendor"][0], products=[cut_inside_a_gap["product"][0]])
+        data = self.data(doc)
+        again = ics.parse_index(ics.to_index(data))        # the check every update does before it stores anything
+        self.assertEqual(again.advisories, data.advisories)
+
+    def test_a_product_family_counts_and_duplicates_collapse(self):
+        doc = self.pair("ICSA-26-001-01", "Acme", ["Widget", "Widget"])
+        doc["product_tree"]["branches"][0]["branches"].append({"category": "product_family", "name": "Gadget line"})
+        self.assertEqual(self.data(doc).advisories["ICSA-26-001-01"].products, ("Widget", "Gadget line"))
+
+    def test_the_vendor_and_the_product_must_both_match_in_the_same_advisory(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Siemens", ["SIMATIC S7-1500 CPU"]),
+                         self.pair("ICSA-26-002-01", "Advantech", ["WebAccess SCADA"], cve="CVE-2026-0002"))
+        self.assertEqual([a.id for a in data.match("Siemens", "S7-1500")[0]], ["ICSA-26-001-01"])
+        self.assertEqual(data.match("Siemens", "WebAccess")[:2], ((), 0))    # in different advisories
+        self.assertEqual(data.match("Advantech", "S7-1500")[:2], ((), 0))
+
+    def test_every_word_of_the_vendor_must_match_not_just_one(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Rockwell Automation", ["Widget"]),
+                         self.pair("ICSA-26-002-01", "Schneider Electric", ["Widget"], cve="CVE-2026-0002"))
+        self.assertEqual(data.match("Rockwell Automation", "Widget")[1], 1)
+        self.assertEqual(data.match("Rockwell Electric", "Widget"), ((), 0, False))
+        self.assertEqual(data.match("Schneider", "Widget")[1], 1)
+
+    def test_a_product_alone_never_matches_when_the_vendor_is_unknown(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Siemens", ["SIMATIC S7-1500 CPU"]))
+        self.assertEqual(data.match("Unknown Vendor", "S7-1500"), ((), 0, False))
+        self.assertEqual(data.match("Siemens", "S7-1500")[1], 1)
+
+    def test_matching_ignores_case_order_punctuation_and_a_legal_ending(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Siemens AG", ["SIMATIC S7-1500 CPU 1511-1 PN"]))
+        for vendor, product in (("siemens", "s7 1500"), ("SIEMENS, Inc.", "1500-S7"), ("Siemens AG", "CPU 1511-1"),
+                                ("the Siemens", "simatic")):
+            with self.subTest(vendor=vendor, product=product):
+                self.assertEqual(data.match(vendor, product)[1], 1)
+
+    def test_the_title_is_searched_too(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Moxa", ["NPort 5110"], title="Moxa NPort 5100 Series Terminal"))
+        self.assertEqual(data.match("Moxa", "terminal server")[1], 0)
+        self.assertEqual(data.match("Moxa", "terminal")[1], 1)
+
+    def test_a_missing_or_too_short_vendor_or_product_matches_nothing(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Acme", ["A1 Widget"]))
+        for vendor, product in (("", "Widget"), ("Acme", ""), ("Acme", "a"), ("Acme", "A1"), ("Acme", "-"),
+                                ("!!!", "Widget"), ("Inc", "Widget"), (None, None), (5, 7)):
+            with self.subTest(vendor=vendor, product=product):
+                self.assertEqual(data.match(vendor, product), ((), 0, False))
+        self.assertEqual(data.match("Acme", "A1 Widget")[1], 1)
+
+    def test_it_says_when_no_advisory_names_the_vendor_at_all(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Rockwell Automation", ["ControlLogix"]))
+        self.assertEqual(data.match("Allen-Bradley", "MicroLogix"), ((), 0, False))
+        self.assertEqual(data.match("Rockwell Automation", "PowerFlex"), ((), 0, True))
+        self.assertEqual(data.match("Rockwell Automation", "ControlLogix")[2], True)
+
+    def test_newest_first_with_the_real_total_and_a_limit_on_what_is_listed(self):
+        docs = [self.pair(f"ICSA-26-{n:03d}-01", "Acme", ["Widget"], updated=f"2026-02-{n:02d}T00:00:00Z",
+                          cve=f"CVE-2026-{n:04d}") for n in range(1, 9)]
+        found, count, known = self.data(*docs).match("Acme", "Widget")
+        self.assertEqual((count, known, len(found)), (8, True, ics.MAX_LISTED))
+        self.assertEqual(found[0].id, "ICSA-26-008-01")
+        self.assertEqual([a.updated for a in found], sorted((a.updated for a in found), reverse=True))
+
+    def test_the_answer_is_the_same_the_second_time_and_the_cache_is_bounded(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Acme", ["Widget"]))
+        self.assertEqual(data.match("Acme", "Widget"), data.match("Acme", "Widget"))
+        old = ics.MAX_MATCH_CACHE
+        ics.MAX_MATCH_CACHE = 10
+        try:
+            for n in range(100):
+                data.match("Acme", f"Gadget{n}")
+            self.assertLessEqual(len(data._cache), 12)
+            self.assertEqual(data.match("Acme", "Widget")[1], 1)
+        finally:
+            ics.MAX_MATCH_CACHE = old
+
+    def test_matching_survives_the_stored_index(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Acme", ["Widget Pro"]))
+        again = ics.parse_index(ics.to_index(data))
+        self.assertEqual(again.match("Acme", "Widget")[1], 1)
+        self.assertEqual(again.advisories["ICSA-26-001-01"].products, ("Widget Pro",))
+
+    def test_many_different_assets_are_matched_quickly(self):
+        docs = [self.pair(f"ICSA-26-{n:03d}-01", f"Vendor{n % 40}", [f"Product{n} Model{n % 7}"],
+                          cve=f"CVE-2026-{n:04d}") for n in range(1, 400)]
+        data = self.data(*docs)
+        start = time.monotonic()
+        for n in range(20_000):
+            data.match(f"Vendor{n % 60}", f"Product{n} Model{n % 9}")
+        self.assertLess(time.monotonic() - start, 10.0)
+
+    def test_hostile_names_are_handled(self):
+        data = self.data(self.pair("ICSA-26-001-01", "Acme", ["Widget"]))
+        for text in ("\x00" * 100, "\u202e" * 100, "a" * 100_000, "\U0001f600" * 50, " ".join(["Acme"] * 10_000)):
+            with self.subTest(len=len(text)):
+                data.match(text, text)
+                data.match("Acme", text)
 
 
 class FakeFetcher:

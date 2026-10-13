@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import icsadvisories
 import ot_triage_cli as cli
 import settings as scoring
 import threatdata as td
@@ -79,6 +80,23 @@ class RankingTests(CliCase):
         rows = {r["asset_id"]: r for r in self.csv_rows(target)}
         self.assertEqual((rows["PLC-01"]["worst_priority"], rows["PLC-01"]["findings"]), ("NEXT", "2"))
         self.assertIn("(2 assets)", out)
+
+    def test_the_asset_roll_up_names_the_advisories_that_may_apply_from_the_inventory_vendor_and_product(self):
+        data = self.dir / "data"
+        data.mkdir()
+        archive = self.dir / "csaf.tar.gz"
+        archive.write_bytes(good(advisory("ICSA-26-001-01", "Siemens SIMATIC S7-1500", ("CVE-2026-0001",), "Siemens",
+                                          products=["SIMATIC S7-1500 CPU"])))
+        self.assertTrue(icsadvisories.import_from_file(archive, data).ok)
+        inv = self.write("i.csv", "asset_id,criticality,exposure,controls,vendor,product\n"
+                                  "PLC-01,standard,low,none,Siemens AG,S7-1500\nGW-01,standard,low,none,,\n")
+        target = str(self.dir / "assets.csv")
+        code, _out, err = self.run_cli(self.write("f.csv", FINDINGS), "-i", inv, "-a", target)
+        self.assertEqual((code, err), (0, ""))
+        rows = {r["asset_id"]: r for r in self.csv_rows(target)}
+        self.assertEqual((rows["PLC-01"]["vendor"], rows["PLC-01"]["possible_advisories"],
+                          rows["PLC-01"]["newest_possible_advisory"]), ("Siemens AG", "1", "ICSA-26-001-01"))
+        self.assertEqual(rows["GW-01"]["possible_advisories"], "")
 
     def test_quiet_prints_nothing_but_still_writes_files(self):
         target = str(self.dir / "ranked.csv")

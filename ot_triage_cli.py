@@ -167,7 +167,11 @@ def run(args, out, err):
             print(f"Wrote {args.output}", file=out)
     if args.assets:
         summaries, _unassigned = rollup.rollup(items)
-        _write_atomically(args.assets, lambda p: rollup.write_rollup(p, summaries))
+        possible = {}
+        if inv is not None:
+            ics = (data or threatdata.ThreatData.load(data_dir)).ics
+            possible = rollup.possible_advisories(summaries, inv, ics)
+        _write_atomically(args.assets, lambda p: rollup.write_rollup(p, summaries, possible))
         if not args.quiet:
             print(f"Wrote {args.assets} ({len(summaries)} assets)", file=out)
     if args.fail_on:

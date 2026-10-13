@@ -87,7 +87,37 @@ def label(item):
 
 
 COLUMNS = ["asset_id", "worst_priority", "now", "next", "never", "errors", "findings", "visit_together",
-           "top_ordering_score", "top_finding", "finding_ids"]
+           "top_ordering_score", "top_finding", "finding_ids", "vendor", "product", "possible_advisories",
+           "newest_possible_advisory"]
+
+
+@dataclass(frozen=True)
+class PossibleAdvisories:
+    """The CISA ICS advisories that may apply to one asset, found from the vendor and product in the inventory."""
+
+    vendor: str
+    product: str
+    advisories: tuple = ()      # the newest few
+    count: int = 0              # how many match in all
+    vendor_known: bool = False  # whether any advisory names this vendor at all
+
+
+def possible_advisories(summaries, inventory_data, ics):
+    """For every asset whose inventory entry has a vendor and a product, find the advisories that may apply.
+
+    Returns {the asset id as shown: PossibleAdvisories}. Assets with no vendor or product, or an inventory or
+    advisory data that is not loaded, are left out. This points at advisories to read; it does not know versions.
+    """
+    found = {}
+    if inventory_data is None or ics is None:
+        return found
+    for summary in summaries:
+        status, record = inventory_data.lookup(summary.asset_id)
+        if status != "found" or not record.vendor or not record.product:
+            continue
+        advisories, count, known = ics.match(record.vendor, record.product)
+        found[summary.asset_id] = PossibleAdvisories(record.vendor, record.product, advisories, count, known)
+    return found
 
 
 def _safe(text):
@@ -95,8 +125,12 @@ def _safe(text):
     return "'" + text if text and text[0] in "=+-@\t\r" else text
 
 
-def write_rollup(path, summaries):
-    """Write the per-asset roll-up to a CSV file with formula-safe text cells."""
+def write_rollup(path, summaries, possible=None):
+    """Write the per-asset roll-up to a CSV file with formula-safe text cells.
+
+    possible is the result of possible_advisories(); without it the vendor and advisory columns are blank.
+    """
+    possible = possible or {}
     with open(path, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.DictWriter(fh, fieldnames=COLUMNS)
         writer.writeheader()
@@ -106,7 +140,11 @@ def write_rollup(path, summaries):
             listed = "; ".join(names[:MAX_LISTED_IDS])
             if len(names) > MAX_LISTED_IDS:
                 listed += f"; and {len(names) - MAX_LISTED_IDS} more"
+            match = possible.get(summary.asset_id)
             writer.writerow({
+                "vendor": _safe(match.vendor) if match else "", "product": _safe(match.product) if match else "",
+                "possible_advisories": match.count if match else "",
+                "newest_possible_advisory": _safe(match.advisories[0].id) if match and match.advisories else "",
                 "asset_id": _safe(summary.asset_id), "worst_priority": summary.worst, "now": counts[NOW],
                 "next": counts[NEXT], "never": counts[NEVER], "errors": counts["ERROR"],
                 "findings": len(summary.items), "visit_together": len(summary.visit_items),
