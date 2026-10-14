@@ -400,6 +400,34 @@ class MergeTests(Case):
             si.import_exports([SAMPLES / "nessus/classic.csv"], None, 70, "high")
 
 
+class ScannerHintTests(Case):
+    """Opening a scanner export where a findings file or an inventory is expected says what it is and what to do."""
+
+    FILES = ("sample_scan_nessus.csv", "sample_scan_openvas.csv")
+
+    def test_batch_and_the_inventory_loader_name_the_export_and_the_command(self):
+        import inventory
+
+        here = Path(__file__).parent
+        for name in self.FILES:
+            for loader in (batch.process_file, inventory.load):
+                with self.subTest(name, loader=loader.__module__), self.assertRaises(ValueError) as caught:
+                    loader(here / name)
+                message = str(caught.exception)
+                self.assertIn("scanner export (", message)
+                self.assertIn("python3 ot_triage_import.py", message)
+                self.assertIn("docs/IMPORT.md", message)
+                self.assertNotIn("Missing required column", message)
+
+    def test_a_tenable_export_is_named_too_and_other_files_keep_their_old_messages(self):
+        self.assertIn("Tenable Vulnerability Management CSV", si.scanner_hint(TENABLE_HEAD.split(",")))
+        self.assertEqual(si.scanner_hint(["id", "name", "cve", "cvss"]), "")
+        self.assertEqual(si.scanner_hint([]), "")
+        plain = self.write("plain.csv", "id,name\n1,a\n")
+        with self.assertRaisesRegex(ValueError, "Missing required column"):
+            batch.process_file(plain)
+
+
 class AliasFileTests(Case):
     def test_aliases_are_read_case_insensitively(self):
         path = self.write("a.csv", "alias,asset_id\n192.0.2.21,CC-HIST-01\nH.Example.com ,CC-DMZ-04\n,orphan\nx,\n")

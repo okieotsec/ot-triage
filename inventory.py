@@ -114,6 +114,10 @@ def _load(path):
             header = next(reader)
         except StopIteration:
             raise ValueError("The inventory file is empty") from None
+        import scanimport  # imported here because that module itself builds on this one
+        hint = scanimport.scanner_hint(header)
+        if hint:
+            raise ValueError(hint)
         columns = [_header(h) for h in header]
         repeated = sorted({c for c in columns if c and columns.count(c) > 1})
         if repeated:

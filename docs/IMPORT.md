@@ -10,6 +10,8 @@ python3 ot_triage_import.py nessus.csv openvas.csv -o findings.csv --inventory-o
 python3 ot_triage_import.py scan.csv -o findings.csv -i inventory.csv --inventory-out inventory.new.csv --aliases aliases.csv
 ```
 
+A scanner export cannot be opened directly in the Batch view (Open CSV) or as an inventory: they read OT Triage's own files, and say so with this command in the message. Convert first, then open `findings.csv` and load the `inventory.csv` it wrote (fill in each new asset's criticality and exposure; see below).
+
 Try it on the two files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv -o
 findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
 

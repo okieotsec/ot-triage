@@ -201,6 +201,19 @@ _SKIP_RISK = {"none", "info", "informational"}
 _SKIP_STATE = {"fixed", "resolved", "remediated", "closed"}
 
 
+def scanner_hint(header):
+    """A sentence for a person who opened a scanner export where a findings file or an inventory was expected.
+
+    Returns an empty string when the header is not one of the exports this module reads.
+    """
+    source = detect_format(header)
+    if source is None:
+        return ""
+    return (f"This is a scanner export ({FORMAT_NAMES[source]}), not an OT Triage findings file or inventory. "
+            "Convert it with python3 ot_triage_import.py EXPORT -o findings.csv --inventory-out inventory.csv "
+            "(see docs/IMPORT.md), then open findings.csv here and load the inventory it wrote.")
+
+
 def _read_tenable_family(table, report, source):
     """Nessus CSV and Tenable Vulnerability Management findings CSV: one row per plugin, host and CVE."""
     if not table.has("plugin id") or not table.has("name", "plugin name"):
