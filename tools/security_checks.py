@@ -227,6 +227,11 @@ def saf_step(out, work, removed):
     return failures, "; ".join(notes)
 
 
+def shown(path):
+    """A path for the summary: relative to the repository if it is inside it, as given otherwise."""
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     accept = "--accept-suppressions" in sys.argv[1:]
@@ -331,7 +336,7 @@ def main():
     (out / "versions.txt").write_text("\n".join(versions) + "\n")
     width = max(len(n) for n, _, _ in results)
     failed = False
-    lines = [f"Security checks written to {out.relative_to(ROOT)}"]
+    lines = [f"Security checks written to {shown(out)}"]
     for name, findings, note in results:
         status = "NOT RUN" if findings is None else ("0 findings" if findings == 0 else f"{findings} FINDING(S)")
         optional = name.endswith("(optional)")

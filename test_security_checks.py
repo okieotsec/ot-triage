@@ -88,6 +88,14 @@ class SuppressionInventoryTests(unittest.TestCase):
         self.assertIn("./pkg/mod.py", text)
 
 
+class OutputFolderTests(unittest.TestCase):
+    def test_a_folder_inside_the_repository_is_shown_relative_and_one_outside_is_shown_as_given(self):
+        inside = checks.ROOT / "reports" / "cpNN-example"
+        self.assertEqual(checks.shown(inside), Path("reports") / "cpNN-example")
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertEqual(checks.shown(Path(folder)), Path(folder))
+
+
 class PublishedPolicyTests(unittest.TestCase):
     """What SECURITY.md promises must match the code that is being released."""
 
