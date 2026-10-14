@@ -1,0 +1,28 @@
+OT Triage 0.8.0 · merged.findings.csv · 25 rows
+NOW 10 · NEXT 8 · NEVER 2 · not scored 5
+Threat data: KEV 2026.10.08 (2026-10-08); EPSS v2026.06.15 (2026-10-09); ICS advisories 2026-10-08
+Scoring settings: defaults
+Inventory: merged.inventory.csv · 14 assets
+Top findings:
+    1. NOW    9.09  nessus:108797:192.0.2.22:CVE-2019-0708 · CVE-2019-0708 · Remote Desktop Services Remote Co  [CC-ENG-02]
+    2. NOW    9.04  nessus:146855:192.0.2.21:CVE-2021-34527 · CVE-2021-34527 · Windows Print Spooler Remote Co  [CC-HIST-01]
+    3. NOW    8.83  nessus:97833:192.0.2.21:CVE-2017-0144 · CVE-2017-0144 · MS17-010: Security Update for Micr  [CC-HIST-01]
+    4. NOW    8.83  nessus:97833:192.0.2.21:CVE-2017-0143 · CVE-2017-0143 · MS17-010: Security Update for Micr  [CC-HIST-01]
+    5. NOW    8.65  tenable:140657:CC-HMI-03:CVE-2020-1472 · CVE-2020-1472 · Netlogon Elevation of Privilege (  [CC-HMI-03]
+    6. NOW    8.50  openvas:r-0002:CVE-2021-41773 · CVE-2021-41773 · Apache HTTP Server multiple vulnerabiliti  [CC-DMZ-04]
+    7. NOW    8.50  openvas:r-0002:CVE-2021-42013 · CVE-2021-42013 · Apache HTTP Server multiple vulnerabiliti  [CC-DMZ-04]
+    8. NOW    8.08  nessus:97833:cc-hmi-03.example.com:CVE-2017-0143 · CVE-2017-0143 · MS17-010: Security Upda  [CC-HMI-03]
+    9. NOW    8.08  nessus:97833:cc-hmi-03.example.com:CVE-2017-0144 · CVE-2017-0144 · MS17-010: Security Upda  [CC-HMI-03]
+   10. NOW    7.94  nessus:181414:198.51.100.4:CVE-2023-38408 · CVE-2023-38408 · OpenSSH < 9.3p2 Remote Code E  [CC-DMZ-04]
+   11. NEXT   8.09  nozomi:nc-1004 · CVE-2016-0854 · CVE-2016-0854 on CC-SCADA-41  [CC-SCADA-41]
+   12. NEXT   7.44  nozomi:nc-1007 · CVE-2022-31814 · CVE-2022-31814 on CC-FW-44  [CC-FW-44]
+   13. NEXT   7.41  nozomi:nc-1003 · CVE-2024-2617 · CVE-2024-2617 on CC-RTU-21  [CC-RTU-21]
+   14. NEXT   7.35  nessus:156860:cc-sw-05.example.com:CVE-2021-44228 · CVE-2021-44228 · Apache Log4Shell RCE   [CC-SW-05]
+   15. NEXT   6.54  nozomi:nc-1002 · CVE-2016-9361 · CVE-2016-9361 on CC-GW-31  [CC-GW-31]
+   16. NEXT   6.29  openvas:r-0003:CVE-2011-3389 · CVE-2011-3389 · SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Pro  [CC-DMZ-04]
+   17. NEXT   6.29  openvas:r-0003:CVE-2015-0204 · CVE-2015-0204 · SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Pro  [CC-DMZ-04]
+   18. NEXT   5.56  dragos:vd-as-3002 · CVE-2024-2617 · Flaw in the RTU500 CMU firmware (illustrative title)  [CC-RTU-22]
+   19. NEVER  5.10  nozomi:nc-1001 · CVE-2023-28831 · CVE-2023-28831 on CC-PLC-11  [CC-PLC-11]
+   20. NEVER  5.10  dragos:vd-as-3001 · CVE-2023-28831 · Flaw in the CPU firmware (illustrative title)  [CC-PLC-12]
+Wrote result/ranked.csv
+Wrote result/assets.csv (14 assets)

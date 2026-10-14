@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from version import __version__  # noqa: E402
 
-ENTRY_POINTS = ("ot_triage_gui", "ot_triage_cli")
+ENTRY_POINTS = ("ot_triage_gui", "ot_triage_cli", "ot_triage_import")
 LAUNCHER = "OT Triage.pyw"
 TOP_LEVEL_FILES = ("README.md", "CHANGELOG.md", "LICENSE", "SECURITY.md", "THIRD_PARTY_NOTICES.md", "requirements.txt",
                    LAUNCHER)
@@ -32,6 +32,7 @@ To start the application:
   Windows : double-click "OT Triage.pyw" (needs Python 3.12 or newer from python.org, with Tcl/Tk, the default)
   Any     : python3 ot_triage_gui.py
 Command line (no window): python3 ot_triage_cli.py findings.csv -o ranked.csv   (see docs/CLI.md)
+From scanner exports: python3 ot_triage_import.py sample_scan_nessus.csv -o findings.csv   (see docs/IMPORT.md)
 
 Try the sample files first: sample_findings_multiple_per_asset.csv with sample_inventory.csv.
 Nothing is downloaded unless you start an update in the Threat data view (or give --update on the command line).

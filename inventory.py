@@ -43,6 +43,11 @@ def _header(name):
     return _KEY_ALIASES.get(key, key)
 
 
+def canonical_header(name):
+    """The name a column of an inventory is known by once its aliases are resolved (for example model -> product)."""
+    return _header(name)
+
+
 @dataclass(frozen=True)
 class AssetRecord:
     """One asset: its id, an optional name, and the values the inventory states for it (blank cells are left out)."""
@@ -109,6 +114,10 @@ def _load(path):
             header = next(reader)
         except StopIteration:
             raise ValueError("The inventory file is empty") from None
+        import scanimport  # imported here because that module itself builds on this one
+        hint = scanimport.scanner_hint(header)
+        if hint:
+            raise ValueError(hint)
         columns = [_header(h) for h in header]
         repeated = sorted({c for c in columns if c and columns.count(c) > 1})
         if repeated:

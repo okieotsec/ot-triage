@@ -1,0 +1,15 @@
+asset_id,name,criticality,exposure,controls,vendor,product,version
+CC-HIST-01,,crown jewel,medium,partial,,,
+CC-ENG-02,,important,medium,none,,,
+CC-DMZ-04,cc-dmz-04.example.com,important,high,partial,,,
+CC-SW-05,cc-sw-05.example.com,standard,low,none,,,
+CC-HMI-03,cc-hmi-03.example.com,important,medium,partial,,,
+CC-PLC-11,,crown jewel,low,strong,Siemens,S7-1500,V2.9.2
+CC-GW-31,,important,low,partial,Moxa,NPort 5110,2.6
+CC-RTU-21,,crown jewel,high,none,Hitachi Energy,RTU500,13.2.5
+CC-SCADA-41,,crown jewel,medium,partial,Advantech,WebAccess,8.4.5
+CC-FW-44,,important,high,strong,Netgate,pfSense,2.6.0
+CC-PLC-12,,crown jewel,low,strong,Siemens,S7-1500,V2.8.1
+CC-RTU-22,,important,medium,partial,Hitachi Energy,RTU500,13.2.3
+CC-HMI-23,,important,medium,none,Advantech,WebAccess/HMI,8.4.5
+CC-ENG-24,,standard,low,none,Microsoft,Windows 10,21H2

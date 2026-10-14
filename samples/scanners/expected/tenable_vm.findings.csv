@@ -1,0 +1,5 @@
+id,asset_id,name,cve,cvss,patch,source_tool
+tenable:151946:CC-HIST-01:CVE-2021-34527,CC-HIST-01,KB5004948: Windows Print Spooler Vulnerability,CVE-2021-34527,8.8,,tenable-vm
+tenable:125313:CC-ENG-02:CVE-2019-0708,CC-ENG-02,Remote Desktop Services Remote Code Execution (BlueKeep),CVE-2019-0708,9.8,,tenable-vm
+tenable:57608:CC-ENG-02:nocve,CC-ENG-02,SMB Signing not required,,,,tenable-vm
+tenable:140657:CC-HMI-03:CVE-2020-1472,CC-HMI-03,Netlogon Elevation of Privilege (Zerologon),CVE-2020-1472,10.0,,tenable-vm

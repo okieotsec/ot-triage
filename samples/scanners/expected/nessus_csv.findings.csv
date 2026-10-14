@@ -1,0 +1,7 @@
+id,asset_id,name,cve,cvss,patch,source_tool
+nessus:97833:192.0.2.21:CVE-2017-0144,192.0.2.21,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0144,8.1,,nessus
+nessus:97833:192.0.2.21:CVE-2017-0143,192.0.2.21,MS17-010: Security Update for Microsoft Windows SMB Server,CVE-2017-0143,8.1,,nessus
+nessus:108797:192.0.2.22:CVE-2019-0708,192.0.2.22,Remote Desktop Services Remote Code Execution (BlueKeep),CVE-2019-0708,9.8,,nessus
+nessus:146855:192.0.2.21:CVE-2021-34527,192.0.2.21,Windows Print Spooler Remote Code Execution (PrintNightmare),CVE-2021-34527,8.8,,nessus
+nessus:181414:198.51.100.4:CVE-2023-38408,198.51.100.4,OpenSSH < 9.3p2 Remote Code Execution,CVE-2023-38408,9.8,,nessus
+nessus:95631:192.0.2.5:nocve,192.0.2.5,Default Credentials on Network Device (telnet),,9.0,,nessus

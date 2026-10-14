@@ -116,6 +116,10 @@ def read_rows(path):
             header = next(reader)
         except StopIteration:
             raise ValueError("The file is empty") from None
+        import scanimport  # imported here because that module itself builds on this one
+        hint = scanimport.scanner_hint(header)
+        if hint:
+            raise ValueError(hint)
         columns = [_norm_header(h) for h in header]
         duplicates = sorted({c for c in columns if c and columns.count(c) > 1})
         if duplicates:

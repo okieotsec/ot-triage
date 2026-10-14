@@ -1,0 +1,9 @@
+alias,asset_id
+192.0.2.21,CC-HIST-01
+192.0.2.22,CC-ENG-02
+192.0.2.23,CC-HMI-03
+cc-hmi-03.example.com,CC-HMI-03
+198.51.100.4,CC-DMZ-04
+cc-dmz-04.example.com,CC-DMZ-04
+192.0.2.5,CC-SW-05
+cc-sw-05.example.com,CC-SW-05

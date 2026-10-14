@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<NessusClientData_v2>
+<Policy><policyName>OT edge credentialed scan</policyName></Policy>
+<Report name="Cedar Creek edge scan" xmlns:cm="http://www.nessus.org/cm">
+  <ReportHost name="cc-sw-05.example.com">
+    <HostProperties>
+      <tag name="host-ip">192.0.2.5</tag>
+      <tag name="host-fqdn">cc-sw-05.example.com</tag>
+      <tag name="operating-system">Cisco IOS 15.2</tag>
+      <tag name="HOST_START">Mon Oct 12 09:04:11 2026</tag>
+    </HostProperties>
+    <ReportItem port="161" svc_name="snmp" protocol="udp" severity="3" pluginID="41028" pluginName="SNMP Agent Default Community Name (public)" pluginFamily="SNMP">
+      <description>The remote SNMP server replies to the default community name public.</description>
+      <risk_factor>High</risk_factor>
+      <synopsis>The community name of the remote SNMP server can be guessed.</synopsis>
+      <solution>Disable the SNMP service or change the community string.</solution>
+      <cvss_base_score>7.5</cvss_base_score>
+      <plugin_output>The remote SNMP server replies to 'public'.</plugin_output>
+    </ReportItem>
+    <ReportItem port="443" svc_name="www" protocol="tcp" severity="4" pluginID="156860" pluginName="Apache Log4Shell RCE (CVE-2021-44228)" pluginFamily="Web Servers">
+      <description>The remote host uses a vulnerable version of Apache Log4j.</description>
+      <risk_factor>Critical</risk_factor>
+      <synopsis>The remote web application is affected by a remote code execution vulnerability.</synopsis>
+      <solution>Upgrade to Log4j 2.17.1 or later.</solution>
+      <cve>CVE-2021-44228</cve>
+      <cvss_base_score>9.3</cvss_base_score>
+      <cvss3_base_score>10.0</cvss3_base_score>
+      <cvss3_vector>CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H</cvss3_vector>
+      <plugin_output>Path : /opt/mgmt/lib/log4j-core-2.14.1.jar</plugin_output>
+    </ReportItem>
+  </ReportHost>
+  <ReportHost name="cc-hmi-03.example.com">
+    <HostProperties>
+      <tag name="host-ip">192.0.2.23</tag>
+      <tag name="host-fqdn">cc-hmi-03.example.com</tag>
+      <tag name="operating-system">Microsoft Windows 10 IoT Enterprise</tag>
+      <tag name="HOST_START">Mon Oct 12 09:04:11 2026</tag>
+    </HostProperties>
+    <ReportItem port="445" svc_name="cifs" protocol="tcp" severity="3" pluginID="97833" pluginName="MS17-010: Security Update for Microsoft Windows SMB Server" pluginFamily="Windows">
+      <description>The remote Windows host is missing a security update.</description>
+      <risk_factor>High</risk_factor>
+      <synopsis>The remote Windows host is affected by multiple vulnerabilities.</synopsis>
+      <solution>Apply the appropriate Microsoft security update.</solution>
+      <cve>CVE-2017-0143</cve>
+      <cve>CVE-2017-0144</cve>
+      <cvss_base_score>9.3</cvss_base_score>
+      <cvss3_base_score>8.1</cvss3_base_score>
+      <cvss3_vector>CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H</cvss3_vector>
+    </ReportItem>
+    <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings">
+      <description>This plugin displays information about the Nessus scan.</description>
+      <risk_factor>None</risk_factor>
+      <synopsis>Information about the scan.</synopsis>
+      <solution>n/a</solution>
+      <plugin_output>Scan duration : 214 sec</plugin_output>
+    </ReportItem>
+  </ReportHost>
+</Report>
+</NessusClientData_v2>
