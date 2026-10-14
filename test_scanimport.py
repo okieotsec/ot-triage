@@ -210,6 +210,223 @@ class NessusTests(Case):
         self.assertEqual(findings[1].name, "a[31mbc")
 
 
+def xml_item(
+    plugin="97833",
+    severity="3",
+    name="MS17-010",
+    cves=("CVE-2017-0144",),
+    v2="9.3",
+    v3="8.1",
+    extra="",
+    family="Windows",
+):
+    cve = "".join(f"<cve>{c}</cve>" for c in cves)
+    scores = (f"<cvss_base_score>{v2}</cvss_base_score>" if v2 else "") + (
+        f"<cvss3_base_score>{v3}</cvss3_base_score>" if v3 else ""
+    )
+    return (
+        f'<ReportItem port="445" svc_name="cifs" protocol="tcp" severity="{severity}" pluginID="{plugin}" '
+        f'pluginName="{name}" pluginFamily="{family}">{cve}{scores}{extra}'
+        "<plugin_output>output</plugin_output></ReportItem>"
+    )
+
+
+def xml_host(name="192.0.2.21", items=(), tags=""):
+    return f'<ReportHost name="{name}"><HostProperties>{tags}</HostProperties>{"".join(items)}</ReportHost>'
+
+
+def xml_file(*hosts, root="NessusClientData_v2", head='<?xml version="1.0"?>'):
+    return f'{head}<{root}><Policy><policyName>p</policyName></Policy><Report name="r" xmlns:cm="http://www.nessus.org/cm">{"".join(hosts)}</Report></{root}>'
+
+
+class NessusXmlTests(Case):
+    def xml(self, text, name="scan.nessus"):
+        return self.write(name, text)
+
+    def test_the_sample_gives_the_expected_findings_and_names_the_hosts(self):
+        findings, assets, report = self.read(SAMPLES / "nessus/export.nessus")
+        with open(SAMPLES / "expected" / "nessus_xml.findings.csv", newline="", encoding="utf-8") as fh:
+            want = list(csv.DictReader(fh))
+        got = [
+            {
+                "id": f.id,
+                "asset_id": f.asset_id,
+                "name": f.name,
+                "cve": f.cve,
+                "cvss": f.cvss,
+                "patch": f.patch,
+                "source_tool": f.source,
+            }
+            for f in findings
+        ]
+        self.assertEqual(got, want)
+        self.assertEqual(
+            (report.format, report.rows, report.kept, report.skipped),
+            ("Nessus .nessus (v2 XML)", 4, 4, {"informational (no risk)": 1}),
+        )
+        self.assertEqual(sorted(assets), ["cc-hmi-03.example.com", "cc-sw-05.example.com"])
+
+    def test_one_finding_per_cve_the_v3_score_wins_and_text_is_cleaned(self):
+        text = xml_file(
+            xml_host(
+                "h1",
+                [
+                    xml_item(cves=("CVE-2017-0144", "cve-2017-0143", "CVE-2017-0144")),
+                    xml_item(plugin="2", name="No&#8238; cve", cves=(), v2="7.5", v3=""),
+                    xml_item(plugin="3", cves=("CVE-2020-0001",), v2="", v3=""),
+                ],
+            )
+        )
+        findings, _a, _r = self.read(self.xml(text))
+        self.assertEqual(
+            [(f.cve, f.cvss) for f in findings],
+            [("CVE-2017-0144", "8.1"), ("CVE-2017-0143", "8.1"), ("", "7.5"), ("CVE-2020-0001", "")],
+        )
+        self.assertEqual(findings[2].name, "No cve")
+
+    def test_informational_and_compliance_items_are_skipped_and_counted(self):
+        compliance = xml_item(
+            plugin="21157", name="Unix Compliance Checks", cves=(), v2="", v3="", family="Policy Compliance"
+        )
+        child = xml_item(plugin="5", cves=(), v2="", v3="", extra="<cm:compliance-result>FAILED</cm:compliance-result>")
+        text = xml_file(xml_host("h1", [xml_item(severity="0"), compliance, child, xml_item(severity="1")]))
+        findings, _a, report = self.read(self.xml(text))
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(report.skipped, {"informational (no risk)": 1, "compliance check (not a vulnerability)": 2})
+
+    def test_the_host_name_falls_back_to_its_ip_tag_and_a_host_with_neither_is_skipped(self):
+        tags = '<tag name="host-ip">192.0.2.9</tag><tag name="host-fqdn">plc.example.com</tag><tag name="other">x</tag>'
+        text = xml_file(
+            xml_host("", [xml_item()], tags), xml_host("", [xml_item()]), xml_host("named", [xml_item()], tags)
+        )
+        findings, assets, report = self.read(self.xml(text))
+        self.assertEqual([f.asset_id for f in findings], ["192.0.2.9", "named"])
+        self.assertEqual(report.skipped, {"no host or asset name": 1})
+        self.assertEqual([a.name for a in assets.values()], ["plc.example.com", "plc.example.com"])
+
+    def test_a_byte_order_mark_an_undeclared_prefix_and_utf16_are_handled(self):
+        findings, _a, _r = self.read(self.xml("\ufeff" + xml_file(xml_host("h1", [xml_item()]))))
+        self.assertEqual(len(findings), 1)
+        findings, _a, _r = self.read(
+            self.write(
+                "u16.nessus",
+                xml_file(xml_host("h1", [xml_item()]), head='<?xml version="1.0" encoding="UTF-16"?>').encode("utf-16"),
+            )
+        )
+        self.assertEqual(len(findings), 1)
+
+    def test_the_plugin_output_is_never_kept(self):
+        big = "x" * 5_000_000
+        item = xml_item(extra=f"<description>{big}</description>").replace("output", big)
+        findings, _a, _r = self.read(self.xml(xml_file(xml_host("h1", [item]))))
+        self.assertEqual(len(findings), 1)
+        reader = si._NessusXml(si.FileReport("x", "y"))
+        reader.begin_text()
+        for _ in range(3):
+            reader.data("y" * 10_000_000)
+        self.assertLessEqual(len("".join(reader.text)), si.MAX_XML_TEXT_CHARS)
+
+    def test_a_doctype_or_an_entity_is_refused_so_nothing_can_expand(self):
+        bomb = (
+            '<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY a "aaaaaaaaaa">'
+            '<!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]>'
+            "<NessusClientData_v2>&b;</NessusClientData_v2>"
+        )
+        external = '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><NessusClientData_v2>&e;</NessusClientData_v2>'
+        for label, text in (
+            ("billion laughs", bomb),
+            ("external entity", external),
+            ("doctype only", '<?xml version="1.0"?><!DOCTYPE NessusClientData_v2><NessusClientData_v2/>'),
+        ):
+            with self.subTest(label), self.assertRaisesRegex(si.ScanImportError, "declares a DTD or an entity"):
+                self.read(self.xml(text))
+
+    def test_other_files_are_refused_cleanly(self):
+        cases = {
+            "wrong root": xml_file(xml_host("h1", [xml_item()]), root="Other"),
+            "no hosts": xml_file(),
+            "truncated": xml_file(xml_host("h1", [xml_item()]))[:-40],
+            "not xml": "<html><body>hello</body></html>",
+            "garbage": "<<<<",
+            "mismatched": "<NessusClientData_v2><Report></NessusClientData_v2>",
+        }
+        for label, text in cases.items():
+            with self.subTest(label), self.assertRaises(si.ScanImportError):
+                self.read(self.xml(text))
+
+    def test_deep_nesting_is_refused(self):
+        deep = "<NessusClientData_v2>" + "<a>" * 200 + "</a>" * 200 + "</NessusClientData_v2>"
+        with self.assertRaisesRegex(si.ScanImportError, "nested too deeply"):
+            self.read(self.xml(deep))
+
+    def test_limits_on_size_rows_and_findings_apply(self):
+        text = xml_file(xml_host("h1", [xml_item(plugin=str(n)) for n in range(5)]))
+        path = self.xml(text)
+        with mock.patch.object(si, "MAX_FILE_BYTES", 100), self.assertRaisesRegex(si.ScanImportError, "larger than"):
+            self.read(path)
+        with mock.patch.object(si, "MAX_INPUT_ROWS", 3), self.assertRaisesRegex(si.ScanImportError, "more than 3"):
+            self.read(path)
+        with mock.patch.object(si, "MAX_RAW_FINDINGS", 3), self.assertRaisesRegex(si.ScanImportError, "more than 3"):
+            self.read(path)
+
+    def test_the_file_is_fed_to_the_parser_in_pieces_never_whole(self):
+        calls = []
+        real = si.expat.ParserCreate
+
+        class Counting:
+            def __init__(self):
+                object.__setattr__(self, "inner", real())
+
+            def __setattr__(self, name, value):
+                setattr(self.inner, name, value)
+
+            def __getattr__(self, name):
+                return getattr(self.inner, name)
+
+            def Parse(self, data, final=False):
+                calls.append(len(data))
+                return self.inner.Parse(data, final)
+
+        items = [xml_item(plugin=str(n)) for n in range(400)]
+        path = self.xml(xml_file(xml_host("h1", items)))
+        with mock.patch.object(si, "XML_CHUNK_BYTES", 4096), mock.patch.object(si.expat, "ParserCreate", Counting):
+            self.read(path)
+        self.assertGreater(len(calls), 5)
+        self.assertLessEqual(max(calls), 4096)
+        self.assertEqual(calls[-1], 0)         # the parser is told the file has ended
+
+    def test_a_large_file_is_read_in_pieces(self):
+        items = [xml_item(plugin=str(n), cves=(f"CVE-2020-{n % 9000:04d}",)) for n in range(3000)]
+        path = self.xml(xml_file(xml_host("h1", items)))
+        with mock.patch.object(si, "XML_CHUNK_BYTES", 997):
+            findings, _a, _r = self.read(path)
+        self.assertEqual(len(findings), 3000)
+
+    def test_a_csv_that_looks_like_text_is_not_mistaken_for_xml_and_xml_is_found_by_content_not_name(self):
+        findings, _a, _r = self.read(self.write("scan.txt", xml_file(xml_host("h1", [xml_item()]))))
+        self.assertEqual(len(findings), 1)
+        findings, _a, _r = self.read(self.nessus("1,CVE-2020-0001,5,5,High,h,tcp,1,N,,,,,", name="scan.nessus"))
+        self.assertEqual(len(findings), 1)
+
+    def test_it_merges_with_the_csv_exports_of_the_same_scanner(self):
+        csv_path = self.nessus("97833,CVE-2017-0144,9.3,8.1,Critical,192.0.2.21,tcp,445,MS17-010,,,,,")
+        xml_path = self.xml(xml_file(xml_host("192.0.2.21", [xml_item()])))
+        result = si.import_exports([csv_path, xml_path])
+        self.assertEqual((len(result.findings), result.merged), (1, 1))
+        self.assertEqual(result.findings[0].source, "nessus+nessus-xml")
+
+    def test_opening_a_nessus_file_in_batch_or_as_an_inventory_says_what_it_is(self):
+        import inventory
+
+        path = self.xml(xml_file(xml_host("h1", [xml_item()])))
+        for loader in (batch.process_file, inventory.load):
+            with (
+                self.subTest(loader.__module__),
+                self.assertRaisesRegex(ValueError, r"scanner export \(Nessus .nessus"),
+            ):
+                loader(path)
+
+
 class TenableTests(Case):
     ROW = "CC-HIST-01,192.0.2.21,Windows,CVE-2021-34527,8.8,9.6,High,151946,Print Spooler,Active,,,Patch,445,TCP"
 
