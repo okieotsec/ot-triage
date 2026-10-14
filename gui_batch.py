@@ -279,7 +279,9 @@ class BatchView:
             report("Reading the scanner export...")
             return scanimport.read_exports(paths)
 
-        done = lambda result, error: self._import_read(paths, result, error)  # noqa: E731
+        def done(result, error):
+            self._import_read(paths, result, error)
+
         if not self.ctx.worker.start(job, done, self._progress):
             self.ctx.info("Batch import", "Another task is still running. Wait for it to finish or cancel it.")
             return
