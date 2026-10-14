@@ -701,8 +701,12 @@ class JsonSafetyTests(Case):
                 self.read(self.write(f"{label}.json", text))
 
     def test_deeply_nested_json_is_refused_not_crashed(self):
-        with self.assertRaisesRegex(si.ScanImportError, "not a valid JSON"):
+        # Some Python versions give up on 100,000 levels (an invalid file) and some read them (a list of lists that is
+        # not an export); either way the answer is a clean refusal, never a crash.
+        with self.assertRaises(si.ScanImportError):
             self.read(self.write("deep.json", "[" * 100_000 + "]" * 100_000))
+        with self.assertRaisesRegex(si.ScanImportError, "not a valid JSON"):
+            self.read(self.write("deep_open.json", "[" * 100_000))
 
     def test_the_size_and_row_limits_apply(self):
         import json
