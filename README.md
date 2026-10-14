@@ -180,7 +180,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP21 | Security process: NIST SSDF and MITRE SAF alignment, suppression gate, CI hardening, release provenance | [reports/cp21-security-framework](reports/cp21-security-framework/claude.md) |
 | CP22 | Scanner import: the Import scan button in Batch | [reports/cp22-import-gui](reports/cp22-import-gui/claude.md) |
 
-Across the checkpoints 45 findings were recorded (3 Medium, 15 Low, 27 Info) and all but two were fixed or consciously accepted with a reason; the two that remain are a hands-on check that needs a person (see the CP4 report) and the absence of an independent security review (see the CP21 report).
+Across the checkpoints 46 findings were recorded (3 Medium, 15 Low, 28 Info) and all but two were fixed or consciously accepted with a reason; the two that remain are a hands-on check that needs a person (see the CP4 report) and the absence of an independent security review (see the CP21 report).
 
 Techniques used:
 

@@ -52,6 +52,17 @@ Finding CP21-04
 - Recommended fix: the plan header, SECURITY.md and docs/SECURITY_FRAMEWORKS.md now say that no independent review has been done. The review itself is still open.
 - Status: accepted as stated, open. Confidence: Confirmed.
 
+Finding CP21-05
+- Title: The runner's path scrubbing did not work for Windows paths
+- Severity: Info
+- Location: tools/security_checks.py (write_sarif)
+- Description: the archived SARIF is meant never to name where it was produced; the replacement matched only the path as written, but JSON doubles the backslashes of a Windows path, so on Windows the path would stay in the archive.
+- Evidence: the new test failed on the Windows CI job of the pull request (it passed on Linux, where the runner is normally used).
+- Root cause and prevention: the scrub assumed a POSIX path and was only ever tested with one. It now replaces every form the path can take, and a test builds the Windows forms with PureWindowsPath, so it fails on Linux as well.
+- Status: fixed. Confidence: Confirmed.
+
+Found while preparing the merge: the repository's Dependency graph is not enabled on GitHub, so the new "Dependency review" check fails with "Dependency review is not supported on this repository" until the owner turns it on (owner checklist in docs/SECURITY_FRAMEWORKS.md). It is not one of main's required checks.
+
 Release gate for this change
 | Gate | Evidence | Pass |
 | --- | --- | --- |
