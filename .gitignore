@@ -5,3 +5,4 @@ data/
 .idea/
 .vscode/
 .claude/settings.local.json
+saf-cli.log

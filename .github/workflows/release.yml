@@ -1,0 +1,46 @@
+name: Release bundle
+
+# Builds the release bundle from a version tag and records a signed build-provenance attestation for it, so anyone can check that
+# the file was built from this repository's tag by this workflow (SSDF PS.2 and PS.3). It does not publish a release: the owner
+# downloads the artifact, looks at it and attaches it to the GitHub release by hand, as docs/RELEASING.md describes.
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: Build and attest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write      # lets the attestation action obtain a short-lived signing certificate
+      attestations: write  # stores the attestation next to the repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Build the bundle (the same command as docs/RELEASING.md)
+        run: python tools/make_bundle.py dist
+      - name: Attest the build provenance of the bundle
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: dist/*.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release-bundle
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+            sbom/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30

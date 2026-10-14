@@ -1,0 +1,471 @@
+{
+  "platform": {
+    "name": "Heimdall Tools",
+    "release": "2.14.0",
+    "target_id": "Static Analysis Results Interchange Format"
+  },
+  "version": "2.14.0",
+  "statistics": {},
+  "profiles": [
+    {
+      "name": "SARIF",
+      "version": "2.1.0",
+      "title": "Static Analysis Results Interchange Format",
+      "supports": [],
+      "attributes": [],
+      "groups": [],
+      "status": "loaded",
+      "controls": [],
+      "sha256": "d65847af6d3dc72272d8cdf0b3c4b2bb3fbe6d79dd4b0ebdb2d18e4905a33e4a"
+    }
+  ],
+  "passthrough": {
+    "auxiliary_data": [
+      {
+        "name": "SARIF",
+        "data": {
+          "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "Bandit",
+                  "organization": "PyCQA",
+                  "version": "1.9.4",
+                  "semanticVersion": "1.9.4",
+                  "rules": []
+                }
+              },
+              "invocations": [
+                {
+                  "executionSuccessful": true,
+                  "endTimeUtc": "2026-10-14T14:11:49Z"
+                }
+              ],
+              "properties": {
+                "metrics": {
+                  "_totals": {
+                    "loc": 7799,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./batch.py": {
+                    "loc": 322,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./compare.py": {
+                    "loc": 172,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./cvss.py": {
+                    "loc": 300,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./cvss4_tables.py": {
+                    "loc": 294,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./explain.py": {
+                    "loc": 137,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_about.py": {
+                    "loc": 72,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_assess.py": {
+                    "loc": 694,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_batch.py": {
+                    "loc": 768,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_brand.py": {
+                    "loc": 74,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_context.py": {
+                    "loc": 87,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_round.py": {
+                    "loc": 133,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_settings.py": {
+                    "loc": 191,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_testing.py": {
+                    "loc": 70,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_theme.py": {
+                    "loc": 122,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_threat.py": {
+                    "loc": 220,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./gui_widgets.py": {
+                    "loc": 603,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./icsadvisories.py": {
+                    "loc": 693,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./inventory.py": {
+                    "loc": 159,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./jsonfile.py": {
+                    "loc": 39,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./ot_triage_cli.py": {
+                    "loc": 172,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./ot_triage_gui.py": {
+                    "loc": 274,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./ot_triage_import.py": {
+                    "loc": 80,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./prioritizer.py": {
+                    "loc": 186,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./references.py": {
+                    "loc": 90,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./rollup.py": {
+                    "loc": 145,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./scanimport.py": {
+                    "loc": 753,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./settings.py": {
+                    "loc": 123,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./threatdata.py": {
+                    "loc": 623,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./uiprefs.py": {
+                    "loc": 67,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./version.py": {
+                    "loc": 2,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  },
+                  "./versions.py": {
+                    "loc": 134,
+                    "nosec": 0,
+                    "skipped_tests": 0,
+                    "SEVERITY.UNDEFINED": 0,
+                    "SEVERITY.LOW": 0,
+                    "SEVERITY.MEDIUM": 0,
+                    "SEVERITY.HIGH": 0,
+                    "CONFIDENCE.UNDEFINED": 0,
+                    "CONFIDENCE.LOW": 0,
+                    "CONFIDENCE.MEDIUM": 0,
+                    "CONFIDENCE.HIGH": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

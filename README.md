@@ -148,6 +148,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 
 - **[SECURITY.md](SECURITY.md)** explains how to report a vulnerability, which three public files the app can download (and that it works fully offline otherwise), and what it reads and writes.
 - **[SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md)** is the test plan. Each checkpoint's evidence is archived in `reports/`.
+- **[docs/SECURITY_FRAMEWORKS.md](docs/SECURITY_FRAMEWORKS.md)** maps the practice to the NIST Secure Software Development Framework and MITRE's Security Automation Framework, with the evidence for each practice and what is still open. It is a self-assessment, not an audit.
 - **Software bill of materials:** [sbom/sbom.cdx.json](sbom/sbom.cdx.json) (CycloneDX). The application uses only the Python standard library, so the SBOM lists the application itself and no third-party components. It is generated from a brand-new empty environment by `tools/make_sbom.py`, and a test fails if it goes out of date.
 - **Third-party material:** the CVSS 4.0 scoring tables come from FIRST's calculator (BSD-2-Clause); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
@@ -176,9 +177,10 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP18 | Scanner import, phase 1: Nessus, Tenable and OpenVAS CSV | [reports/cp18-scanner-import-phase1](reports/cp18-scanner-import-phase1/claude.md) |
 | CP19 | Scanner import: Nessus `.nessus` XML | [reports/cp19-nessus-xml](reports/cp19-nessus-xml/claude.md) |
 | CP20 | Scanner import: Nozomi and Dragos exports | [reports/cp20-nozomi-dragos](reports/cp20-nozomi-dragos/claude.md) |
+| CP21 | Security process: NIST SSDF and MITRE SAF alignment, suppression gate, CI hardening, release provenance | [reports/cp21-security-framework](reports/cp21-security-framework/claude.md) |
 | CP22 | Scanner import: the Import scan button in Batch | [reports/cp22-import-gui](reports/cp22-import-gui/claude.md) |
 
-Across the checkpoints 41 findings were recorded (3 Medium, 13 Low, 25 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 46 findings were recorded (3 Medium, 15 Low, 28 Info) and all but two were fixed or consciously accepted with a reason; the two that remain are a hands-on check that needs a person (see the CP4 report) and the absence of an independent security review (see the CP21 report).
 
 Techniques used:
 
@@ -189,6 +191,8 @@ Techniques used:
 - **Network behaviour:** a local TLS server tests untrusted certificates, wrong host names, redirects, oversized and slow responses, timeouts and cut connections. The tests never use the real network.
 - **Correctness:** every possible CVSS base vector scores identically to FIRST's official calculators.
 - **Source hygiene:** a test that rejects invisible, direction-changing and look-alike characters in source files.
+- **Suppression review:** every in-source suppression comment is listed and compared with a reviewed baseline, so a new one cannot slip in unseen.
+- **Workflow and repository checks:** zizmor audits the GitHub workflows, CodeQL analyses the code, and OpenSSF Scorecard measures supply-chain practice; all run in CI and weekly.
 - **Mutation checks:** key rules and security controls were deliberately broken to confirm the tests catch them.
 
 Run `python3 -m unittest` for the test suite (see [docs/GUI_TESTING.md](docs/GUI_TESTING.md)).

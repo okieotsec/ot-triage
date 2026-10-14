@@ -1,0 +1,456 @@
+[
+ {
+  "file": "compare.py",
+  "line": 152,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "cvss.py",
+  "line": 272,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "explain.py",
+  "line": 99,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "gui_batch.py",
+  "line": 285,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "scanimport.py",
+  "line": 20,
+  "marker": "nosemgrep",
+  "codes": [
+   "DTDs",
+   "are",
+   "python.lang.security.use-defused-xml.use-defused-xml",
+   "refused"
+  ],
+  "text": "# nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (DTDs are refused)"
+ },
+ {
+  "file": "scanimport.py",
+  "line": 155,
+  "marker": "noqa",
+  "codes": [
+   "SIM115"
+  ],
+  "text": "# noqa: SIM115 - closed in close()"
+ },
+ {
+  "file": "test_bundle.py",
+  "line": 3,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs this project's own scripts with fixed arguments"
+ },
+ {
+  "file": "test_bundle.py",
+  "line": 40,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603"
+ },
+ {
+  "file": "test_cli.py",
+  "line": 4,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs this project's own script with fixed arguments"
+ },
+ {
+  "file": "test_cli.py",
+  "line": 318,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "test_cli.py",
+  "line": 318,
+  "marker": "nosec",
+  "codes": [
+   "B603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "test_gui_app.py",
+  "line": 435,
+  "marker": "noqa",
+  "codes": [
+   "SIM118"
+  ],
+  "text": "# noqa: SIM118 (a Tk widget, not a dict)"
+ },
+ {
+  "file": "test_gui_assess.py",
+  "line": 302,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "test_gui_assess.py",
+  "line": 545,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "test_gui_batch.py",
+  "line": 102,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "test_gui_widgets.py",
+  "line": 381,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "test_gui_widgets.py",
+  "line": 401,
+  "marker": "noqa",
+  "codes": [
+   "E731"
+  ],
+  "text": "# noqa: E731"
+ },
+ {
+  "file": "test_headless.py",
+  "line": 27,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603"
+ },
+ {
+  "file": "test_headless.py",
+  "line": 51,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603"
+ },
+ {
+  "file": "test_import_cli.py",
+  "line": 5,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs this project's own script with fixed arguments"
+ },
+ {
+  "file": "test_import_cli.py",
+  "line": 204,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603"
+ },
+ {
+  "file": "test_threatdata.py",
+  "line": 8,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - used only to create a throwaway test certificate"
+ },
+ {
+  "file": "test_threatdata.py",
+  "line": 560,
+  "marker": "noqa",
+  "codes": [
+   "S603",
+   "S607"
+  ],
+  "text": "# noqa: S603, S607  # nosec B603 B607"
+ },
+ {
+  "file": "test_threatdata.py",
+  "line": 560,
+  "marker": "nosec",
+  "codes": [
+   "B603",
+   "B607"
+  ],
+  "text": "# noqa: S603, S607  # nosec B603 B607"
+ },
+ {
+  "file": "threatdata.py",
+  "line": 337,
+  "marker": "noqa",
+  "codes": [
+   "S310"
+  ],
+  "text": "# noqa: S310  # nosec B310"
+ },
+ {
+  "file": "threatdata.py",
+  "line": 337,
+  "marker": "nosec",
+  "codes": [
+   "B310"
+  ],
+  "text": "# noqa: S310  # nosec B310"
+ },
+ {
+  "file": "threatdata.py",
+  "line": 341,
+  "marker": "nosec",
+  "codes": [
+   "B310"
+  ],
+  "text": "# nosec B310"
+ },
+ {
+  "file": "tools/headless_tests.py",
+  "line": 15,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404"
+ },
+ {
+  "file": "tools/headless_tests.py",
+  "line": 54,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603  # nosec B603  # nosemgrep"
+ },
+ {
+  "file": "tools/headless_tests.py",
+  "line": 54,
+  "marker": "nosec",
+  "codes": [
+   "B603"
+  ],
+  "text": "# noqa: S603  # nosec B603  # nosemgrep"
+ },
+ {
+  "file": "tools/headless_tests.py",
+  "line": 54,
+  "marker": "nosemgrep",
+  "codes": [],
+  "text": "# noqa: S603  # nosec B603  # nosemgrep"
+ },
+ {
+  "file": "tools/make_bundle.py",
+  "line": 13,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs git ls-files, with fixed arguments"
+ },
+ {
+  "file": "tools/make_bundle.py",
+  "line": 20,
+  "marker": "noqa",
+  "codes": [
+   "E402"
+  ],
+  "text": "# noqa: E402"
+ },
+ {
+  "file": "tools/make_bundle.py",
+  "line": 68,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "tools/make_bundle.py",
+  "line": 68,
+  "marker": "nosec",
+  "codes": [
+   "B603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "tools/make_sbom.py",
+  "line": 14,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs cyclonedx-py on a throwaway environment this tool creates"
+ },
+ {
+  "file": "tools/make_sbom.py",
+  "line": 22,
+  "marker": "noqa",
+  "codes": [
+   "E402"
+  ],
+  "text": "# noqa: E402"
+ },
+ {
+  "file": "tools/make_sbom.py",
+  "line": 63,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "tools/make_sbom.py",
+  "line": 63,
+  "marker": "nosec",
+  "codes": [
+   "B603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "tools/security_checks.py",
+  "line": 25,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs fixed command lines for the security tools; no shell, no untrusted input"
+ },
+ {
+  "file": "tools/security_checks.py",
+  "line": 55,
+  "marker": "noqa",
+  "codes": [
+   "S603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "tools/security_checks.py",
+  "line": 55,
+  "marker": "nosec",
+  "codes": [
+   "B603"
+  ],
+  "text": "# noqa: S603  # nosec B603"
+ },
+ {
+  "file": "tools/security_checks.py",
+  "line": 63,
+  "marker": "nosec",
+  "codes": [
+   "B607"
+  ],
+  "text": "# nosec B607 - fixed command, git is found on PATH"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 13,
+  "marker": "nosec",
+  "codes": [
+   "B404"
+  ],
+  "text": "# nosec B404 - runs Node.js on files this tool just downloaded"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 22,
+  "marker": "noqa",
+  "codes": [
+   "E402"
+  ],
+  "text": "# noqa: E402"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 24,
+  "marker": "noqa",
+  "codes": [
+   "E402"
+  ],
+  "text": "# noqa: E402"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 90,
+  "marker": "noqa",
+  "codes": [
+   "S310"
+  ],
+  "text": "# noqa: S310  # nosec B310  # nosem"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 90,
+  "marker": "nosec",
+  "codes": [
+   "B310"
+  ],
+  "text": "# noqa: S310  # nosec B310  # nosem"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 100,
+  "marker": "noqa",
+  "codes": [
+   "S607"
+  ],
+  "text": "# noqa: S607  # nosec B603 B607"
+ },
+ {
+  "file": "tools/verify_cvss_against_reference.py",
+  "line": 100,
+  "marker": "nosec",
+  "codes": [
+   "B603",
+   "B607"
+  ],
+  "text": "# noqa: S607  # nosec B603 B607"
+ }
+]

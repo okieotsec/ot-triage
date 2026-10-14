@@ -27,3 +27,5 @@ ignore = ["SIM105", "SIM108", "RUF005"]
 [lint.per-file-ignores]
 # Test classes keep read-only fixture dicts as class attributes.
 "test_*.py" = ["RUF012"]
+# The security runner holds long command lines and report text.
+"tools/security_checks.py" = ["E501"]
