@@ -165,6 +165,7 @@ class SafetyTests(ImportCliCase):
         self.assertEqual(code, 1)
         self.assertIn("between 0 and 100", err)
 
+    @unittest.skipIf(sys.platform == "win32", "Windows file names cannot contain control characters")
     def test_printed_text_from_a_file_is_cleaned(self):
         evil = self.dir / "e\x1b[31mvil.csv"
         evil.write_text("Plugin ID,CVE,CVSS,Risk,Host,Name\n1,CVE-2020-0001,5,High,h,n\n", encoding="utf-8")
