@@ -2,7 +2,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 ROOT = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("security_checks", ROOT / "tools" / "security_checks.py")
@@ -79,6 +79,23 @@ class SuppressionInventoryTests(unittest.TestCase):
         active, removed = checks.without_suppressed(self.sarif())
         self.assertEqual(removed, 1)
         self.assertEqual([r["ruleId"] for r in active["runs"][0]["results"]], ["a"])
+
+    def test_the_path_is_scrubbed_in_every_form_it_can_take(self):
+        root = checks.ROOT
+        for form in (str(root), json.dumps(str(root))[1:-1], root.as_posix()):
+            with self.subTest(form=form):
+                self.assertEqual(checks.scrub_path(f"x {form}/pkg y"), "x ./pkg y")
+        self.assertEqual(checks.scrub_path("a\\\\b"), "a\\\\b")
+
+    def test_a_windows_style_path_is_scrubbed_as_json_writes_it(self):
+        checks.ROOT = PureWindowsPath("C:/Users/runner/work/repo")      # restored by the cleanup in setUp
+        escaped = "C:\\Users\\runner\\work\\repo/pkg/mod.py"
+        written = json.dumps({"uri": escaped, "other": "C:/Users/runner/work/repo/x.py"})
+        self.assertIn("C:\\\\Users", written)
+        scrubbed = checks.scrub_path(written)
+        self.assertNotIn("runner", scrubbed)
+        self.assertIn("./pkg/mod.py", scrubbed)
+        self.assertIn("./x.py", scrubbed)
 
     def test_archived_sarif_does_not_name_where_it_was_produced(self):
         target = self.root / "out.sarif"

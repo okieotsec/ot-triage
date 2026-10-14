@@ -170,9 +170,18 @@ def without_suppressed(data):
     return clone, removed
 
 
+def scrub_path(text):
+    """Replace this checkout's absolute path in JSON text, in every form it can take (on Windows: with backslashes, which
+    JSON writes doubled, and with forward slashes)."""
+    forms = {str(ROOT), json.dumps(str(ROOT))[1:-1], ROOT.as_posix()}
+    for form in sorted(forms, key=len, reverse=True):
+        text = text.replace(form, ".")
+    return text
+
+
 def write_sarif(data, target):
     """Write SARIF with this checkout's absolute path replaced, so an archived report never names where it was produced."""
-    Path(target).write_text(json.dumps(data, indent=1).replace(str(ROOT), ".") + "\n")
+    Path(target).write_text(scrub_path(json.dumps(data, indent=1)) + "\n")
 
 
 def saf_command():
