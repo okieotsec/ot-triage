@@ -1,6 +1,6 @@
 # Importing scanner exports: research and plan
 
-Status: **phase 1 is built** (Nessus CSV, Tenable Vulnerability Management CSV and OpenVAS CSV readers, the merge step and the `ot_triage_import.py` command; see [IMPORT.md](IMPORT.md)). The rest is a plan. The sample files and the results are in
+Status: **phase 1 and the `.nessus` XML reader are built** (Nessus CSV, Tenable Vulnerability Management CSV, OpenVAS CSV and Nessus v2 XML readers, the merge step and the `ot_triage_import.py` command; see [IMPORT.md](IMPORT.md)). The Nozomi and Dragos readers and the Batch button are still a plan. The sample files and the results are in
 [samples/scanners/](../samples/scanners/README.md); a throw-away prototype produced them, so every mapping below has
 been run, not only written down.
 

@@ -95,6 +95,25 @@ class RunTests(ImportCliCase):
         self.assertEqual((stop.exception.code, out.getvalue().strip()), (0, f"OT Triage {__version__}"))
 
 
+class NessusXmlCliTests(ImportCliCase):
+    def test_a_nessus_file_is_imported_with_the_csv_exports_and_merged(self):
+        out = self.dir / "f.csv"
+        code, text, err = self.run_cli(str(NESSUS), str(HERE / "sample_scan.nessus"), "-o", str(out))
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("sample_scan.nessus: Nessus .nessus (v2 XML), 4 rows, 4 findings kept", text)
+        self.assertIn("  skipped 1: informational (no risk)", text)
+        self.assertEqual(len(self.rows(out)), 10)
+
+    def test_a_nessus_file_with_a_doctype_is_refused_with_no_output(self):
+        bad = self.dir / "bad.nessus"
+        bad.write_text('<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "b">]><NessusClientData_v2/>', encoding="utf-8")
+        out = self.dir / "f.csv"
+        code, _t, err = self.run_cli(str(bad), "-o", str(out))
+        self.assertEqual(code, 1)
+        self.assertIn("declares a DTD or an entity", err)
+        self.assertFalse(out.exists())
+
+
 class SafetyTests(ImportCliCase):
     def test_an_existing_output_is_not_replaced_without_force(self):
         out = self.dir / "f.csv"

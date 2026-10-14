@@ -15,6 +15,8 @@ import csv
 import os
 import re
 from dataclasses import dataclass, field
+from typing import ClassVar
+from xml.parsers import expat  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (DTDs are refused)
 
 import inventory
 from references import clean
@@ -36,10 +38,14 @@ FINDING_COLUMNS = ["id", "asset_id", "name", "cve", "cvss", "patch", "source_too
 NEW_INVENTORY_COLUMNS = ["asset_id", "name", "criticality", "exposure", "controls", "vendor", "product", "version"]
 _FORMULA_START = "=+-@\t\r"
 
-NESSUS, TENABLE_VM, OPENVAS = "nessus", "tenable-vm", "openvas"
+MAX_XML_DEPTH = 24
+MAX_XML_TEXT_CHARS = 2_000            # text kept from one XML element that is read at all (the rest is thrown away)
+XML_CHUNK_BYTES = 1024 * 1024
+
+NESSUS, TENABLE_VM, OPENVAS, NESSUS_XML = "nessus", "tenable-vm", "openvas", "nessus-xml"
 ID_PREFIX = {NESSUS: "nessus", TENABLE_VM: "tenable"}      # finding ids start with the tool, then plugin, asset, CVE
 FORMAT_NAMES = {NESSUS: "Nessus CSV", TENABLE_VM: "Tenable Vulnerability Management CSV",
-                OPENVAS: "OpenVAS / Greenbone CSV"}
+                OPENVAS: "OpenVAS / Greenbone CSV", NESSUS_XML: "Nessus .nessus (v2 XML)"}
 
 
 class ScanImportError(ValueError):
@@ -206,7 +212,8 @@ def scanner_hint(header):
 
     Returns an empty string when the header is not one of the exports this module reads.
     """
-    source = detect_format(header)
+    first = str(header[0]).lstrip("\ufeff \t").lower() if header else ""
+    source = NESSUS_XML if first.startswith(("<?xml", "<nessusclientdata")) else detect_format(header)
     if source is None:
         return ""
     return (f"This is a scanner export ({FORMAT_NAMES[source]}), not an OT Triage findings file or inventory. "
@@ -291,8 +298,172 @@ def _score_int(text):
         return None
 
 
+class _NessusXml:
+    """Reads a Nessus v2 (.nessus) file as it streams past, keeping only what is needed.
+
+    The parser is expat (the standard library's), driven chunk by chunk, so a large file is never held in memory and the
+    text of a plugin's output (which can be huge) is never kept. A file that declares a DTD or an entity is refused:
+    that is how entity-expansion attacks are made, and a scanner never writes one.
+    """
+
+    KEPT: ClassVar = frozenset({"cve", "cvss_base_score", "cvss3_base_score"})
+    HOST_TAGS: ClassVar = frozenset({"host-ip", "host-fqdn", "netbios-name", "operating-system"})
+
+    def __init__(self, report):
+        self.report = report
+        self.findings, self.assets = [], {}
+        self.depth = 0
+        self.host = None
+        self.item = None
+        self.item_depth = 0
+        self.tag = None
+        self.child = None
+        self.text = []
+        self.size = 0
+        self.hosts = 0
+
+    # -- expat handlers (an exception raised here stops the parse and is passed on) --
+    def start(self, name, attrs):
+        self.depth += 1
+        if self.depth > MAX_XML_DEPTH:
+            raise ScanImportError("the file is nested too deeply to be a Nessus export")
+        if self.depth == 1 and name != "NessusClientData_v2":
+            raise ScanImportError(f"the root element is '{clean(name)[:40]}', not NessusClientData_v2: this is not a "
+                                  "Nessus v2 (.nessus) file")
+        if name == "ReportHost":
+            self.host = {"name": attrs.get("name", ""), "tags": {}}
+            self.hosts += 1
+        elif self.host is not None and self.item is None and name == "tag" and attrs.get("name") in self.HOST_TAGS:
+            self.tag = attrs["name"]
+            self.begin_text()
+        elif self.host is not None and self.item is None and name == "ReportItem":
+            self.report.rows += 1
+            if self.report.rows > MAX_INPUT_ROWS:
+                raise ScanImportError(f"the file has more than {MAX_INPUT_ROWS:,} findings")
+            self.item = {"attrs": dict(attrs), "cves": [], "v2": "", "v3": "", "compliance": False}
+            self.item_depth = self.depth
+        elif self.item is not None and self.depth == self.item_depth + 1:
+            if name.startswith("cm:"):
+                self.item["compliance"] = True
+            if name in self.KEPT:
+                self.child = name
+                self.begin_text()
+
+    def end(self, name):
+        if self.tag is not None and name == "tag":
+            self.host["tags"][self.tag] = self.take_text()
+            self.tag = None
+        elif self.child is not None and name == self.child and self.depth == self.item_depth + 1:
+            text = self.take_text()
+            if name == "cve":
+                self.item["cves"] += [c for c in _cves(text) if c not in self.item["cves"]]
+            else:
+                self.item["v2" if name == "cvss_base_score" else "v3"] = text
+            self.child = None
+        elif name == "ReportItem" and self.item is not None and self.depth == self.item_depth:
+            self.finish_item()
+            self.item = None
+        elif name == "ReportHost" and self.host is not None:
+            self.finish_host()
+            self.host = None
+        self.depth -= 1
+
+    def data(self, text):
+        if self.text is not None and self.size < MAX_XML_TEXT_CHARS:
+            self.text.append(text[:MAX_XML_TEXT_CHARS - self.size])
+            self.size += len(text)
+
+    def forbidden(self, *_args):
+        raise ScanImportError("the file declares a DTD or an entity, which a Nessus export never does; it was refused")
+
+    def begin_text(self):
+        self.text, self.size = [], 0
+
+    def take_text(self):
+        text = "".join(self.text)
+        self.text, self.size = None, 0
+        return text
+
+    # -- what a finished element means --
+    def host_name(self):
+        tags = self.host["tags"]
+        return _cell(self.host["name"] or tags.get("host-ip", ""), MAX_ASSET_CHARS)
+
+    def finish_item(self):
+        report, item = self.report, self.item
+        attrs = item["attrs"]
+        if item["attrs"].get("severity", "").strip() == "0":
+            report.skip("informational (no risk)")
+            return
+        if item["compliance"] or _norm(attrs.get("pluginFamily", "")) == "policy compliance":
+            report.skip("compliance check (not a vulnerability)")
+            return
+        asset = self.host_name()
+        if not asset:
+            report.skip("no host or asset name")
+            return
+        plugin = _cell(attrs.get("pluginID", ""), 40)
+        title = _cell(attrs.get("pluginName", ""), MAX_NAME_CHARS) or f"Plugin {plugin}"
+        score = _score(item["v3"]) or _score(item["v2"])
+        for cve in item["cves"] or [""]:
+            ident = f"nessus:{plugin}:{asset}:{cve or 'nocve'}"[:MAX_ID_CHARS]
+            self.findings.append(Finding(ident, asset, title, cve, score, "", NESSUS_XML))
+            _check_size(self.findings)
+
+    def finish_host(self):
+        asset = self.host_name()
+        if asset:
+            tags = self.host["tags"]
+            name = _cell(tags.get("host-fqdn") or tags.get("netbios-name", ""), MAX_NAME_CHARS)
+            known = self.assets.setdefault(asset.lower(), Asset(asset))
+            known.name = known.name or (name if name.lower() != asset.lower() else "")
+
+
+def _looks_like_xml(path):
+    try:
+        with open(path, "rb") as fh:
+            start = fh.read(1024)
+    except OSError as error:
+        raise ScanImportError(f"{os.path.basename(path)} could not be read ({error.strerror or error})") from None
+    if start[:2] in (b"\xff\xfe", b"\xfe\xff"):                      # UTF-16 with a byte order mark
+        return start.decode("utf-16", errors="ignore").lstrip("\ufeff \t\r\n").startswith("<")
+    return start.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<")
+
+
+def _read_nessus_xml(path):
+    """Read a Nessus v2 (.nessus) file; return (findings, assets, FileReport)."""
+    name = os.path.basename(path)
+    try:
+        if os.path.getsize(path) > MAX_FILE_BYTES:
+            raise ScanImportError(f"{name} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
+        report = FileReport(name, FORMAT_NAMES[NESSUS_XML])
+        reader = _NessusXml(report)
+        parser = expat.ParserCreate()
+        parser.buffer_text = True
+        parser.StartElementHandler, parser.EndElementHandler = reader.start, reader.end
+        parser.CharacterDataHandler = reader.data
+        parser.StartDoctypeDeclHandler = parser.EntityDeclHandler = reader.forbidden
+        parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(XML_CHUNK_BYTES)
+                parser.Parse(chunk, not chunk)
+                if not chunk:
+                    break
+    except expat.ExpatError as error:
+        raise ScanImportError(f"{name} is not a valid XML file ({expat.ErrorString(error.code)})") from None
+    except OSError as error:
+        raise ScanImportError(f"{name} could not be read ({error.strerror or error})") from None
+    if reader.hosts == 0:
+        raise ScanImportError(f"{name} has no ReportHost: it holds no scan results")
+    report.kept = len(reader.findings)
+    return reader.findings, reader.assets, report
+
+
 def read_export(path, min_qod=DEFAULT_MIN_QOD):
     """Read one export file; return (findings, assets, FileReport). Raises ScanImportError if it cannot be used."""
+    if _looks_like_xml(path):
+        return _read_nessus_xml(path)
     table = _Table(path)
     try:
         source = detect_format(table.header)

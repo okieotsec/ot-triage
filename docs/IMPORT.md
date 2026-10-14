@@ -12,8 +12,8 @@ python3 ot_triage_import.py scan.csv -o findings.csv -i inventory.csv --inventor
 
 A scanner export cannot be opened directly in the Batch view (Open CSV) or as an inventory: they read OT Triage's own files, and say so with this command in the message. Convert first, then open `findings.csv` and load the `inventory.csv` it wrote (fill in each new asset's criticality and exposure; see below).
 
-Try it on the two files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv -o
-findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
+Try it on the three files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv
+sample_scan.nessus -o findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
 
 ## What it reads
 
@@ -22,11 +22,11 @@ findings.csv --inventory-out inventory.csv`. They are fictional (every host, add
 | **Nessus CSV** | Plugin ID, CVE, CVSS (v2 and/or v3), Risk, Host, Name ... |
 | **Tenable Vulnerability Management CSV** | Asset Name, IPv4 Address, CVE, CVSSv3 Base Score, Severity, Plugin ID, Plugin Name, State ... |
 | **OpenVAS / Greenbone CSV** | IP, Hostname, CVSS, Severity, QoD, NVT Name, CVEs, Result ID ... |
+| **Nessus `.nessus` (v2 XML)** | an XML file whose root is `NessusClientData_v2`, with `ReportHost` and `ReportItem` elements |
 
 The format is found from the header, by column **name** and never by position, so the order of columns and the spelling
 (`CVSS v3.0 Base Score`, `cvss_v3.0_base_score`) do not matter. A file whose header is not one of these is refused, with
-the start of its header in the message, rather than guessed at. Nessus `.nessus` XML and the Nozomi and Dragos exports are
-planned ([SCANNER_IMPORT.md](SCANNER_IMPORT.md)).
+the start of its header in the message, rather than guessed at. The Nozomi and Dragos exports are planned ([SCANNER_IMPORT.md](SCANNER_IMPORT.md)).
 
 ## What it writes
 
@@ -50,6 +50,9 @@ Every skipped row is counted and named in the summary, never dropped silently:
 * OpenVAS: *Log* entries, results with no score, and results whose **Quality of Detection** is below `--min-qod`
   (default 70, Greenbone's own default for hiding low-confidence detections; `--min-qod 0` keeps everything).
 * Rows with no host or asset name.
+* `.nessus` files: items with severity 0 (informational), and **compliance checks** (items of the *Policy Compliance* family or with `cm:` elements), which are configuration audits, not vulnerabilities.
+
+A `.nessus` file is read as a stream, so a large one is never held in memory, and the text of a plugin's output (which can be huge) is never kept. The severity and CVE rules are those of the CSV: one finding per `cve` element, the `cvss3_base_score` if present, otherwise `cvss_base_score`, and the host's name, or its `host-ip` tag if it has no name. A file that declares a DTD or an entity is **refused**: that is how XML entity-expansion attacks are made, and a scanner never writes one. The format follows Tenable's published description of the Nessus v2 file (the v3 score element is newer than that document and is read when present).
 
 ## Several tools, one device
 

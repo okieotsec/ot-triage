@@ -52,6 +52,7 @@ class ContentTests(BundleCase):
                        "OT Triage.pyw", "README.md", "LICENSE", "CHANGELOG.md",
                        "SECURITY.md", "THIRD_PARTY_NOTICES.md", "START-HERE.txt", "sbom/sbom.cdx.json",
                        "docs/CLI.md", "docs/POLICY.md", "sample_inventory.csv", "sample_scan_nessus.csv",
+                       "sample_scan.nessus",
                        "sample_findings_multiple_per_asset.csv", "requirements.txt"):
             self.assertIn(f"{TOP}/{needed}", self.names, needed)
 
@@ -113,9 +114,11 @@ class RunsOnItsOwnTests(BundleCase):
     def test_the_scanner_import_runs_from_the_extracted_bundle(self):
         out = self.root / "imported.csv"
         done = self.run_python("ot_triage_import.py", "sample_scan_nessus.csv", "sample_scan_openvas.csv",
-                               "-o", str(out), "--inventory-out", str(self.root / "inventory.new.csv"))
+                               "sample_scan.nessus", "-o", str(out),
+                               "--inventory-out", str(self.root / "inventory.new.csv"))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("Nessus CSV", done.stdout)
+        self.assertIn("Nessus .nessus (v2 XML)", done.stdout)
         self.assertTrue(out.read_text(encoding="utf-8").startswith("id,asset_id,name,cve,cvss,patch,source_tool"))
 
     def test_every_module_imports_from_the_extracted_bundle_alone(self):
