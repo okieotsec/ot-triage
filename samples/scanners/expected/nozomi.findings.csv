@@ -1,6 +1,6 @@
 id,asset_id,name,cve,cvss,patch,source_tool
-nozomi:nc-1001,CC-PLC-11,CVE-2023-28831 on CC-PLC-11,CVE-2023-28831,7.5,available,nozomi
-nozomi:nc-1002,CC-GW-31,CVE-2016-9361 on CC-GW-31,CVE-2016-9361,9.8,available,nozomi
-nozomi:nc-1003,CC-RTU-21,CVE-2024-2617 on CC-RTU-21,CVE-2024-2617,7.2,available,nozomi
-nozomi:nc-1004,CC-SCADA-41,CVE-2016-0854 on CC-SCADA-41,CVE-2016-0854,9.8,,nozomi
-nozomi:nc-1007,CC-FW-44,CVE-2022-31814 on CC-FW-44,CVE-2022-31814,9.8,,nozomi
+nozomi:nc-1001,CC-PLC-11,Illustrative summary: a flaw in the CPU firmware affects availability.,CVE-2023-28831,7.5,available,nozomi
+nozomi:nc-1002,CC-GW-31,Illustrative summary: a flaw in the device server web interface.,CVE-2016-9361,9.8,available,nozomi
+nozomi:nc-1003,CC-RTU-21,Illustrative summary: a flaw in the RTU500 CMU firmware.,CVE-2024-2617,7.2,available,nozomi
+nozomi:nc-1004,CC-SCADA-41,Illustrative summary: a flaw in the SCADA server.,CVE-2016-0854,9.8,,nozomi
+nozomi:nc-1007,CC-FW-44,Illustrative summary: a flaw in a firewall package.,CVE-2022-31814,9.8,,nozomi

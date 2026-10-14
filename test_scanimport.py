@@ -393,7 +393,7 @@ class NessusXmlTests(Case):
             self.read(path)
         self.assertGreater(len(calls), 5)
         self.assertLessEqual(max(calls), 4096)
-        self.assertEqual(calls[-1], 0)         # the parser is told the file has ended
+        self.assertEqual(calls[-1], 0)  # the parser is told the file has ended
 
     def test_a_large_file_is_read_in_pieces(self):
         items = [xml_item(plugin=str(n), cves=(f"CVE-2020-{n % 9000:04d}",)) for n in range(3000)]
@@ -425,6 +425,361 @@ class NessusXmlTests(Case):
                 self.assertRaisesRegex(ValueError, r"scanner export \(Nessus .nessus"),
             ):
                 loader(path)
+
+
+NOZOMI_RECORD = {
+    "id": "nc-1",
+    "cve": "CVE-2023-28831",
+    "cve_score": 7.5,
+    "cve_summary": "A flaw in the firmware",
+    "asset_id": "a-1",
+    "node_label": "PLC-1",
+    "node_vendor": "Siemens",
+    "node_product_name": "S7-1500",
+    "node_firmware_version": "V2.9.2",
+    "latest_hotfix": "V2.9.7",
+    "likelihood": 0.6,
+    "resolved": False,
+}
+
+
+def dragos_record(vuln_id="vd-1", state="open", cve="CVE-2023-28831", base=7.5, name="PLC-1", **extra):
+    host = {
+        "id": "as-1",
+        "name": name,
+        "vendor": "Siemens",
+        "hardware": {"model": "S7-1500", "firmware_version": "V2.8.1"},
+    }
+    vuln = {
+        "id": vuln_id,
+        "enumeration": cve,
+        "reference": cve,
+        "title": "A flaw",
+        "state": state,
+        "severity": 3,
+        "dragos_score": 6.1,
+        "intel": {"active_exploit": True},
+    }
+    if base is not None:
+        vuln["score"] = {"base": base, "version": "3.1"}
+    return {"host": host, "vulnerability": {**vuln, **extra}}
+
+
+class NozomiTests(Case):
+    def json(self, doc, name="n.json"):
+        import json
+
+        return self.write(name, json.dumps(doc))
+
+    def test_the_sample_gives_findings_assets_and_an_experimental_note(self):
+        findings, assets, report = self.read(SAMPLES / "nozomi/node_cves.json")
+        self.assertEqual(report.format, "Nozomi node_cves (experimental)")
+        self.assertEqual(report.note, si.EXPERIMENTAL_NOTE)
+        self.assertEqual((report.rows, report.kept, report.skipped), (7, 5, {"already resolved": 1, "no CVE": 1}))
+        self.assertEqual(
+            [(f.asset_id, f.cve, f.cvss, f.patch) for f in findings][:2],
+            [("CC-PLC-11", "CVE-2023-28831", "7.5", "available"), ("CC-GW-31", "CVE-2016-9361", "9.8", "available")],
+        )
+        plc = assets["cc-plc-11"]
+        self.assertEqual((plc.vendor, plc.product, plc.version), ("Siemens", "S7-1500", "V2.9.2"))
+
+    def test_every_documented_container_is_read(self):
+        for doc in (
+            {"result": [NOZOMI_RECORD]},
+            {"results": [NOZOMI_RECORD]},
+            {"data": [NOZOMI_RECORD]},
+            [NOZOMI_RECORD],
+        ):
+            with self.subTest(type(doc).__name__):
+                findings, _a, _r = self.read(self.json(doc))
+                self.assertEqual(len(findings), 1)
+
+    def test_resolved_records_are_skipped_in_every_spelling(self):
+        for value, skipped in (
+            (True, True),
+            ("true", True),
+            ("True", True),
+            ("1", True),
+            (1, True),
+            (False, False),
+            ("false", False),
+            ("", False),
+            (None, False),
+            (0, False),
+        ):
+            with self.subTest(value=value):
+                findings, _a, _r = self.read(self.json({"result": [dict(NOZOMI_RECORD, resolved=value)]}))
+                self.assertEqual(len(findings), 0 if skipped else 1)
+
+    def test_scores_may_arrive_as_text_and_bad_ones_are_left_empty(self):
+        recs = [
+            dict(NOZOMI_RECORD, id=f"n{i}", cve_score=score)
+            for i, score in enumerate(("9.8", 7, "abc", 12, -1, None, ""))
+        ]
+        findings, _a, _r = self.read(self.json(recs))
+        self.assertEqual([f.cvss for f in findings], ["9.8", "7.0", "", "", "", "", ""])
+
+    def test_a_record_with_no_cve_or_several_or_no_asset_is_skipped_and_counted(self):
+        recs = [
+            dict(NOZOMI_RECORD, cve=""),
+            dict(NOZOMI_RECORD, cve="CVE-2023-0001 CVE-2023-0002"),
+            dict(NOZOMI_RECORD, node_label="", asset_id=""),
+            dict(NOZOMI_RECORD, node_label="", id="x"),
+            "text",
+            5,
+            None,
+            [],
+        ]
+        findings, _a, report = self.read(self.json(recs))
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].asset_id, "a-1")
+        self.assertEqual(report.skipped, {"no CVE": 2, "no node label or asset id": 1, "not a record": 4})
+
+    def test_the_patch_is_available_only_when_a_hotfix_is_named_and_the_name_is_the_summary(self):
+        recs = [
+            dict(NOZOMI_RECORD, id="a", latest_hotfix="", minimum_hotfix="KB1"),
+            dict(NOZOMI_RECORD, id="b", latest_hotfix="", minimum_hotfix=""),
+            dict(NOZOMI_RECORD, id="c", cve_summary=""),
+        ]
+        findings, _a, _r = self.read(self.json(recs))
+        self.assertEqual([f.patch for f in findings], ["available", "", "available"])
+        self.assertEqual((findings[0].name, findings[2].name), ("A flaw in the firmware", "CVE-2023-28831 on PLC-1"))
+
+    def test_the_likelihood_never_reaches_the_findings(self):
+        findings, _a, _r = self.read(self.json([NOZOMI_RECORD]))
+        self.assertNotIn("0.6", repr(findings))
+
+    def test_the_cve_is_normalised(self):
+        findings, _a, _r = self.read(self.json([dict(NOZOMI_RECORD, cve="  cve-2023-28831 ")]))
+        self.assertEqual(findings[0].cve, "CVE-2023-28831")
+
+    def test_a_csv_export_of_the_same_fields_is_read_too(self):
+        header = (
+            "id,cve,cve_score,cve_summary,node_label,node_vendor,node_product_name,node_firmware_version,"
+            "resolved,latest_hotfix"
+        )
+        rows = [
+            "nc-1,CVE-2023-28831,7.5,A flaw,PLC-1,Siemens,S7-1500,V2.9.2,false,",
+            "nc-2,CVE-2023-28831,7.5,A flaw,PLC-2,,,,true,",
+            'nc-3,"CVE-2020-0001",9.8,"A, flaw",PLC-3,Moxa,NPort,1.0,,KB5',
+        ]
+        findings, assets, report = self.read(self.write("n.csv", header + "\n" + "\n".join(rows) + "\n"))
+        self.assertEqual(report.format, "Nozomi node_cves (experimental)")
+        self.assertEqual(report.note, si.EXPERIMENTAL_NOTE)
+        self.assertEqual(
+            [(f.asset_id, f.cve, f.patch) for f in findings],
+            [("PLC-1", "CVE-2023-28831", ""), ("PLC-3", "CVE-2020-0001", "available")],
+        )
+        self.assertEqual(report.skipped, {"already resolved": 1})
+        self.assertEqual(assets["plc-3"].vendor, "Moxa")
+        self.assertEqual(findings[1].name, "A, flaw")
+
+    def test_header_spelling_of_the_csv_does_not_matter(self):
+        text = "CVE,Score,Node Label\nCVE-2020-0001,5,H\n"
+        self.assertEqual(si.detect_format(["CVE", "Score", "Node Label"]), si.NOZOMI)
+        findings, _a, _r = self.read(self.write("n.csv", text))
+        self.assertEqual(self.ids(findings), [("H", "CVE-2020-0001", "5.0")])
+
+
+class DragosTests(Case):
+    def json(self, doc, name="d.json"):
+        import json
+
+        return self.write(name, json.dumps(doc))
+
+    def test_the_sample_gives_findings_assets_and_an_experimental_note(self):
+        findings, assets, report = self.read(SAMPLES / "dragos/detections.json")
+        self.assertEqual(report.format, "Dragos detections (experimental)")
+        self.assertEqual(report.note, si.EXPERIMENTAL_NOTE)
+        self.assertEqual((report.rows, report.kept, report.skipped), (5, 4, {"already resolved": 1}))
+        self.assertEqual(
+            [(f.asset_id, f.cve, f.cvss) for f in findings],
+            [
+                ("CC-PLC-12", "CVE-2023-28831", "7.5"),
+                ("CC-RTU-22", "CVE-2024-2617", "7.2"),
+                ("CC-HMI-23", "CVE-2016-0854", ""),
+                ("CC-ENG-24", "", ""),
+            ],
+        )
+        self.assertEqual(assets["cc-plc-12"].product, "S7-1500")
+
+    def test_every_documented_container_is_read(self):
+        for doc in (
+            {"content": [dragos_record()]},
+            {"detections": [dragos_record()]},
+            {"data": [dragos_record()]},
+            {"results": [dragos_record()]},
+            [dragos_record()],
+        ):
+            with self.subTest(type(doc).__name__):
+                self.assertEqual(len(self.read(self.json(doc))[0]), 1)
+
+    def test_closed_detections_are_skipped_and_other_states_kept(self):
+        recs = [
+            dragos_record(f"v{i}", state=s)
+            for i, s in enumerate(("open", "Resolved", "CLOSED", "fixed", "remediated", "mitigated", "", None))
+        ]
+        findings, _a, report = self.read(self.json(recs))
+        self.assertEqual(len(findings), 4)
+        self.assertEqual(report.skipped, {"already resolved": 4})
+
+    def test_the_score_is_the_cvss_base_and_dragos_own_scale_is_never_used(self):
+        recs = [
+            dragos_record("a", base=9.8),
+            dragos_record("b", base=None),
+            dragos_record("c", base="bad"),
+            dragos_record("d", base=11),
+        ]
+        findings, _a, _r = self.read(self.json(recs))
+        self.assertEqual([f.cvss for f in findings], ["9.8", "", "", ""])
+        self.assertNotIn("6.1", repr(findings))
+
+    def test_the_enumeration_wins_over_the_reference_when_both_name_a_cve(self):
+        findings, _a, _r = self.read(self.json([dragos_record(enumeration="CVE-2020-0001", reference="CVE-2020-0002")]))
+        self.assertEqual(findings[0].cve, "CVE-2020-0001")
+
+    def test_the_cve_comes_from_enumeration_then_reference_and_may_be_absent(self):
+        recs = [
+            dragos_record("a", cve="CVE-2020-0001"),
+            dragos_record("b", enumeration="", reference="CVE-2020-0002"),
+            dragos_record("c", enumeration="CWE-79", reference="x"),
+        ]
+        findings, _a, _r = self.read(self.json(recs))
+        self.assertEqual([f.cve for f in findings], ["CVE-2020-0001", "CVE-2020-0002", ""])
+
+    def test_a_detection_without_a_host_or_a_name_is_skipped(self):
+        recs = [
+            dragos_record(name=""),
+            {"host": {"name": "h"}, "vulnerability": []},
+            {"vulnerability": {}},
+            "x",
+            dragos_record("ok"),
+        ]
+        recs[0]["host"]["id"] = ""
+        findings, _a, report = self.read(self.json(recs))
+        self.assertEqual([f.id for f in findings], ["dragos:ok"])
+        self.assertEqual(
+            report.skipped,
+            {"no host name": 1, "not a detection (no host and vulnerability)": 2, "not a record": 1},
+        )
+
+    def test_missing_hardware_details_leave_the_asset_facts_empty(self):
+        rec = dragos_record()
+        del rec["host"]["hardware"]
+        del rec["host"]["vendor"]
+        _f, assets, _r = self.read(self.json([rec]))
+        self.assertEqual((assets["plc-1"].vendor, assets["plc-1"].product, assets["plc-1"].version), ("", "", ""))
+
+    def test_the_intelligence_and_the_purdue_level_never_reach_the_findings(self):
+        rec = dragos_record()
+        rec["host"]["pera_level"] = 0
+        findings, _a, _r = self.read(self.json([rec]))
+        self.assertNotIn("exploit", repr(findings).lower())
+        self.assertNotIn("pera", repr(findings).lower())
+
+
+class JsonSafetyTests(Case):
+    def test_json_that_is_not_an_export_is_refused_cleanly(self):
+        cases = {
+            "empty object": "{}",
+            "empty list": "[]",
+            "scalar": "5",
+            "no list": '{"a": 1}',
+            "wrong records": '[{"x": 1}]',
+            "truncated": '{"result": [',
+            "nan": '{"result": [{"cve": "CVE-2020-0001", "node_label": "x", "cve_score": NaN}]}',
+            "infinity": '{"result": [{"cve": "CVE-2020-0001", "node_label": "x", "cve_score": Infinity}]}',
+            "duplicate keys": '{"result": [], "result": []}',
+            "duplicate keys in a record": (
+                '{"result": [{"cve": "CVE-2020-0001", "node_label": "x", "cve": "CVE-2020-0002"}]}'
+            ),
+            "not json": "[hello",
+            "string": '"text"',
+        }
+        for label, text in cases.items():
+            with self.subTest(label), self.assertRaises(si.ScanImportError):
+                self.read(self.write(f"{label}.json", text))
+
+    def test_deeply_nested_json_is_refused_not_crashed(self):
+        # Some Python versions give up on 100,000 levels (an invalid file) and some read them (a list of lists that is
+        # not an export); either way the answer is a clean refusal, never a crash.
+        with self.assertRaises(si.ScanImportError):
+            self.read(self.write("deep.json", "[" * 100_000 + "]" * 100_000))
+        with self.assertRaisesRegex(si.ScanImportError, "not a valid JSON"):
+            self.read(self.write("deep_open.json", "[" * 100_000))
+
+    def test_the_size_and_row_limits_apply(self):
+        import json
+
+        path = self.write("n.json", json.dumps({"result": [NOZOMI_RECORD] * 5}))
+        with mock.patch.object(si, "MAX_JSON_BYTES", 100), self.assertRaisesRegex(si.ScanImportError, "larger than"):
+            self.read(path)
+        with mock.patch.object(si, "MAX_INPUT_ROWS", 3), self.assertRaisesRegex(si.ScanImportError, "more than 3"):
+            self.read(path)
+        with mock.patch.object(si, "MAX_RAW_FINDINGS", 3), self.assertRaisesRegex(si.ScanImportError, "more than 3"):
+            self.read(path)
+
+    def test_hostile_text_is_cleaned_cut_and_defused(self):
+        import json
+
+        rec = dict(
+            NOZOMI_RECORD,
+            cve_summary="=cmd|' /c calc'!A1\x1b[31m" + "x" * 500,
+            node_label="@evil\u202e",
+            node_vendor="+v",
+            node_firmware_version="-1",
+        )
+        findings, assets, _r = self.read(self.write("h.json", json.dumps([rec])))
+        self.assertTrue(findings[0].name.startswith("=cmd"))
+        self.assertLessEqual(len(findings[0].name), si.MAX_NAME_CHARS)
+        self.assertNotIn("\x1b", findings[0].name)
+        out = self.dir / "out.csv"
+        si.write_findings(out, si.merge(si.ImportResult(findings=findings, assets=assets)))
+        text = out.read_text(encoding="utf-8")
+        self.assertIn("'=cmd", text)
+        self.assertIn("'@evil", text)
+
+    def test_json_is_found_by_content_not_by_name_and_a_csv_with_braces_is_still_a_csv(self):
+        import json
+
+        findings, _a, _r = self.read(self.write("export.txt", json.dumps([NOZOMI_RECORD])))
+        self.assertEqual(len(findings), 1)
+        csv_path = self.nessus('1,,5,5,High,h,tcp,1,"{not json}",,,,,')
+        self.assertEqual(len(self.read(csv_path)[0]), 1)
+
+    def test_opening_a_json_file_in_batch_or_as_an_inventory_says_what_to_do(self):
+        import inventory
+
+        path = self.write("n.json", '{"result": []}')
+        for loader in (batch.process_file, inventory.load):
+            with self.subTest(loader.__module__), self.assertRaisesRegex(ValueError, "This is a JSON file"):
+                loader(path)
+
+    def test_the_summary_carries_the_experimental_note_for_json_exports_only(self):
+        result = si.import_exports([SAMPLES / "nozomi/node_cves.json", SAMPLES / "nessus/classic.csv"])
+        text = "\n".join(si.summary_lines(result))
+        self.assertEqual(text.count("note: read from a public description"), 1)
+        self.assertIn("node_cves.json: Nozomi node_cves (experimental), 7 rows, 5 findings kept", text)
+
+    def test_an_inventory_is_filled_from_the_ot_tools_and_the_threat_decisions_stay_the_same(self):
+        result = si.import_exports([SAMPLES / "nozomi/node_cves.json", SAMPLES / "dragos/detections.json"])
+        self.assertEqual(result.need_threat, 1)
+        out = self.dir / "i.csv"
+        self.assertEqual(si.write_inventory(out, result), (9, 0))
+        with open(out, newline="", encoding="utf-8") as fh:
+            rows = {r["asset_id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual(
+            (
+                rows["CC-PLC-11"]["vendor"],
+                rows["CC-PLC-11"]["product"],
+                rows["CC-PLC-11"]["version"],
+                rows["CC-PLC-11"]["name"],
+            ),
+            ("Siemens", "S7-1500", "V2.9.2", ""),
+        )
+        self.assertEqual(
+            {rows["CC-PLC-11"]["criticality"], rows["CC-PLC-11"]["exposure"], rows["CC-PLC-11"]["controls"]}, {""}
+        )
 
 
 class TenableTests(Case):

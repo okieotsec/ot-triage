@@ -12,8 +12,8 @@ python3 ot_triage_import.py scan.csv -o findings.csv -i inventory.csv --inventor
 
 A scanner export cannot be opened directly in the Batch view (Open CSV) or as an inventory: they read OT Triage's own files, and say so with this command in the message. Convert first, then open `findings.csv` and load the `inventory.csv` it wrote (fill in each new asset's criticality and exposure; see below).
 
-Try it on the three files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv
-sample_scan.nessus -o findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
+Try it on the five files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv
+sample_scan.nessus sample_scan_nozomi.json sample_scan_dragos.json -o findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
 
 ## What it reads
 
@@ -23,10 +23,12 @@ sample_scan.nessus -o findings.csv --inventory-out inventory.csv`. They are fict
 | **Tenable Vulnerability Management CSV** | Asset Name, IPv4 Address, CVE, CVSSv3 Base Score, Severity, Plugin ID, Plugin Name, State ... |
 | **OpenVAS / Greenbone CSV** | IP, Hostname, CVSS, Severity, QoD, NVT Name, CVEs, Result ID ... |
 | **Nessus `.nessus` (v2 XML)** | an XML file whose root is `NessusClientData_v2`, with `ReportHost` and `ReportItem` elements |
+| **Nozomi `node_cves`** *(experimental)* | JSON (`{"result": [...]}`) or a CSV exported from a `node_cves` query; fields `cve`, `cve_score`, `node_label`, `node_vendor`, `node_product_name`, `node_firmware_version`, `resolved` ... |
+| **Dragos detections** *(experimental)* | JSON (`{"content": [...]}`), each record with a `host` and a `vulnerability` |
 
 The format is found from the header, by column **name** and never by position, so the order of columns and the spelling
 (`CVSS v3.0 Base Score`, `cvss_v3.0_base_score`) do not matter. A file whose header is not one of these is refused, with
-the start of its header in the message, rather than guessed at. The Nozomi and Dragos exports are planned ([SCANNER_IMPORT.md](SCANNER_IMPORT.md)).
+the start of its header in the message, rather than guessed at. The Nozomi and Dragos readers are **experimental**: they follow Nozomi's published `node_cves` data model and third-party descriptions of the Dragos API, and have not been checked against a real export, so the summary says so each time. A file that does not look like them is refused, never guessed at. See [SCANNER_IMPORT.md](SCANNER_IMPORT.md).
 
 ## What it writes
 
@@ -40,6 +42,12 @@ the start of its header in the message, rather than guessed at. The Nozomi and D
   vendor, product or version is filled in from the scan but a value you wrote is never replaced. New assets have empty
   criticality, exposure and controls: **no scanner knows those**, so they are for you to fill in. OT Triage reports a
   finding on an asset with no criticality or exposure as not scored, so nothing is ranked on a guess.
+
+## Nozomi and Dragos: what is used
+
+* **Nozomi.** Nozomi publishes the fields of its `node_cves` query, and its consoles export a query's results as CSV or Excel; the importer reads the JSON a query returns (`{"result": [...]}`) and a CSV with the same field names as columns (save an Excel export as CSV first). One finding per record: the CVE, `cve_score` as the score, the CVE summary as the title, and `available` as the patch status when a hotfix is named (Nozomi fills the hotfix fields for Windows assets only). The node's label (or asset id) is the asset, and its vendor, product name and firmware version go to the inventory, which feeds the version comparison. Records with `resolved` true are skipped. `likelihood` is **not** used.
+* **Dragos.** One finding per detection: the host's name is the asset, the vulnerability's CVE (from `enumeration`, then `reference`) and `score.base` (the CVSS base score) are the finding, and the host's vendor, hardware model and firmware version go to the inventory. Detections whose state is resolved, closed, fixed or remediated are skipped. Dragos's own risk score, its 0 to 5 severity, its exploit intelligence and the Purdue level are **not** used: they are shown nowhere and decide nothing, like every vendor's own priority.
+* A detection with no CVE, or with no `score.base`, is kept and shows as not scored (a CVE with no score could be filled from CISA's advisory data; that option is planned and off by default).
 
 ## What it skips
 

@@ -15,11 +15,11 @@ openvas:r-0002:CVE-2021-41773,CC-DMZ-04,Apache HTTP Server multiple vulnerabilit
 openvas:r-0002:CVE-2021-42013,CC-DMZ-04,Apache HTTP Server multiple vulnerabilities,CVE-2021-42013,7.5,available,openvas
 openvas:r-0003:CVE-2011-3389,CC-DMZ-04,SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Protocol Detection,CVE-2011-3389,4.3,,openvas
 openvas:r-0003:CVE-2015-0204,CC-DMZ-04,SSL/TLS: Deprecated TLSv1.0 and TLSv1.1 Protocol Detection,CVE-2015-0204,4.3,,openvas
-nozomi:nc-1001,CC-PLC-11,CVE-2023-28831 on CC-PLC-11,CVE-2023-28831,7.5,available,nozomi
-nozomi:nc-1002,CC-GW-31,CVE-2016-9361 on CC-GW-31,CVE-2016-9361,9.8,available,nozomi
-nozomi:nc-1003,CC-RTU-21,CVE-2024-2617 on CC-RTU-21,CVE-2024-2617,7.2,available,nozomi
-nozomi:nc-1004,CC-SCADA-41,CVE-2016-0854 on CC-SCADA-41,CVE-2016-0854,9.8,,nozomi
-nozomi:nc-1007,CC-FW-44,CVE-2022-31814 on CC-FW-44,CVE-2022-31814,9.8,,nozomi
+nozomi:nc-1001,CC-PLC-11,Illustrative summary: a flaw in the CPU firmware affects availability.,CVE-2023-28831,7.5,available,nozomi
+nozomi:nc-1002,CC-GW-31,Illustrative summary: a flaw in the device server web interface.,CVE-2016-9361,9.8,available,nozomi
+nozomi:nc-1003,CC-RTU-21,Illustrative summary: a flaw in the RTU500 CMU firmware.,CVE-2024-2617,7.2,available,nozomi
+nozomi:nc-1004,CC-SCADA-41,Illustrative summary: a flaw in the SCADA server.,CVE-2016-0854,9.8,,nozomi
+nozomi:nc-1007,CC-FW-44,Illustrative summary: a flaw in a firewall package.,CVE-2022-31814,9.8,,nozomi
 dragos:vd-as-3001,CC-PLC-12,Flaw in the CPU firmware (illustrative title),CVE-2023-28831,7.5,,dragos
 dragos:vd-as-3002,CC-RTU-22,Flaw in the RTU500 CMU firmware (illustrative title),CVE-2024-2617,7.2,,dragos
 dragos:vd-as-3003,CC-HMI-23,Flaw in the SCADA server (illustrative title),CVE-2016-0854,,,dragos
