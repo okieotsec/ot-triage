@@ -6,8 +6,8 @@ How a release of OT Triage is made, so that anyone can check what was published.
 
 1. **Prepare:** a pull request bumps `version.py`, regenerates the SBOM (`python3 tools/make_sbom.py`, which needs `pip install cyclonedx-bom`) and dates the changelog's "Unreleased" section. All CI checks must pass before it is merged.
 2. **Tag:** an annotated tag `v<version>` on the merge commit, made under the project's own identity.
-3. **Build the bundle:** from a clean checkout of the tag, `python3 tools/make_bundle.py`. This writes `dist/ot-triage-<version>.zip` and `dist/ot-triage-<version>.zip.sha256`.
-4. **Publish:** a GitHub release for the tag with the notes from the changelog and three files attached: the bundle, its `.sha256` file, and the SBOM (`ot-triage-<version>.cdx.json`).
+3. **Build the bundle:** pushing the tag starts the *Release bundle* workflow, which builds `dist/ot-triage-<version>.zip` and its `.sha256` file with `python3 tools/make_bundle.py`, records a signed build-provenance attestation for the zip, and keeps the files as a workflow artifact for 30 days. It does not create the release. To build locally instead, run the same command from a clean checkout of the tag.
+4. **Check, then publish:** download the workflow artifact, run `gh attestation verify ot-triage-<version>.zip --repo okieotsec/ot-triage`, and confirm that the checksum matches a local rebuild from the tag. Then make the GitHub release for the tag with the notes from the changelog and three files attached: the bundle, its `.sha256` file, and the SBOM (`ot-triage-<version>.cdx.json`).
 
 ## What the bundle contains
 
@@ -20,6 +20,12 @@ sha256sum -c ot-triage-<version>.zip.sha256          # on Windows: certutil -has
 ```
 
 To confirm the bundle is what the tag says, check out the tag and run `python3 tools/make_bundle.py`: the same files always produce the same bytes (fixed dates, fixed order, fixed permissions), so the checksum matches the one published. Build on Linux or macOS to compare with a published bundle; Windows does not record the executable permission, so its zip differs in that one detail.
+
+## Build provenance
+
+The attestation is a signed statement, recorded by GitHub, that names the zip's SHA-256, the repository, the tag's commit and the workflow that built it. It is made with short-lived keys from GitHub's workflow identity, so there is no signing key to keep or lose. It proves where the file came from, not that the code is free of defects. GitHub documents this kind of attestation as SLSA build provenance at Build Level 2. Releases made before the workflow existed have no attestation.
+
+The workflow's first run on a real tag has not happened yet. After the first release made this way, record in the checkpoint report that `gh attestation verify` succeeded.
 
 ## Why there is no .exe
 

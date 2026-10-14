@@ -1,8 +1,9 @@
 # Security Test Plan: OT Triage
 
 **Owner:** okieotsec (project lead, final approver)
-**Reviewers:** Claude Code (developer and reviewer), OpenAI Codex (independent reviewer), Google Gemini (independent reviewer)
+**Reviewers:** Claude Code (developer and reviewer), OpenAI Codex (independent reviewer), Google Gemini (independent reviewer). As of CP21 no report from an independent reviewer is archived; the planned independent review is still open.
 **Applies to:** every release checkpoint below
+**Frameworks:** the plan follows the NIST Secure Software Development Framework (SSDF, SP 800-218 version 1.1) and organises its automation along MITRE's Security Automation Framework (SAF). [docs/SECURITY_FRAMEWORKS.md](docs/SECURITY_FRAMEWORKS.md) maps each practice to its evidence and lists what is still open.
 
 ---
 
@@ -16,6 +17,8 @@ This plan defines how the application is security tested before each checkpoint 
 4. **Run the tools; don't simulate them.** Tool output must come from an actual run and be attached. If you can't run a tool, say so in the report rather than describing what it would likely find.
 5. **Don't fix while reviewing.** Report findings. Fixes are made by the developer in a separate change and re-verified (section 8).
 6. **No sensitive data.** Use only the synthetic test data in `tests/data/` and public KEV and EPSS files. Never use employer or customer data.
+7. **Record the cause.** For every confirmed finding the report says what the root cause was and what now prevents it from coming back (a test, a check, a changed rule). A fix without a stated cause is not complete.
+8. **Suppressions are reviewed.** Every in-source suppression comment (semgrep, bandit or ruff) must be in `security/suppressions.baseline.json`. A new one fails the checkpoint until someone has read it, judged that the reason is true, and accepted it (section 5).
 
 ---
 
@@ -65,7 +68,15 @@ A checkpoint is accepted only when its exit criteria (section 9) are met.
 
 ## 5. Static analysis (SAST) and supply chain
 
-Run at every checkpoint. Attach full output.
+Run at every checkpoint. Attach full output. `python tools/security_checks.py reports/<checkpoint>` runs the tools below that apply (ruff, bandit, semgrep, gitleaks), writes each tool's raw output, and prints one line per tool; a tool that cannot run is shown as NOT RUN with the reason, never skipped silently. pip-audit and osv-scanner are reported as not applicable because the application has no third-party dependency.
+
+**Pipeline parity.** CI runs ruff, bandit, semgrep and gitleaks on every push and pull request, and again every week. The same four tools therefore run by hand at a checkpoint and automatically. A tool that exists only in one of the two places is a gap to fix.
+
+**Suppression inventory (SSDF PW.7).** The runner lists every suppression comment in `suppressions.json` and compares it with `security/suppressions.baseline.json`. A suppression that is new, or used more often than the baseline allows, fails the run. After reading each one, accept them with `python tools/security_checks.py reports/<checkpoint> --accept-suppressions`, and list in the report which suppressions were added or removed and why.
+
+**Repository and pipeline checks** (`.github/workflows/security.yml`, also weekly): zizmor audits the workflows (unpinned actions, excess permissions, template injection, persisted credentials); CodeQL analyses the Python; dependency review blocks a pull request that adds a dependency with a known high-severity vulnerability; OpenSSF Scorecard measures supply-chain practice. Workflows must pass `zizmor --persona pedantic` with no findings.
+
+**Normalised results (MITRE SAF, optional).** When the SAF CLI is installed (`saf`, or the `SAF_CLI` environment variable), the runner converts the SARIF output of each tool to the Heimdall Data Format under `hdf/`, applies `saf validate threshold -I "{failed.total.max: 0}"`, and archives `saf-summary.txt`. Results that are suppressed in the source are removed first, because the inventory above accounts for them. Without the CLI the step is reported as NOT RUN. It is not part of the release gate, so nothing needs Node to build or contribute.
 
 **Code analysis**
 - `bandit -r <src> -f json -o reports/bandit.json`
@@ -136,7 +147,7 @@ Expected result for every case: a clear error message or safe fallback, no crash
 
 **Fuzzing**
 - Property-based tests with `hypothesis` for `parse_cvss`, the batch row parser, the settings loader, and the KEV/EPSS parsers.
-- Optional: `atheris` coverage-guided fuzzing of the parsers for at least 30 minutes per parser at CP2 and CP4.
+- `atheris` coverage-guided fuzzing of the parsers (threat-data files, the scanner-import readers, the inventory and findings CSV readers) for at least 15 minutes per parser at each release checkpoint. If it is not run, the report says so under "Tools not run" with the reason; hypothesis and the hostile-file set do not replace it, they cover different ground.
 
 **Network testing** (CP2 and CP4)
 - Route the app through `mitmproxy` with an untrusted certificate. Expected: the update fails with a clear TLS error.
@@ -172,6 +183,9 @@ Checkpoint / commit:
 Tools run (with versions):
 Tools not run (and why):
 
+Suppressions added / removed (and why):
+SSDF practices touched (for example PW.7, RV.1):
+
 Finding <ID>
 - Title:
 - Severity:
@@ -179,6 +193,7 @@ Finding <ID>
 - Description:
 - Evidence / reproduction steps:
 - Recommended fix:
+- Root cause and prevention: (what allowed it, and the test or check that now stops it)
 - Confidence: Confirmed / Likely / Needs verification
 ```
 
@@ -200,10 +215,15 @@ AI reviewers can produce plausible but incorrect findings. Nothing is fixed or a
 - Every Medium finding is fixed or has a documented acceptance.
 - The full test suite, including the malicious file set, passes.
 - SBOM generated and diffed against the previous checkpoint.
+- Suppression inventory matches the reviewed baseline, with any change explained in the report.
+- The CI workflows (tests, lint, security) pass on the commit being accepted.
+- `docs/SECURITY_FRAMEWORKS.md` is updated if the checkpoint changed a practice's status.
 
 **Release (CP4) additionally requires**
 - No known vulnerabilities in dependencies, or each one documented as not reachable.
 - Final SBOM (`sbom/sbom.cdx.json`) committed and attached to the release.
-- `SECURITY.md` published with: how to report a vulnerability, supported versions, what data the app downloads and from where, and that it runs fully offline apart from user-started updates.
+- The release bundle was built by the release workflow, its build-provenance attestation verifies (`gh attestation verify <bundle> --repo okieotsec/ot-triage`), and its SHA-256 matches the bundle rebuilt locally from the tag (docs/RELEASING.md).
+- Atheris was run on the parsers, or the report records why not.
+- `SECURITY.md` published with: how to report a vulnerability and what response to expect, supported versions, what data the app downloads and from where, how to verify a release, and that it runs fully offline apart from user-started updates.
 - README links to the SBOM and summarizes the security testing performed.
 - This plan and all checkpoint reports archived in the repository.

@@ -1,0 +1,75 @@
+{
+  "platform": {
+    "name": "Heimdall Tools",
+    "release": "2.14.0",
+    "target_id": "Static Analysis Results Interchange Format"
+  },
+  "version": "2.14.0",
+  "statistics": {},
+  "profiles": [
+    {
+      "name": "SARIF",
+      "version": "2.1.0",
+      "title": "Static Analysis Results Interchange Format",
+      "supports": [],
+      "attributes": [],
+      "groups": [],
+      "status": "loaded",
+      "controls": [],
+      "sha256": "d65847af6d3dc72272d8cdf0b3c4b2bb3fbe6d79dd4b0ebdb2d18e4905a33e4a"
+    }
+  ],
+  "passthrough": {
+    "auxiliary_data": [
+      {
+        "name": "SARIF",
+        "data": {
+          "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+          "runs": [
+            {
+              "invocations": [
+                {
+                  "executionSuccessful": true,
+                  "toolExecutionNotifications": []
+                }
+              ],
+              "tool": {
+                "driver": {
+                  "name": "Semgrep OSS",
+                  "rules": [
+                    {
+                      "defaultConfiguration": {
+                        "level": "error"
+                      },
+                      "fullDescription": {
+                        "text": "The Python documentation recommends using `defusedxml` instead of `xml` because the native Python `xml` library is vulnerable to XML External Entity (XXE) attacks. These attacks can leak confidential data and \"XML bombs\" can cause denial of service."
+                      },
+                      "helpUri": "https://semgrep.dev/r/python.lang.security.use-defused-xml.use-defused-xml",
+                      "id": "python.lang.security.use-defused-xml.use-defused-xml",
+                      "name": "python.lang.security.use-defused-xml.use-defused-xml",
+                      "properties": {
+                        "precision": "very-high",
+                        "tags": [
+                          "CWE-611: Improper Restriction of XML External Entity Reference",
+                          "LOW CONFIDENCE",
+                          "OWASP-A02:2025 - Security Misconfiguration",
+                          "OWASP-A04:2017 - XML External Entities (XXE)",
+                          "OWASP-A05:2021 - Security Misconfiguration",
+                          "security"
+                        ]
+                      },
+                      "shortDescription": {
+                        "text": "Semgrep Finding: python.lang.security.use-defused-xml.use-defused-xml"
+                      }
+                    }
+                  ],
+                  "semanticVersion": "1.180.0"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

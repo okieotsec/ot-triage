@@ -1,0 +1,9 @@
+Security checks written to reports/cp21-security-framework
+  ruff            0 findings
+  bandit          0 findings
+  semgrep         0 findings
+  gitleaks        0 findings
+  pip-audit       0 findings  (n/a: no third-party dependency)
+  osv-scanner     0 findings  (n/a: no third-party dependency)
+  suppressions    0 findings  (50 suppression(s), all in the accepted baseline)
+  saf (optional)  0 findings  (semgrep: 1 suppressed result(s) left out (listed in suppressions.json))

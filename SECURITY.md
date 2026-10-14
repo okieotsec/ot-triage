@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
-| 0.4.x | Yes (current release candidate and its fixes) |
+| 0.8.x | Yes (the current release and its fixes) |
 | Older | No |
 
 ## Reporting a vulnerability
@@ -14,7 +14,17 @@ Please report suspected vulnerabilities **privately**, not in a public issue.
 - Use GitHub's **Report a vulnerability** button on the repository's **Security** tab (private vulnerability reporting).
 - Include the version (shown in the About view), what you did, what you expected, and what happened. A sample input file that triggers the problem is the most useful thing you can send. Use synthetic data only; never send real vulnerability inventories.
 
-This is a small project maintained on a best-effort basis. Reports are read as soon as practical, confirmed by reproducing them, and fixed in the supported version. See [SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md) section 8 for how findings are triaged.
+This is a small project maintained by one person on a best-effort basis. These are targets, not guarantees:
+
+| Step | Target |
+| --- | --- |
+| Acknowledge your report | within 7 days |
+| Confirm it by reproducing it, and tell you whether it is accepted | within 14 days |
+| Fix a Critical or High issue in the supported version | within 30 days of confirmation |
+| Fix a Medium issue | within 90 days of confirmation |
+| Lower-severity issues | in a later release, or documented as accepted with the reason |
+
+Severity follows the rubric in [SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md) section 7, and section 8 describes how findings are triaged: a finding is fixed or accepted only after it has been reproduced. When a fix is released, the report is published as a GitHub security advisory and you are credited if you wish. There is no bug bounty.
 
 ## What the application connects to
 
@@ -56,6 +66,16 @@ The application works **fully offline**. It connects to the internet only when y
 - CVSS 2 vectors are not supported, and only base scores are calculated (see [docs/CVSS.md](docs/CVSS.md)).
 - The CISA ICS advisories archive is trusted on HTTPS to GitHub only. CISA signs each advisory file with PGP, but the archive as a whole is not signed and the Python standard library cannot check PGP signatures, so the tool treats the content as untrusted and validates it (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md)).
 
+## Verifying a download
+
+Each release has three attached files: the bundle (`ot-triage-<version>.zip`), its SHA-256 checksum and the SBOM.
+
+- **Checksum:** `sha256sum -c ot-triage-<version>.zip.sha256` (on Windows: `certutil -hashfile ot-triage-<version>.zip SHA256`). This shows the file was not damaged in transit.
+- **Provenance (releases made after the release workflow was added):** `gh attestation verify ot-triage-<version>.zip --repo okieotsec/ot-triage`. This shows the file was built from the repository's tag by its release workflow on GitHub's runners, using a signed attestation. Earlier releases have the checksum only.
+- **Rebuild it yourself:** check out the tag and run `python3 tools/make_bundle.py`; the same files give the same bytes ([docs/RELEASING.md](docs/RELEASING.md)).
+
 ## How the application is tested
 
-Security testing follows [SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md) and is archived under [reports/](reports/): static analysis (bandit, semgrep, ruff), secret scanning (gitleaks), dependency scanning (pip-audit, osv-scanner), a software bill of materials ([sbom/sbom.cdx.json](sbom/sbom.cdx.json)), hostile-input and fuzz tests, and tests against a local TLS server. The application uses only the Python standard library, so it has no third-party runtime dependencies.
+Security testing follows [SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md) and is archived under [reports/](reports/): static analysis (bandit, semgrep, ruff, CodeQL), secret scanning (gitleaks), a review of every in-source suppression, an audit of the build workflows (zizmor), a software bill of materials ([sbom/sbom.cdx.json](sbom/sbom.cdx.json)), hostile-input and fuzz tests, and tests against a local TLS server. The same checks run in continuous integration and again every week. The application uses only the Python standard library, so it has no third-party runtime dependencies to scan.
+
+The practices are mapped to the NIST Secure Software Development Framework and MITRE's Security Automation Framework in [docs/SECURITY_FRAMEWORKS.md](docs/SECURITY_FRAMEWORKS.md), including what is not yet done. That page is the developer's own assessment, not an audit or a certification. No independent security review has been done yet.
