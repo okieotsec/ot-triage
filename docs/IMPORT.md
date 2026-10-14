@@ -10,7 +10,17 @@ python3 ot_triage_import.py nessus.csv openvas.csv -o findings.csv --inventory-o
 python3 ot_triage_import.py scan.csv -o findings.csv -i inventory.csv --inventory-out inventory.new.csv --aliases aliases.csv
 ```
 
-A scanner export cannot be opened directly in the Batch view (Open CSV) or as an inventory: they read OT Triage's own files, and say so with this command in the message. Convert first, then open `findings.csv` and load the `inventory.csv` it wrote (fill in each new asset's criticality and exposure; see below).
+## In the application
+
+In the **Batch** view, **Import scan…** does the same without the command line:
+
+1. Choose one or more scanner exports.
+2. A preview shows what will be imported, what was skipped and why, and any note about a format that is still experimental. Here you can choose a threat level for findings with no CVE (the default is to leave it empty), an **aliases file** and your **existing inventory** (which is extended in a copy and never changed). The summary updates as you change them.
+3. **Save and open…** asks where to save the findings and the inventory, writes them, and opens them in the view.
+
+The import never overwrites a file it reads from (an export, the aliases file, your inventory) and never saves the findings and the inventory under the same name. The new assets have empty criticality, exposure and controls, because no scanner knows them: fill them in (a spreadsheet will do) and press **Load inventory…** again, and until then their findings show as not scored.
+
+Opening a scanner export with **Open CSV…** or **Load inventory…** does not work (those read OT Triage's own files) and says so, with the import command, in the message.
 
 Try it on the five files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv
 sample_scan.nessus sample_scan_nozomi.json sample_scan_dragos.json -o findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).

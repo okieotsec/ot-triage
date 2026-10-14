@@ -7,8 +7,10 @@ from tkinter import ttk
 import batch
 import compare
 import explain
+import gui_import
 import inventory
 import rollup
+import scanimport
 import threatdata
 from gui_round import recolor_corners, round_corners
 from gui_theme import PRIORITY_SYMBOLS
@@ -71,6 +73,16 @@ def _text(item):
     return f"{item.id} {item.name} {item.cve} {item.asset_id} {item.error} {item.threat_sources}".lower()
 
 
+def _same_file(first, second):
+    """True if two paths name the same file (an existing one, or the same path for one not written yet)."""
+    try:
+        if os.path.exists(first) and os.path.exists(second):
+            return os.path.samefile(first, second)
+    except OSError:
+        return False
+    return os.path.normcase(os.path.abspath(first)) == os.path.normcase(os.path.abspath(second))
+
+
 class BatchView:
     """Builds and updates the Batch screen."""
 
@@ -102,6 +114,8 @@ class BatchView:
         bar.pack(fill=tk.X)
         self.open_button = button(bar, s, "Open CSV…", self.open_file)
         self.open_button.pack(side=tk.LEFT)
+        self.import_button = button(bar, s, "Import scan\u2026", self.import_scanner, "secondary")
+        self.import_button.pack(side=tk.LEFT, padx=(8, 0))
         self.file_label = tk.Label(bar, text="No file loaded", font=s.font(9), bg=t.bg, fg=t.muted, anchor="w")
         self.export_button = button(bar, s, "Export ranked CSV", self.export_current, "secondary")
         self.export_button.pack(side=tk.RIGHT)
@@ -252,6 +266,92 @@ class BatchView:
         path = self.ctx.open_file("Select an asset inventory CSV", [("CSV files", "*.csv"), ("All files", "*.*")])
         if path:
             self._run(self.state.path or None, inventory_path=path)
+
+    # ---- importing scanner exports ----
+    def import_scanner(self):
+        """Ask for scanner export files, read them in the background, then show what would be imported."""
+        paths = self.ctx.open_files("Select scanner exports (Nessus, Tenable, OpenVAS, Nozomi, Dragos)",
+                                    gui_import.EXPORT_TYPES)
+        if not paths:
+            return
+
+        def job(_cancel, report):
+            report("Reading the scanner export...")
+            return scanimport.read_exports(paths)
+
+        def done(result, error):
+            self._import_read(paths, result, error)
+
+        if not self.ctx.worker.start(job, done, self._progress):
+            self.ctx.info("Batch import", "Another task is still running. Wait for it to finish or cancel it.")
+            return
+        self._busy(True)
+
+    def _busy(self, working):
+        """Show or hide the progress row and the buttons that must not be pressed meanwhile."""
+        if not self.frame.winfo_exists():
+            return
+        if working:
+            for control in (self.open_button, self.import_button, self.inventory_button, self.inventory_clear_button):
+                set_enabled(control, False)
+            self.progress_row.pack(fill=tk.X, pady=(8, 0), after=self.toolbar)
+            self.progress_bar.start(12)
+        else:
+            self.progress_bar.stop()
+            self.progress_row.pack_forget()
+            set_enabled(self.open_button, True)
+            set_enabled(self.import_button, True)
+            set_enabled(self.inventory_button, True)
+            self._update_inventory_label()
+
+    def _import_read(self, paths, raw, error):
+        self._busy(False)
+        if self.ctx.worker.cancel_event.is_set():
+            return
+        if error:
+            self.ctx.error("Scanner import", error)
+            return
+        choice = gui_import.ask_import(self.frame, self.style, raw, self.ctx.open_file)
+        if choice is not None:
+            self._save_import(paths, choice)
+
+    def _save_import(self, paths, choice):
+        """Ask where to save the findings (and the inventory), write them, and open them in this view."""
+        result, ctx = choice.result, self.ctx
+        types = [("CSV files", "*.csv"), ("All files", "*.*")]
+        findings_path = ctx.save_file("Save the imported findings", "findings.csv", types)
+        if not findings_path:
+            return
+        inventory_path = ""
+        if result.assets:
+            inventory_path = ctx.save_file("Save the asset inventory (its new assets need their criticality and "
+                                           "exposure filled in)", "inventory.csv", types)
+        inputs = [p for p in (*paths, choice.aliases, choice.existing_inventory) if p]
+        outputs = [p for p in (findings_path, inventory_path) if p]
+        clash = any(_same_file(out, other) for out in outputs for other in inputs)
+        if clash or (inventory_path and _same_file(findings_path, inventory_path)):
+            ctx.error("Scanner import", "That would replace a file the import reads from (or the other file being "
+                                        "saved). Your exports, aliases and inventory are never overwritten: choose "
+                                        "another name.")
+            return
+        new = 0
+        try:
+            scanimport.write_atomically(findings_path, lambda p: scanimport.write_findings(p, result))
+            if inventory_path:
+                counts = []
+                scanimport.write_atomically(inventory_path, lambda p: counts.append(
+                    scanimport.write_inventory(p, result, choice.existing_inventory or None)))
+                new = counts[0][0]
+        except (OSError, ValueError) as error:
+            ctx.error("Scanner import", str(getattr(error, "strerror", None) or error))
+            return
+        if new:
+            ctx.info("Scanner import", f"Saved {len(result.findings):,} findings and an inventory with {new:,} new "
+                                       f"asset{'s' if new != 1 else ''}.\n\nNo scanner knows an asset's criticality, "
+                                       "exposure or controls, so those columns are empty for the new assets: open the "
+                                       "inventory in a spreadsheet, fill them in, then press Load inventory\u2026 "
+                                       "again to rank the findings. Until then they show as not scored.")
+        self._run(findings_path, inventory_path=inventory_path or None)
 
     def clear_inventory(self):
         """Stop using the inventory and score the open findings file again without it."""
@@ -485,7 +585,8 @@ class BatchView:
     def _clear_details(self):
         self.detail_title.configure(text="Select a row to see why." if self.state.items else
                                     "Open a CSV file to score it. Required columns: cvss (or cvss_vector), asset, "
-                                    "exposure (or asset_id with an inventory), and threat (or cve).")
+                                    "exposure (or asset_id with an inventory), and threat (or cve). A scanner "
+                                    "export (Nessus, Tenable, OpenVAS, Nozomi, Dragos): use Import scan\u2026")
         self.detail_chips.set_items([])
         self.detail_text.configure(text="")
         self._show_references(())

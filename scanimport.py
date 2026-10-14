@@ -11,10 +11,12 @@ What is read, and what is left alone, follows docs/SCANNER_IMPORT.md:
 * a finding the export does not score stays in the file with an empty score, so OT Triage shows it as not scored;
 * criticality, exposure and controls are never invented: a scanner does not know them.
 """
+import copy
 import csv
 import json
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from typing import ClassVar
 from xml.parsers import expat  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (DTDs are refused)
@@ -697,6 +699,9 @@ def merge(result, aliases=None, default_threat=""):
     A finding is the same when it has the same asset and CVE (or, with no CVE, the same asset and title). The highest
     score is kept, a patch status is kept if any report has one, and every source tool is listed.
     """
+    if default_threat and default_threat not in THREAT_LEVELS:
+        raise ScanImportError(f"default threat must be one of: {', '.join(THREAT_LEVELS)}")
+    result = copy.deepcopy(result)          # the same reading can be merged again with other options
     aliases = aliases or {}
     resolved_assets, merged = {}, {}
     for finding in result.findings:
@@ -740,10 +745,8 @@ def merge(result, aliases=None, default_threat=""):
     return result
 
 
-def import_exports(paths, aliases=None, min_qod=DEFAULT_MIN_QOD, default_threat=""):
-    """Read and merge several exports. Raises ScanImportError for a file that cannot be used."""
-    if default_threat and default_threat not in THREAT_LEVELS:
-        raise ScanImportError(f"default threat must be one of: {', '.join(THREAT_LEVELS)}")
+def read_exports(paths, min_qod=DEFAULT_MIN_QOD):
+    """Read several exports into one ImportResult that is not merged yet (see merge). Raises ScanImportError."""
     result = ImportResult()
     for path in paths:
         findings, assets, report = read_export(path, min_qod)
@@ -753,10 +756,31 @@ def import_exports(paths, aliases=None, min_qod=DEFAULT_MIN_QOD, default_threat=
         for key, asset in assets.items():
             known = result.assets.setdefault(key, asset)
             known.name = known.name or asset.name
-    return merge(result, aliases, default_threat)
+    return result
+
+
+def import_exports(paths, aliases=None, min_qod=DEFAULT_MIN_QOD, default_threat=""):
+    """Read and merge several exports. Raises ScanImportError for a file that cannot be used."""
+    return merge(read_exports(paths, min_qod), aliases, default_threat)
 
 
 # ---- writing ---------------------------------------------------------------------
+
+def write_atomically(path, write):
+    """Run write(temporary_path) and move the result into place, so a failure never leaves a half-written file."""
+    directory = os.path.dirname(os.path.abspath(path))
+    fd, temp = tempfile.mkstemp(dir=directory, prefix=".ot-triage-", suffix=".part")
+    os.close(fd)
+    try:
+        write(temp)
+        os.replace(temp, path)
+    except BaseException:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        raise
+
 
 def _safe(text):
     text = str(text)
@@ -869,4 +893,5 @@ def summary_lines(result, min_qod=DEFAULT_MIN_QOD):
     if result.need_threat:
         lines.append(f"{_n(result.need_threat, 'finding has', 'findings have')} no CVE, so a threat level is needed: "
                      "add a threat column or import with --default-threat")
-    return lines
+    # file names come from the person's disk: whatever shows them (a window or a terminal) gets clean text
+    return [" " * (len(line) - len(line.lstrip())) + clean(line) for line in lines]

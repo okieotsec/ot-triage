@@ -11,10 +11,12 @@ from unittest import mock
 import batch
 import compare
 import gui_batch
+import gui_import
 import gui_widgets
 import icsadvisories
 import inventory
 import rollup
+import scanimport
 import threatdata as td
 from gui_context import Context
 from gui_testing import DisplayTestCase
@@ -1411,6 +1413,308 @@ class BatchVersionTests(BatchViewTestCase):
                           rows["PLC-1"]["newest_possible_advisory"]), ("V2.9.4", "1", "ICSA-26-001-01"))
         self.assertEqual((rows["PLC-2"]["version"], rows["PLC-2"]["listing_your_version"]), ("banana", ""))
         self.assertEqual((rows["PLC-3"]["version"], rows["PLC-3"]["listing_your_version"]), ("", ""))
+
+
+SCAN_DIR = Path(__file__).parent / "samples" / "scanners"
+NESSUS_SCAN = str(Path(__file__).parent / "sample_scan_nessus.csv")
+NOZOMI_SCAN = str(Path(__file__).parent / "sample_scan_nozomi.json")
+
+
+class BatchImportTests(BatchViewTestCase):
+    """The Import scan button: read an export, preview it, save the findings and inventory, open them."""
+
+    def setUp(self):
+        super().setUp()
+        self.ctx.open_files = mock.Mock(return_value=())
+        self.ctx.open_file = mock.Mock(return_value="")
+        self.ctx.save_file = mock.Mock(return_value="")
+        self.callback_errors = []          # an exception inside a window callback is logged by Tk, never raised
+        self.root.report_callback_exception = lambda *details: self.callback_errors.append(details)
+
+    def choice(self, paths, aliases="", inventory_path="", threat=""):
+        merged = scanimport.import_exports(
+            paths, scanimport.load_aliases(aliases) if aliases else None, default_threat=threat
+        )
+        return gui_import.ImportChoice(merged, inventory_path, aliases, threat)
+
+    def run_import(self, paths, choice, findings=None, inv=None):
+        view = self.view or self.build()
+        self.ctx.open_files.return_value = tuple(paths)
+        self.ctx.save_file.side_effect = [str(p) if p else "" for p in (findings, inv)]
+        with mock.patch("gui_import.ask_import", return_value=choice) as ask:
+            view.import_scanner()
+            self.assertTrue(
+                self.pump(10, until=lambda: not self.ctx.worker.running and (ask.called or self.ctx.error.called))
+            )
+            self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+            self.pump(0.3)
+        self.assertEqual(self.callback_errors, [])
+        return view, ask
+
+    def test_the_button_is_there_and_cancelling_the_file_dialog_does_nothing(self):
+        view = self.build()
+        self.assertEqual(view.import_button.cget("text"), "Import scan\u2026")
+        with mock.patch.object(self.ctx.worker, "start") as start, mock.patch("gui_import.ask_import") as ask:
+            view.import_scanner()
+            self.pump(0.2)
+        self.ctx.open_files.assert_called_once()
+        start.assert_not_called()
+        ask.assert_not_called()
+        self.assertEqual((view.state.items, self.ctx.error.called, self.callback_errors), ([], False, []))
+
+    def test_the_buttons_are_disabled_while_the_export_is_read(self):
+        view = self.build()
+        release = threading.Event()
+        real = scanimport.read_exports
+
+        def slow(paths, *args):
+            release.wait(10)
+            return real(paths, *args)
+
+        self.ctx.open_files.return_value = (NESSUS_SCAN,)
+        reading = mock.patch("scanimport.read_exports", side_effect=slow)
+        with reading, mock.patch("gui_import.ask_import", return_value=None):
+            view.import_scanner()
+            self.pump(0.2)
+            for control in (view.import_button, view.open_button, view.inventory_button):
+                self.assertEqual(str(control.cget("state")), "disabled")
+            release.set()
+            self.assertTrue(self.pump(10, until=lambda: not self.ctx.worker.running))
+            self.pump(0.3)
+        for control in (view.import_button, view.open_button, view.inventory_button):
+            self.assertEqual(str(control.cget("state")), "normal")
+
+    def test_an_import_saves_the_findings_and_inventory_and_opens_them_in_the_view(self):
+        findings, inv = self.work / "findings.csv", self.work / "inventory.csv"
+        choice = self.choice([NESSUS_SCAN])
+        view, ask = self.run_import([NESSUS_SCAN], choice, findings, inv)
+        self.assertEqual(ask.call_count, 1)
+        self.assertTrue(findings.read_text(encoding="utf-8").startswith("id,asset_id,name,cve,cvss,patch,source_tool"))
+        with open(inv, newline="", encoding="utf-8") as fh:
+            self.assertEqual(len(list(csv.DictReader(fh))), 4)
+        self.assertEqual(len(view.state.items), 6)
+        self.assertEqual(view.state.path, str(findings))
+        self.assertIsNotNone(view.state.inventory)
+        self.assertEqual(len(view.state.inventory), 4)
+        message = self.ctx.info.call_args[0][1]
+        self.assertIn("4 new assets", message)
+        self.assertIn("fill them in", message)
+
+    def test_findings_for_assets_with_no_criticality_show_as_not_scored_not_guessed(self):
+        view, _ask = self.run_import(
+            [NESSUS_SCAN], self.choice([NESSUS_SCAN]), self.work / "f.csv", self.work / "i.csv"
+        )
+        self.assertEqual(batch.summarize(view.state.items)["ERROR"], 6)
+
+    def test_a_threat_level_chosen_in_the_preview_reaches_the_findings_without_a_cve(self):
+        findings = self.work / "f.csv"
+        choice = self.choice([NESSUS_SCAN], threat="none")
+        self.run_import([NESSUS_SCAN], choice, findings, self.work / "i.csv")
+        with open(findings, newline="", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+        self.assertEqual({r["threat"] for r in rows if not r["cve"]}, {"none"})
+        self.assertEqual({r["threat"] for r in rows if r["cve"]}, {""})
+
+    def test_the_existing_inventory_is_extended_in_the_copy_and_never_changed(self):
+        existing = self.work / "mine.csv"
+        existing.write_text(
+            "asset_id,name,criticality,exposure,controls\n192.0.2.21,Historian,crown jewel,low,strong\n",
+            encoding="utf-8",
+        )
+        before = existing.read_bytes()
+        out = self.work / "inv.csv"
+        choice = self.choice([NESSUS_SCAN], inventory_path=str(existing))
+        view, _ask = self.run_import([NESSUS_SCAN], choice, self.work / "f.csv", out)
+        self.assertEqual(existing.read_bytes(), before)
+        with open(out, newline="", encoding="utf-8") as fh:
+            rows = {r["asset_id"]: r for r in csv.DictReader(fh)}
+        self.assertEqual((rows["192.0.2.21"]["name"], rows["192.0.2.21"]["criticality"]), ("Historian", "crown jewel"))
+        self.assertEqual(len(rows), 4)
+        scored = [i for i in view.state.items if i.asset_id == "192.0.2.21" and i.result]
+        self.assertTrue(scored or any("threat" in (i.error or "") for i in view.state.items))
+
+    def test_saving_over_the_aliases_file_or_the_existing_inventory_is_refused(self):
+        aliases, mine = self.work / "a.csv", self.work / "mine.csv"
+        aliases.write_text("alias,asset_id\n192.0.2.21,HIST\n", encoding="utf-8")
+        mine.write_text("asset_id,name\nHIST,Historian\n", encoding="utf-8")
+        before = (aliases.read_bytes(), mine.read_bytes())
+        cases = (("aliases", aliases, self.work / "i.csv"), ("inventory", self.work / "f.csv", mine))
+        for label, findings, inv in cases:
+            with self.subTest(label):
+                self.ctx.error.reset_mock()
+                choice = self.choice([NESSUS_SCAN], aliases=str(aliases), inventory_path=str(mine))
+                view, _ask = self.run_import([NESSUS_SCAN], choice, findings, inv)
+                self.assertIn("never overwritten", self.ctx.error.call_args[0][1])
+                self.assertEqual((aliases.read_bytes(), mine.read_bytes()), before)
+                self.assertEqual(view.state.items, [])
+        self.assertFalse((self.work / "f.csv").exists() or (self.work / "i.csv").exists())
+
+    def test_saving_over_an_input_is_refused_and_nothing_is_written(self):
+        export = self.work / "scan.csv"
+        export.write_bytes(Path(NESSUS_SCAN).read_bytes())
+        before = export.read_bytes()
+        other = self.work / "inv.csv"
+        choice = self.choice([str(export)])
+        view, _ask = self.run_import([str(export)], choice, export, other)
+        self.assertEqual(export.read_bytes(), before)
+        self.assertFalse(other.exists())
+        self.assertIn("never overwritten", self.ctx.error.call_args[0][1])
+        self.assertEqual(view.state.items, [])
+
+    def test_the_findings_and_the_inventory_cannot_be_the_same_file(self):
+        same = self.work / "same.csv"
+        view, _ask = self.run_import([NESSUS_SCAN], self.choice([NESSUS_SCAN]), same, same)
+        self.assertFalse(same.exists())
+        self.assertTrue(self.ctx.error.called)
+        self.assertEqual(view.state.items, [])
+
+    def test_cancelling_the_preview_or_a_save_dialog_changes_nothing(self):
+        view, _ask = self.run_import([NESSUS_SCAN], None, self.work / "f.csv", self.work / "i.csv")
+        self.assertEqual((view.state.items, list(self.work.glob("*.csv"))), ([], []))
+        self.ctx.save_file.assert_not_called()
+        view, _ask = self.run_import([NESSUS_SCAN], self.choice([NESSUS_SCAN]), None, None)
+        self.assertEqual((view.state.items, list(self.work.glob("*.csv"))), ([], []))
+        self.assertEqual((self.ctx.error.called, self.ctx.info.called), (False, False))
+
+    def test_cancelling_the_inventory_save_still_opens_the_findings(self):
+        findings = self.work / "f.csv"
+        view, _ask = self.run_import([NESSUS_SCAN], self.choice([NESSUS_SCAN]), findings, None)
+        self.assertEqual((len(view.state.items), view.state.inventory), (6, None))
+        self.assertTrue(findings.exists())
+        self.assertFalse((self.work / "i.csv").exists())
+
+    def test_an_export_that_cannot_be_read_gives_an_error_and_never_opens_the_preview(self):
+        bad = self.write_csv("bad.csv", "id,name\n1,2\n")
+        view, ask = self.run_import([bad], None, self.work / "f.csv", self.work / "i.csv")
+        self.assertFalse(ask.called)
+        self.assertIn("not an export this tool knows", self.ctx.error.call_args[0][1])
+        self.assertEqual(str(view.open_button.cget("state")), "normal")
+
+    def test_a_write_failure_is_reported_and_leaves_no_partial_file(self):
+        findings = self.work / "f.csv"
+        def fail_half_way(path, result):
+            Path(path).write_text("id,asset_id\npartial", encoding="utf-8")
+            raise OSError(28, "No space left on device")
+
+        with mock.patch("scanimport.write_findings", side_effect=fail_half_way):
+            view, _ask = self.run_import([NESSUS_SCAN], self.choice([NESSUS_SCAN]), findings, self.work / "i.csv")
+        self.assertIn("No space left", self.ctx.error.call_args[0][1])
+        self.assertEqual((list(self.work.glob("*.csv")), list(self.work.glob(".ot-triage-*"))), ([], []))
+        self.assertEqual(view.state.items, [])
+
+    def test_several_exports_are_read_together_and_merged(self):
+        choice = self.choice([NESSUS_SCAN, NOZOMI_SCAN])
+        view, _ask = self.run_import([NESSUS_SCAN, NOZOMI_SCAN], choice, self.work / "f.csv", self.work / "i.csv")
+        self.assertEqual(len(view.state.items), 11)
+
+    def test_the_buttons_come_back_after_an_import(self):
+        view, _ask = self.run_import(
+            [NESSUS_SCAN], self.choice([NESSUS_SCAN]), self.work / "f.csv", self.work / "i.csv"
+        )
+        for control in (view.open_button, view.import_button, view.inventory_button):
+            self.assertEqual(str(control.cget("state")), "normal")
+
+    def test_scoring_is_untouched_by_how_the_findings_arrived(self):
+        findings = self.work / "f.csv"
+        view, _ask = self.run_import([NESSUS_SCAN], self.choice([NESSUS_SCAN]), findings, self.work / "i.csv")
+        by_file = {(i.id, i.priority, i.error) for i in view.state.items}
+        again = batch.process_file(str(findings), DEFAULT_SETTINGS, None, view.state.inventory)
+        self.assertEqual({(i.id, i.priority, i.error) for i in again}, by_file)
+
+
+class ImportPreviewTests(BatchViewTestCase):
+    """The preview window itself."""
+
+    def setUp(self):
+        super().setUp()
+        self.raw = scanimport.read_exports([NESSUS_SCAN, str(SCAN_DIR / "openvas/report.csv")])
+        self.files = {}
+
+    def open_preview(self):
+        asked = []
+
+        def ask(title, types):
+            asked.append(title)
+            return self.files.get(len(asked), "")
+
+        window = gui_import.ImportPreview(self.holder, self.style, self.raw, ask)
+        self.addCleanup(lambda: window.window.winfo_exists() and window.window.destroy())
+        self.pump(0.2)
+        return window, asked
+
+    def text(self, preview):
+        return preview.summary.get("1.0", tk.END)
+
+    def test_it_summarises_what_will_be_imported_and_skipped(self):
+        preview, _asked = self.open_preview()
+        self.assertEqual(str(preview.summary.cget("state")), "disabled")
+        text = self.text(preview)
+        self.assertIn("Nessus CSV, 8 rows, 6 findings kept", text)
+        self.assertIn("skipped 2: informational (no risk)", text)
+        self.assertIn("OpenVAS / Greenbone CSV", text)
+        self.assertIn("1 finding with no CVE", preview.need.cget("text"))
+
+    def test_the_threat_choice_changes_the_result_and_the_message(self):
+        preview, _asked = self.open_preview()
+        before = preview.result.need_threat
+        self.assertGreater(before, 0)
+        preview.threat.set("none")
+        preview.refresh()
+        self.assertEqual(preview.result.need_threat, 0)
+        self.assertIn("Every finding has a CVE", preview.need.cget("text"))
+        preview.threat.set("")
+        preview.refresh()
+        self.assertEqual(preview.result.need_threat, before)
+
+    def test_choosing_an_aliases_file_merges_devices_and_a_bad_one_is_reported_not_crashed(self):
+        aliases = self.work / "a.csv"
+        aliases.write_text("alias,asset_id\n192.0.2.21,HIST\n192.0.2.22,ENG\n", encoding="utf-8")
+        self.files = {1: str(aliases)}
+        preview, asked = self.open_preview()
+        before = len(preview.result.assets)
+        preview.choose_aliases()
+        self.assertEqual(len(asked), 1)
+        self.assertIn("moved to their asset id through the aliases file", self.text(preview))
+        self.assertIn("HIST", {f.asset_id for f in preview.result.findings})
+        self.assertEqual(len(preview.result.assets), before)
+        preview.clear_aliases()
+        self.assertEqual(preview.aliases_label.cget("text"), "None")
+        bad = self.work / "bad.csv"
+        bad.write_text("from,to\nA,B\n", encoding="utf-8")
+        preview.ask_file = lambda *a: str(bad)
+        preview.choose_aliases()
+        self.assertIn("needs an alias and an asset_id column", preview.error.cget("text"))
+        self.assertIsNone(preview.result)
+        self.assertEqual(self.text(preview).strip(), "")
+        self.assertEqual(str(preview.accept_button.cget("state")), "disabled")
+        preview.accept()
+        self.assertIsNone(preview.choice)
+        self.assertTrue(preview.window.winfo_exists())
+
+    def test_accepting_returns_the_choices_and_cancelling_returns_none(self):
+        preview, _asked = self.open_preview()
+        preview.threat.set("public")
+        preview.inventory_path = "inv.csv"
+        self.root.after(50, preview.accept)
+        choice = preview.show()
+        self.assertEqual((choice.threat, choice.existing_inventory, choice.aliases), ("public", "inv.csv", ""))
+        self.assertTrue(choice.result.findings)
+        again, _asked = self.open_preview()
+        self.root.after(50, again.cancel)
+        self.assertIsNone(again.show())
+
+    def test_nothing_can_be_saved_when_nothing_is_left_to_import(self):
+        self.raw = scanimport.ImportResult()
+        preview, _asked = self.open_preview()
+        self.assertEqual(str(preview.accept_button.cget("state")), "disabled")
+        preview.accept()
+        self.assertIsNone(preview.choice)
+
+    def test_a_text_that_looks_like_markup_is_shown_as_plain_text(self):
+        self.raw.reports[0].path = "[b]<script>\x1b[31m.csv"
+        preview, _asked = self.open_preview()
+        self.assertIn("<script>", self.text(preview))
+        self.assertNotIn("\x1b", self.text(preview))
 
 
 if __name__ == "__main__":

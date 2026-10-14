@@ -54,7 +54,7 @@ threat-data update that you start yourself.
 ```
 python3 ot_triage_gui.py            # the app (Python 3.12 or newer, with Tkinter)
 python3 ot_triage_cli.py findings.csv -o ranked.csv    # the same ranking on the command line (docs/CLI.md)
-python3 ot_triage_import.py scan.csv -o findings.csv   # findings and an inventory from a Nessus, Tenable or OpenVAS export (docs/IMPORT.md)
+python3 ot_triage_import.py scan.csv -o findings.csv   # findings and an inventory from a scanner export (docs/IMPORT.md); Batch has Import scan... too
 python3 tools/headless_tests.py     # the tests, on an invisible display (no windows open on your screen)
 python3 -m unittest                 # the tests, the plain way (GUI tests open real windows)
 ```
@@ -71,7 +71,7 @@ Each [release](https://github.com/okieotsec/ot-triage/releases) has a portable b
 | View | What it does |
 | --- | --- |
 | **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV, EPSS and CISA ICS advisory data to fill in the threat level. Shows the bucket, why-chips, the recommended action, the reference links CISA lists for a KEV entry, the ICS advisories that name the CVE with what each vendor says to do about it, and what single change would move the result. |
-| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. **By asset** groups the findings by `asset_id`: the worst bucket on each asset, how many NOW, NEXT and NEVER findings it has, and what could be handled on one outage window. **Compare with previous…** reads an earlier ranked export and shows what is new, what moved up or down and what was resolved since. |
+| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. **By asset** groups the findings by `asset_id`: the worst bucket on each asset, how many NOW, NEXT and NEVER findings it has, and what could be handled on one outage window. **Compare with previous…** reads an earlier ranked export and shows what is new, what moved up or down and what was resolved since. **Import scan…** turns a Nessus, Tenable, OpenVAS, Nozomi or Dragos export into findings and an inventory, with a preview of what is imported and skipped. |
 | **Threat data** | See how fresh the KEV, EPSS and ICS advisory data is. Update it (after a confirmation) or import files for offline use. |
 | **Settings** | Change the four scoring settings with live validation, and choose the theme and text size. |
 | **About** | Version, the exposure definition, where the categories come from, and the documentation. |
@@ -176,8 +176,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP18 | Scanner import, phase 1: Nessus, Tenable and OpenVAS CSV | [reports/cp18-scanner-import-phase1](reports/cp18-scanner-import-phase1/claude.md) |
 | CP19 | Scanner import: Nessus `.nessus` XML | [reports/cp19-nessus-xml](reports/cp19-nessus-xml/claude.md) |
 | CP20 | Scanner import: Nozomi and Dragos exports | [reports/cp20-nozomi-dragos](reports/cp20-nozomi-dragos/claude.md) |
+| CP22 | Scanner import: the Import scan button in Batch | [reports/cp22-import-gui](reports/cp22-import-gui/claude.md) |
 
-Across the checkpoints 40 findings were recorded (3 Medium, 13 Low, 24 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 41 findings were recorded (3 Medium, 13 Low, 25 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 
