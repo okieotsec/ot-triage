@@ -1,0 +1,245 @@
+{
+  "content": [
+    {
+      "host": {
+        "id": "as-3001",
+        "name": "CC-PLC-12",
+        "hostname": [
+          "cc-plc-12.example.com"
+        ],
+        "ip": [
+          "192.0.2.12"
+        ],
+        "mac": [
+          "00:00:5e:00:53:01"
+        ],
+        "vendor": "Siemens",
+        "type": "PLC",
+        "is_ot": true,
+        "zone": {
+          "id": "z-capper",
+          "name": "Capper cell"
+        },
+        "hardware": {
+          "model": "S7-1500",
+          "firmware_version": "V2.8.1"
+        },
+        "pera_level": 1
+      },
+      "vulnerability": {
+        "id": "vd-as-3001",
+        "report_id": "DRA-2026-01",
+        "reference": "CVE-2023-28831",
+        "enumeration": "CVE-2023-28831",
+        "title": "Flaw in the CPU firmware (illustrative title)",
+        "severity": 3,
+        "state": "open",
+        "mitigations": [
+          "Restrict access to the engineering workstation",
+          "Update the firmware to V2.9.7 or later"
+        ],
+        "intel": {
+          "active_exploit": false,
+          "poc_exists": true,
+          "remotely_exploitable": true
+        },
+        "score": {
+          "base": 7.5,
+          "version": "3.1"
+        },
+        "dragos_score": 6.1
+      }
+    },
+    {
+      "host": {
+        "id": "as-3002",
+        "name": "CC-RTU-22",
+        "hostname": [
+          "cc-rtu-22.example.com"
+        ],
+        "ip": [
+          "192.0.2.22"
+        ],
+        "mac": [
+          "00:00:5e:00:53:02"
+        ],
+        "vendor": "Hitachi Energy",
+        "type": "RTU",
+        "is_ot": true,
+        "zone": {
+          "id": "z-tank",
+          "name": "Tank farm"
+        },
+        "hardware": {
+          "model": "RTU500",
+          "firmware_version": "13.2.3"
+        },
+        "pera_level": 0
+      },
+      "vulnerability": {
+        "id": "vd-as-3002",
+        "report_id": "DRA-2026-02",
+        "reference": "CVE-2024-2617",
+        "enumeration": "CVE-2024-2617",
+        "title": "Flaw in the RTU500 CMU firmware (illustrative title)",
+        "severity": 3,
+        "state": "open",
+        "mitigations": [
+          "Update the CMU firmware to 13.2.7"
+        ],
+        "intel": {
+          "active_exploit": false,
+          "poc_exists": false,
+          "remotely_exploitable": true
+        },
+        "score": {
+          "base": 7.2,
+          "version": "3.1"
+        },
+        "dragos_score": 5.4
+      }
+    },
+    {
+      "host": {
+        "id": "as-3003",
+        "name": "CC-HMI-23",
+        "hostname": [
+          "cc-hmi-23.example.com"
+        ],
+        "ip": [
+          "192.0.2.23"
+        ],
+        "mac": [
+          "00:00:5e:00:53:03"
+        ],
+        "vendor": "Advantech",
+        "type": "HMI",
+        "is_ot": true,
+        "zone": {
+          "id": "z-line",
+          "name": "Line 1"
+        },
+        "hardware": {
+          "model": "WebAccess/HMI",
+          "firmware_version": "8.4.5"
+        }
+      },
+      "vulnerability": {
+        "id": "vd-as-3003",
+        "report_id": "DRA-2026-03",
+        "reference": "CVE-2016-0854",
+        "enumeration": "CVE-2016-0854",
+        "title": "Flaw in the SCADA server (illustrative title)",
+        "severity": 5,
+        "state": "open",
+        "mitigations": [
+          "Isolate the server from the corporate network"
+        ],
+        "intel": {
+          "active_exploit": true,
+          "poc_exists": true,
+          "remotely_exploitable": true
+        },
+        "dragos_score": 8.5
+      }
+    },
+    {
+      "host": {
+        "id": "as-3004",
+        "name": "CC-GW-32",
+        "hostname": [
+          "cc-gw-32.example.com"
+        ],
+        "ip": [
+          "192.0.2.32",
+          "192.0.2.33"
+        ],
+        "mac": [
+          "00:00:5e:00:53:04"
+        ],
+        "vendor": "Moxa",
+        "type": "Serial gateway",
+        "is_ot": true,
+        "zone": {
+          "id": "z-filler",
+          "name": "Filler cell"
+        },
+        "hardware": {
+          "model": "NPort 5110",
+          "firmware_version": "2.7"
+        },
+        "pera_level": 1
+      },
+      "vulnerability": {
+        "id": "vd-as-3004",
+        "report_id": "DRA-2026-04",
+        "reference": "CVE-2016-9361",
+        "enumeration": "CVE-2016-9361",
+        "title": "Flaw in the web interface (illustrative title)",
+        "severity": 4,
+        "state": "resolved",
+        "mitigations": [
+          "Upgrade to 2.7"
+        ],
+        "intel": {
+          "active_exploit": false,
+          "poc_exists": false,
+          "remotely_exploitable": true
+        },
+        "score": {
+          "base": 9.8,
+          "version": "3.1"
+        },
+        "dragos_score": 7.2
+      }
+    },
+    {
+      "host": {
+        "id": "as-3005",
+        "name": "CC-ENG-24",
+        "hostname": [
+          "cc-eng-24.example.com"
+        ],
+        "ip": [
+          "192.0.2.24"
+        ],
+        "mac": [
+          "00:00:5e:00:53:05"
+        ],
+        "vendor": "Microsoft",
+        "type": "Workstation",
+        "is_ot": false,
+        "zone": {
+          "id": "z-control",
+          "name": "Control room"
+        },
+        "hardware": {
+          "model": "Windows 10",
+          "firmware_version": "21H2"
+        },
+        "pera_level": 2
+      },
+      "vulnerability": {
+        "id": "vd-as-3005",
+        "report_id": "DRA-2026-05",
+        "reference": "",
+        "enumeration": "",
+        "title": "Legacy SMBv1 enabled",
+        "severity": 2,
+        "state": "open",
+        "mitigations": [
+          "Disable SMBv1"
+        ],
+        "intel": {
+          "active_exploit": false,
+          "poc_exists": false,
+          "remotely_exploitable": false
+        }
+      }
+    }
+  ],
+  "pageSize": 100,
+  "pageNumber": 0,
+  "totalCount": 5,
+  "totalPages": 1
+}

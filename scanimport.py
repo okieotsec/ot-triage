@@ -12,6 +12,7 @@ What is read, and what is left alone, follows docs/SCANNER_IMPORT.md:
 * criticality, exposure and controls are never invented: a scanner does not know them.
 """
 import csv
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from typing import ClassVar
 from xml.parsers import expat  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (DTDs are refused)
 
 import inventory
+import threatdata
 from references import clean
 
 MAX_FILE_BYTES = 200 * 1024 * 1024
@@ -41,11 +43,19 @@ _FORMULA_START = "=+-@\t\r"
 MAX_XML_DEPTH = 24
 MAX_XML_TEXT_CHARS = 2_000            # text kept from one XML element that is read at all (the rest is thrown away)
 XML_CHUNK_BYTES = 1024 * 1024
+MAX_JSON_BYTES = 100 * 1024 * 1024    # a JSON file is read whole, so it is held to a smaller limit than a streamed one
 
 NESSUS, TENABLE_VM, OPENVAS, NESSUS_XML = "nessus", "tenable-vm", "openvas", "nessus-xml"
+NOZOMI, DRAGOS = "nozomi", "dragos"
+EXPERIMENTAL = frozenset({NOZOMI, DRAGOS})
+EXPERIMENTAL_NOTE = "read from a public description of this format and not yet checked against a real export"
+JSON_LISTS = ("result", "results", "content", "detections", "data", "items")
+_TRUE = frozenset({"true", "1", "yes", "y"})
+_CLOSED = frozenset({"resolved", "closed", "fixed", "remediated"})
 ID_PREFIX = {NESSUS: "nessus", TENABLE_VM: "tenable"}      # finding ids start with the tool, then plugin, asset, CVE
 FORMAT_NAMES = {NESSUS: "Nessus CSV", TENABLE_VM: "Tenable Vulnerability Management CSV",
-                OPENVAS: "OpenVAS / Greenbone CSV", NESSUS_XML: "Nessus .nessus (v2 XML)"}
+                OPENVAS: "OpenVAS / Greenbone CSV", NESSUS_XML: "Nessus .nessus (v2 XML)",
+                NOZOMI: "Nozomi node_cves (experimental)", DRAGOS: "Dragos detections (experimental)"}
 
 
 class ScanImportError(ValueError):
@@ -86,6 +96,7 @@ class FileReport:
     rows: int = 0
     kept: int = 0
     skipped: dict = field(default_factory=dict)       # reason -> how many
+    note: str = ""                                    # something to tell the person about how the file was read
 
     def skip(self, reason):
         self.skipped[reason] = self.skipped.get(reason, 0) + 1
@@ -198,6 +209,9 @@ def detect_format(header):
         return TENABLE_VM
     if "plugin id" in names and "host" in names:
         return NESSUS
+    labels = {"node label", "assets name", "asset id", "node id"}
+    if "cve" in names and ("cve score" in names or "score" in names) and names & labels:
+        return NOZOMI
     return None
 
 
@@ -213,6 +227,10 @@ def scanner_hint(header):
     Returns an empty string when the header is not one of the exports this module reads.
     """
     first = str(header[0]).lstrip("\ufeff \t").lower() if header else ""
+    if first[:1] in ("{", "["):
+        return ("This is a JSON file. OT Triage reads CSV; if it is a Nozomi or Dragos export, convert it with python3 "
+                "ot_triage_import.py EXPORT -o findings.csv --inventory-out inventory.csv (see docs/IMPORT.md), then "
+                "open findings.csv here and load the inventory it wrote.")
     source = NESSUS_XML if first.startswith(("<?xml", "<nessusclientdata")) else detect_format(header)
     if source is None:
         return ""
@@ -419,6 +437,164 @@ class _NessusXml:
             known.name = known.name or (name if name.lower() != asset.lower() else "")
 
 
+def _text(value):
+    """A value from a JSON record as text: numbers and booleans are written out, anything nested or missing is empty."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return value if isinstance(value, str) else ""
+
+
+def _load_json(path):
+    """Read a JSON file (size-limited; duplicate keys and NaN are refused); return the record list inside it."""
+    name = os.path.basename(path)
+    try:
+        if os.path.getsize(path) > MAX_JSON_BYTES:
+            raise ScanImportError(f"{name} is larger than {MAX_JSON_BYTES // (1024 * 1024)} MB (a JSON export is read "
+                                  "whole: export it in smaller pieces)")
+        with open(path, "rb") as fh:
+            raw = fh.read()
+        doc = json.loads(raw.decode("utf-8-sig"), parse_constant=threatdata._reject_constant,
+                         object_pairs_hook=threatdata._reject_duplicates)
+    except ScanImportError:
+        raise
+    except OSError as error:
+        raise ScanImportError(f"{name} could not be read ({error.strerror or error})") from None
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        raise ScanImportError(f"{name} is not a valid JSON file") from None
+    if isinstance(doc, dict):
+        for key in JSON_LISTS:
+            if isinstance(doc.get(key), list):
+                return doc[key]
+        raise ScanImportError(f"{name} has no list of records (looked for: {', '.join(JSON_LISTS)})")
+    if isinstance(doc, list):
+        return doc
+    raise ScanImportError(f"{name} is not a list of records")
+
+
+def detect_json(records):
+    """Name the JSON export a list of records belongs to, or None."""
+    for record in records[:20]:
+        if not isinstance(record, dict):
+            continue
+        if isinstance(record.get("host"), dict) and isinstance(record.get("vulnerability"), dict):
+            return DRAGOS
+        if "cve" in record and ("node_label" in record or "asset_id" in record or "node_id" in record):
+            return NOZOMI
+    return None
+
+
+def _nozomi_finding(record, report, assets):
+    """One Nozomi node_cves record (from JSON or from a CSV row, with keys as in Nozomi's data model)."""
+    def get(*names):
+        for name in names:
+            value = _text(record.get(name, "")).strip()
+            if value:
+                return value
+        return ""
+
+    if get("resolved").lower() in _TRUE:
+        report.skip("already resolved")
+        return None
+    cves = _cves(get("cve"))
+    if len(cves) != 1:
+        report.skip("no CVE")
+        return None
+    asset = _cell(get("node_label", "assets_name", "asset_id", "node_id"), MAX_ASSET_CHARS)
+    if not asset:
+        report.skip("no node label or asset id")
+        return None
+    cve = cves[0]
+    title = _cell(get("cve_summary"), MAX_NAME_CHARS) or f"{cve} on {asset}"
+    patch = "available" if get("latest_hotfix", "minimum_hotfix") else ""
+    ident = f"nozomi:{_cell(get('id'), 80) or cve + ':' + asset}"[:MAX_ID_CHARS]
+    known = assets.setdefault(asset.lower(), Asset(asset))
+    for attr, names in (("vendor", ("node_vendor",)), ("product", ("node_product_name",)),
+                        ("version", ("node_firmware_version",))):
+        if not getattr(known, attr):
+            setattr(known, attr, _cell(get(*names), MAX_NAME_CHARS))
+    return Finding(ident, asset, title, cve, _score(get("cve_score", "score")), patch, NOZOMI)
+
+
+def _dragos_finding(record, report, assets):
+    """One Dragos vulnerability detection: the host it was found on and the vulnerability."""
+    host, vuln = record.get("host"), record.get("vulnerability")
+    if not isinstance(host, dict) or not isinstance(vuln, dict):
+        report.skip("not a detection (no host and vulnerability)")
+        return None
+    if _text(vuln.get("state")).strip().lower() in _CLOSED:
+        report.skip("already resolved")
+        return None
+    asset = _cell(_text(host.get("name")) or _text(host.get("id")), MAX_ASSET_CHARS)
+    if not asset:
+        report.skip("no host name")
+        return None
+    cves = _cves(_text(vuln.get("enumeration"))) or _cves(_text(vuln.get("reference")))
+    cve = cves[0] if cves else ""
+    base = vuln.get("score")
+    score = _score(_text(base.get("base"))) if isinstance(base, dict) else ""
+    title = _cell(_text(vuln.get("title")), MAX_NAME_CHARS) or (f"{cve} on {asset}" if cve else "Dragos detection")
+    ident = f"dragos:{_cell(_text(vuln.get('id')), 80) or (cve or 'nocve') + ':' + asset}"[:MAX_ID_CHARS]
+    hardware = host.get("hardware") if isinstance(host.get("hardware"), dict) else {}
+    known = assets.setdefault(asset.lower(), Asset(asset))
+    for attr, value in (("vendor", host.get("vendor")), ("product", hardware.get("model")),
+                        ("version", hardware.get("firmware_version"))):
+        if not getattr(known, attr):
+            setattr(known, attr, _cell(_text(value), MAX_NAME_CHARS))
+    return Finding(ident, asset, title, cve, score, "", DRAGOS)
+
+
+def _read_json_export(path):
+    """Read a Nozomi or Dragos JSON export; return (findings, assets, FileReport)."""
+    name = os.path.basename(path)
+    records = _load_json(path)
+    source = detect_json(records)
+    if source is None:
+        raise ScanImportError(f"{name} is not an export this tool knows (as JSON it reads Nozomi node_cves and "
+                              "Dragos detections; the other formats are listed in docs/IMPORT.md)")
+    report = FileReport(name, FORMAT_NAMES[source], note=EXPERIMENTAL_NOTE)
+    convert = _nozomi_finding if source == NOZOMI else _dragos_finding
+    findings, assets = [], {}
+    for record in records:
+        report.rows += 1
+        if report.rows > MAX_INPUT_ROWS:
+            raise ScanImportError(f"{name} has more than {MAX_INPUT_ROWS:,} records")
+        if not isinstance(record, dict):
+            report.skip("not a record")
+            continue
+        finding = convert({_norm(k).replace(" ", "_"): v for k, v in record.items()} if source == NOZOMI else record,
+                          report, assets)
+        if finding is not None:
+            findings.append(finding)
+            _check_size(findings)
+    report.kept = len(findings)
+    return findings, assets, report
+
+
+def _read_nozomi_csv(table, report):
+    """A CSV exported from a Nozomi query on node_cves: the columns are the fields of Nozomi's data model."""
+    findings, assets = [], {}
+    names = [h.replace(" ", "_") for h in table.header]
+    for cells in table.rows():
+        report.rows += 1
+        record = {names[i]: cells[i] for i in range(min(len(names), len(cells)))}
+        finding = _nozomi_finding(record, report, assets)
+        if finding is not None:
+            findings.append(finding)
+            _check_size(findings)
+    return findings, assets
+
+
+def _looks_like_json(path):
+    try:
+        with open(path, "rb") as fh:
+            start = fh.read(1024)
+    except OSError as error:
+        raise ScanImportError(f"{os.path.basename(path)} could not be read ({error.strerror or error})") from None
+    return start.lstrip(b"\xef\xbb\xbf \t\r\n")[:1] in (b"{", b"[")
+
+
 def _looks_like_xml(path):
     try:
         with open(path, "rb") as fh:
@@ -464,6 +640,8 @@ def read_export(path, min_qod=DEFAULT_MIN_QOD):
     """Read one export file; return (findings, assets, FileReport). Raises ScanImportError if it cannot be used."""
     if _looks_like_xml(path):
         return _read_nessus_xml(path)
+    if _looks_like_json(path):
+        return _read_json_export(path)
     table = _Table(path)
     try:
         source = detect_format(table.header)
@@ -474,6 +652,9 @@ def read_export(path, min_qod=DEFAULT_MIN_QOD):
         report = FileReport(os.path.basename(path), FORMAT_NAMES[source])
         if source == OPENVAS:
             findings, assets = _read_openvas(table, report, min_qod)
+        elif source == NOZOMI:
+            report.note = EXPERIMENTAL_NOTE
+            findings, assets = _read_nozomi_csv(table, report)
         else:
             findings, assets = _read_tenable_family(table, report, source)
     finally:
@@ -673,6 +854,8 @@ def summary_lines(result, min_qod=DEFAULT_MIN_QOD):
     lines = []
     for report in result.reports:
         lines.append(f"{report.path}: {report.format}, {report.rows:,} rows, {report.kept:,} findings kept")
+        if report.note:
+            lines.append(f"  note: {report.note}")
         for reason, count in sorted(report.skipped.items()):
             lines.append(f"  skipped {count:,}: {reason}")
     if result.renamed:

@@ -175,8 +175,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP17 | Version-aware advisory matching | [reports/cp17-version-aware](reports/cp17-version-aware/claude.md) |
 | CP18 | Scanner import, phase 1: Nessus, Tenable and OpenVAS CSV | [reports/cp18-scanner-import-phase1](reports/cp18-scanner-import-phase1/claude.md) |
 | CP19 | Scanner import: Nessus `.nessus` XML | [reports/cp19-nessus-xml](reports/cp19-nessus-xml/claude.md) |
+| CP20 | Scanner import: Nozomi and Dragos exports | [reports/cp20-nozomi-dragos](reports/cp20-nozomi-dragos/claude.md) |
 
-Across the checkpoints 39 findings were recorded (3 Medium, 13 Low, 23 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
+Across the checkpoints 40 findings were recorded (3 Medium, 13 Low, 24 Info) and all but one were fixed or consciously accepted with a reason; the remaining one is a hands-on check that needs a person (see the CP4 report).
 
 Techniques used:
 

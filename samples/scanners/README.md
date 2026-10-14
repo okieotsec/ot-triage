@@ -1,7 +1,7 @@
 # Fictional scanner exports
 
 Made-up exports in the shape of six scanner formats, for designing and testing a future import feature (see
-[docs/SCANNER_IMPORT.md](../../docs/SCANNER_IMPORT.md)). Nothing here is read by the application today.
+[docs/SCANNER_IMPORT.md](../../docs/SCANNER_IMPORT.md)). The importer (`ot_triage_import.py`, see [docs/IMPORT.md](../../docs/IMPORT.md)) reads all six of them, and copies of the small ones ship in the portable bundle as `sample_scan_*`.
 
 **Everything is invented**: the plant ("Cedar Creek"), the hosts, the addresses (only the ranges reserved for
 documentation: 192.0.2.0/24, 198.51.100.0/24, `example.com`), the plugin and result ids, the dates and the summaries.
@@ -37,4 +37,4 @@ exports are still needed to check an importer (see the plan).
   `ranked.csv` for the ranking with reasons and `assets.csv` for the per-asset view, including how many CISA advisories
   list each asset's firmware version. Later threat data gives different numbers.
 
-The files in `expected/` and `merge/` were produced by a throw-away prototype, not by shipped code.
+The files in `expected/`, `merge/` and `result/` were produced by `ot_triage_import.py` and `ot_triage_cli.py` themselves (they were first written by a throw-away prototype, and the importer reproduces them exactly, apart from the title of the Nozomi findings, which the importer takes from the CVE summary).
