@@ -100,6 +100,10 @@ class Context:
         """Ask for an existing file; return its path or an empty string."""
         return filedialog.askopenfilename(parent=self.root, title=title, filetypes=types)
 
+    def open_files(self, title, types):
+        """Ask for one or more existing files; return their paths (an empty tuple if cancelled)."""
+        return tuple(filedialog.askopenfilenames(parent=self.root, title=title, filetypes=types))
+
     def save_file(self, title, initial, types):
         """Ask where to save a file; return the path or an empty string."""
         return filedialog.asksaveasfilename(parent=self.root, title=title, initialfile=initial, defaultextension=".csv",
