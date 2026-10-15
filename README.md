@@ -114,7 +114,7 @@ For the reasoning behind each rule, see [docs/POLICY.md](docs/POLICY.md).
 3. **Patch available**: strong controls lower the bucket one level, but never below NEXT for actively exploited items.
 4. **No patch (pending or end of life)**: with CVSS of 4.0 or more, the bucket is raised one level unless strong controls are in place. Strong controls withhold the raise but earn no additional downgrade. End-of-life items with CVSS of 7.0 or more are floored at NEXT, since they need a replacement plan.
 5. **Exposed crown jewel floor**: a crown jewel with high exposure and CVSS of 4.0 or more is never below NEXT.
-6. **High-CVSS crown jewel floor**: a crown jewel with CVSS of 7.0 or more is never below NEXT, at any exposure and with any controls.
+6. **High-CVSS floors**: a crown jewel with CVSS of 7.0 or more, and an important asset with CVSS of 9.0 or more, are never below NEXT, at any exposure and with any controls.
 7. **Controls and ranking**: partial controls never change the bucket and lower the ordering score by 0.5; strong controls lower it by 1.0 (and can also lower the bucket, see rule 3).
 8. **The action follows the bucket**: a NEVER result says there is no scheduled fix and what to do at a routine opportunity, instead of "Apply the patch".
 
@@ -122,7 +122,7 @@ When the CVSS vector says the flaw can be attacked over a network and exposure i
 
 The **ordering score** (0 to 10) only ranks items within a bucket; it never decides the bucket.
 
-Two CVSS lines in these rules (7.0 and 9.0, and 7.0 is also the line in rule 6) can be adjusted within limits; see [docs/SETTINGS.md](docs/SETTINGS.md). Values shown above are the defaults.
+Two CVSS lines in these rules (7.0 and 9.0, and both are also lines in rule 6) can be adjusted within limits; see [docs/SETTINGS.md](docs/SETTINGS.md). Values shown above are the defaults.
 
 **Low exposure** means no routable path from IT or the internet, verified by testing, not assumed from a firewall's existence.
 
@@ -187,6 +187,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP24 | Crown jewel floor for high CVSS, the NEVER action text and the exposure check note | [reports/cp24-crown-jewel-floor](reports/cp24-crown-jewel-floor/claude.md) |
 | CP25 | Threat data downloads never go back in time; every file read is checked as a regular file | [reports/cp25-feed-rollback-and-file-checks](reports/cp25-feed-rollback-and-file-checks/claude.md) |
 | CP26 | Scanner import: Claroty xDome device-vulnerability pairs | [reports/cp26-claroty-import](reports/cp26-claroty-import/claude.md) |
+| CP27 | An important asset with a critical score is never NEVER; the exposure note's wording | [reports/cp27-important-asset-floor](reports/cp27-important-asset-floor/claude.md) |
 
 Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 

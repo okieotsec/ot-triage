@@ -34,9 +34,10 @@ def cvss_band(value):
     return label, direction
 
 
-EXPOSURE_HINT = ("The CVSS vector says this flaw can be attacked over the network. Low exposure means no routable "
-                 "path from IT or the internet, verified by testing; any device that can reach this one on the "
-                 "network could attack it. Confirm Low by testing, or choose Medium. This note does not change the "
+EXPOSURE_HINT = ("The CVSS vector says this flaw can be exploited over a network. Choosing Low exposure asserts "
+                 "that no IT or internet path reaches this device (for example, it is air-gapped or fully segmented), "
+                 "verified by testing. If an attacker gets into the OT network, any device that can route to this one "
+                 "could exploit it. Confirm the isolation by testing, or choose Medium. This note does not change the "
                  "priority.")
 
 

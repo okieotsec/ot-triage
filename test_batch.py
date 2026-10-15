@@ -667,7 +667,7 @@ class ExposureCheckTests(unittest.TestCase):
         plain, networked = self.export([{**self.ROW, "cvss": "9.8"}, {**self.ROW, "cvss_vector": self.NETWORK}])
         by_vector = {r["cvss_vector"]: r for r in (plain, networked)}
         with_note, without = by_vector[self.NETWORK], by_vector[""]
-        self.assertIn("Confirm Low by testing", with_note["exposure_check"])
+        self.assertIn("Confirm the isolation by testing", with_note["exposure_check"])
         self.assertEqual(without["exposure_check"], "")
         for column in ("priority", "ordering_score", "action", "rationale"):
             self.assertEqual(with_note[column], without[column], column)
