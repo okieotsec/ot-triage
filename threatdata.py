@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import references
+import safefile
 from prioritizer import Factor, Threat
 
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
@@ -45,6 +46,7 @@ CHUNK_BYTES = 64 * 1024
 
 KEV_FILE, EPSS_FILE, META_FILE = "kev.json", "epss.csv.gz", "meta.json"
 RANSOMWARE_SCORE_BONUS = 0.5
+MAX_SHRINK_PERCENT = 20     # a replacement may hold at most this share fewer entries than the stored copy
 
 CVE_RE = re.compile(r"^CVE-\d{4}-\d{4,}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -420,11 +422,8 @@ def _write_atomic(path, data):
 
 
 def _read_capped(path, cap):
-    if not path.is_file():
-        raise ThreatDataError(f"{path.name} is not a regular file")
-    if path.stat().st_size > cap:
-        raise ThreatDataError(f"{path.name} is larger than {cap // MB} MB")
-    return path.read_bytes()
+    """Read a regular file of at most `cap` bytes, checked on the open file (see safefile)."""
+    return safefile.read_regular(path, cap, ThreatDataError, f"{path.name} is larger than {cap // MB} MB")
 
 
 def _label(text):
@@ -452,36 +451,85 @@ def _read_meta(data_dir):
     return clean
 
 
-def _install(name, raw, source, data_dir, now):
-    """Validate raw bytes and, only if valid, replace the stored copy and its metadata."""
+def _day(text):
+    """The calendar date a stored date text starts with, or None."""
+    day = str(text or "")[:10]
+    return datetime.date.fromisoformat(day) if _valid_date(day) else None
+
+
+def rollback_problems(stored, new_date, new_count):
+    """Say what is worse about replacing the stored copy with this one: a list of phrases, empty when nothing is.
+
+    `stored` is a SourceStatus. A copy is worse when it is dated earlier than the stored one, or holds more than
+    MAX_SHRINK_PERCENT fewer entries (a flaw once listed as exploited would silently lose that signal). Nothing is
+    compared when no usable copy is stored, so a damaged or missing one can always be replaced.
+    """
+    if stored is None or not stored.loaded:
+        return []
+    problems = []
+    old, new = _day(stored.date), _day(new_date)
+    if old and new and new < old:
+        problems.append(f"older than the previous copy (dated {new.isoformat()}, previous {old.isoformat()})")
+    if stored.count and new_count * 100 < stored.count * (100 - MAX_SHRINK_PERCENT):
+        fall = (stored.count - new_count) * 100 // stored.count
+        problems.append(f"much smaller than the previous copy ({new_count:,} entries against {stored.count:,}, "
+                        f"a fall of {fall}%)")
+    return problems
+
+
+def _refuse_or_note(problems, strict):
+    """A network update (strict) refuses a worse copy; a file import allows it and returns a note to show."""
+    if not problems:
+        return ""
+    text = " and ".join(problems)
+    if strict:
+        raise ThreatDataError(f"the download is {text}; a network update does not accept that "
+                              "(import a file if you are sure)")
+    return f" Note: this file is {text}."
+
+
+def _install(name, raw, source, data_dir, now, strict=False):
+    """Validate raw bytes and, only if valid, replace the stored copy and its metadata.
+
+    With strict (a network update) a copy older or much smaller than the stored one is refused. Without it (a file
+    the person chose) it is installed and a note saying so is returned.
+    """
     data_dir = Path(data_dir)
     if name == "kev":
-        count = len(parse_kev(raw).entries)
+        parsed = parse_kev(raw)
+        count, date = len(parsed.entries), parsed.date_released
         stored, filename = raw, KEV_FILE
     else:
-        count = len(parse_epss(raw).scores)
+        parsed = parse_epss(raw)
+        count, date = len(parsed.scores), parsed.score_date
         stored, filename = (raw if raw[:2] == b"\x1f\x8b" else gzip.compress(raw)), EPSS_FILE
+    previous = read_status(data_dir, (name,))[0]
+    note = _refuse_or_note(rollback_problems(previous, date, count), strict)
     _write_atomic(data_dir / filename, stored)
     meta = _read_meta(data_dir)
     meta[name] = {"source": _label(source), "retrieved_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
                   "sha256": hashlib.sha256(stored).hexdigest(), "count": str(count)}
     _write_atomic(data_dir / META_FILE, json.dumps({"version": 1, **meta}, indent=2).encode("utf-8"))
+    return note
 
 
-def _run(name, produce, source, data_dir, now):
+def _run(name, produce, source, data_dir, now, strict=False):
     label = "KEV" if name == "kev" else "EPSS"
     try:
-        _install(name, produce(), source, data_dir, now)
+        note = _install(name, produce(), source, data_dir, now, strict)
     except ThreatDataError as error:
         return SourceResult(name, False, f"{label} not updated: {error}. The previous copy was kept.")
     except OSError as error:
         return SourceResult(name, False, f"{label} not updated: file error ({error.strerror or error}). "
                                          "The previous copy was kept.")
-    return SourceResult(name, True, f"{label} updated.")
+    return SourceResult(name, True, f"{label} updated.{note}")
 
 
 def update_from_network(data_dir=None, fetcher=None, now=None, cancel=None, progress=None):
-    """Download both sources, replacing each stored copy only if its new data validates.
+    """Download both sources, replacing each stored copy only if its new data validates and is not worse.
+
+    A download dated earlier than the stored copy, or with more than MAX_SHRINK_PERCENT fewer entries, is refused
+    and the stored copy kept (a file chosen by the person with import_from_files is allowed, with a note).
 
     fetcher defaults to this module's fetch, looked up when called (so a test can replace it).
     """
@@ -498,7 +546,7 @@ def update_from_network(data_dir=None, fetcher=None, now=None, cancel=None, prog
         if progress:
             progress(f"Downloading {label}...")
         get = fetcher if cancel is None else functools.partial(fetcher, cancel=cancel)
-        results.append(_run(name, lambda u=url, c=cap, h=hosts, g=get: g(u, c, h), url, data_dir, now))
+        results.append(_run(name, lambda u=url, c=cap, h=hosts, g=get: g(u, c, h), url, data_dir, now, strict=True))
     return results
 
 
@@ -612,13 +660,11 @@ class SourceStatus:
 
 def _epss_header(path):
     """Read the model version and score date from the first line of a stored EPSS file."""
-    if not path.is_file():
-        raise ThreatDataError("stored EPSS file is not a regular file")
-    with open(path, "rb") as raw:
-        gzipped = raw.read(2) == b"\x1f\x8b"
-    opener = gzip.open if gzipped else open
     try:
-        with opener(path, "rb") as stream:
+        with safefile.open_regular(path, True, error=ThreatDataError) as raw:
+            gzipped = raw.read(2) == b"\x1f\x8b"
+            raw.seek(0)
+            stream = gzip.GzipFile(fileobj=raw) if gzipped else raw
             first = stream.read(300).split(b"\n", 1)[0].decode("utf-8").rstrip("\r")
     except (OSError, EOFError, zlib.error, UnicodeDecodeError):
         raise ThreatDataError("stored EPSS data is unreadable") from None
@@ -628,11 +674,13 @@ def _epss_header(path):
     return match.group(1), match.group(2)
 
 
-def read_status(data_dir=None):
-    """Return the stored status of KEV and EPSS without parsing the full EPSS file."""
+def read_status(data_dir=None, names=("kev", "epss")):
+    """Return the stored status of KEV and EPSS (or only the named ones) without parsing the full EPSS file."""
     data_dir = Path(data_dir or default_data_dir())
     meta, report = _read_meta(data_dir), []
     for name, label, filename in (("kev", "KEV", KEV_FILE), ("epss", "EPSS", EPSS_FILE)):
+        if name not in names:
+            continue
         path = data_dir / filename
         if not path.exists():
             report.append(SourceStatus(name, label))

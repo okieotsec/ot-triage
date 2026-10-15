@@ -185,6 +185,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP22 | Scanner import: the Import scan button in Batch | [reports/cp22-import-gui](reports/cp22-import-gui/claude.md) |
 | CP23 | Independent AI review of 0.9.0 (OpenAI Codex): triage and fixes | [reports/cp23-independent-review-fixes](reports/cp23-independent-review-fixes/claude.md), [the review itself](reports/independent-review-codex/codex-report.md) |
 | CP24 | Crown jewel floor for high CVSS, the NEVER action text and the exposure check note | [reports/cp24-crown-jewel-floor](reports/cp24-crown-jewel-floor/claude.md) |
+| CP25 | Threat data downloads never go back in time; every file read is checked as a regular file | [reports/cp25-feed-rollback-and-file-checks](reports/cp25-feed-rollback-and-file-checks/claude.md) |
 
 Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 

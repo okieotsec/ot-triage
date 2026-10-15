@@ -16,13 +16,13 @@ import csv
 import json
 import os
 import re
-import stat
 import tempfile
 from dataclasses import dataclass, field
 from typing import ClassVar
 from xml.parsers import expat  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (DTDs are refused)
 
 import inventory
+import safefile
 import threatdata
 from references import clean
 
@@ -149,27 +149,17 @@ def _cves(text):
 # ---- reading -------------------------------------------------------------------
 
 def _open_input(path, binary, limit=None, advice="", **options):
-    """Open a file to read, after checking the opened file itself (not the name it was reached by).
+    """Open a file to read, after checking the opened file itself (see safefile.open_regular).
 
-    It must be a regular file, so a folder, a named pipe (which would block for ever) or a device is refused, and it
-    must not be over the limit, judged on the same open file so it cannot be swapped between the check and the read.
     Raises ScanImportError; the caller closes the file.
     """
     name = os.path.basename(path)
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+        return safefile.open_regular(path, binary, limit, ScanImportError,
+                                     limit is not None and f"{name} is larger than {limit // (1024 * 1024)} MB{advice}",
+                                     "imported", **options)
     except OSError as error:
         raise ScanImportError(f"{name} could not be read ({error.strerror or error})") from None
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise ScanImportError(f"{name} is not a regular file (a folder, a pipe or a device cannot be imported)")
-        if limit is not None and info.st_size > limit:
-            raise ScanImportError(f"{name} is larger than {limit // (1024 * 1024)} MB{advice}")
-        return os.fdopen(fd, "rb" if binary else "r", **options)
-    except BaseException:
-        os.close(fd)
-        raise
 
 
 class _Table:

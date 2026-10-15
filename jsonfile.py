@@ -4,6 +4,8 @@ import os
 import tempfile
 from pathlib import Path
 
+import safefile
+
 
 def _reject_constant(name):
     raise ValueError(f"invalid number {name}")
@@ -18,12 +20,8 @@ def _reject_duplicates(pairs):
 
 def read_json(path, max_bytes):
     """Read a small UTF-8 JSON file, rejecting oversized files, NaN and duplicate keys."""
-    path = Path(path)
-    if not path.is_file():
-        raise ValueError("not a regular file")
-    if path.stat().st_size > max_bytes:
-        raise ValueError(f"file is larger than {max_bytes // 1024} KB")
-    text = path.read_bytes().decode("utf-8-sig")
+    data = safefile.read_regular(path, max_bytes, ValueError, f"file is larger than {max_bytes // 1024} KB")
+    text = data.decode("utf-8-sig")
     return json.loads(text, parse_constant=_reject_constant, object_pairs_hook=_reject_duplicates)
 
 

@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass, field
 
 import batch
+import safefile
 from references import clean
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -105,10 +106,10 @@ def load(path):
 
 
 def _load(path):
-    if os.path.getsize(path) > MAX_FILE_BYTES:
-        raise ValueError(f"The inventory is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
     inventory = Inventory(label=clean(os.path.basename(str(path)))[:60])
-    with open(path, newline="", encoding="utf-8-sig") as fh:
+    with safefile.open_regular(path, False, MAX_FILE_BYTES, ValueError,
+                               f"The inventory is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB",
+                               newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
         try:
             header = next(reader)

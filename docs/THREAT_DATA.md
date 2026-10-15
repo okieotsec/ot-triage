@@ -43,6 +43,17 @@ Nothing is downloaded unless you start an update. Two ways to update:
 
 Each source is handled on its own: if one fails, the others can still update, and the failed one **keeps its previous copy**. Data is checked in memory first and only written to disk if it passes.
 
+### A download is never worse than what you have
+
+The files are not signed, so a well-formed file from the right host could still be an old one or a cut-down one, and an exploited CVE that dropped out would silently lose its signal. So a **download** (not a file you import) is also refused when, compared with the stored copy of the same source:
+
+- its date is **earlier** (the release date for KEV, the score date for EPSS, the newest advisory date for the ICS advisories; the same date is fine), or
+- it has **more than 20% fewer entries** (exactly 20% fewer is allowed; 100 entries may be followed by 80).
+
+The message says which, for example `KEV not updated: the download is older than the previous copy (dated 2026-10-01, previous 2026-10-04); a network update does not accept that (import a file if you are sure). The previous copy was kept.` Nothing is compared when no usable copy is stored, so a missing or damaged copy can always be replaced.
+
+A file you choose with **Import from file** is allowed to be older or smaller, because you chose it, and the result carries a note (`Note: this file is older than the previous copy (...)`). This is a guard against a wrong file, not against a hostile one that is newer and about the same size: that is the limit of trusting HTTPS alone (see SECURITY.md).
+
 ## What is checked
 
 | Check | KEV | EPSS |
@@ -53,6 +64,7 @@ Each source is handled on its own: if one fails, the others can still update, an
 | Each record | Valid CVE ID, valid dates, known ransomware field is `Known` or `Unknown`, text fields under 10,000 characters | Valid CVE ID, numbers between 0 and 1 |
 | Duplicates | Rejected | Rejected |
 | Odd content | Control characters in text are replaced with spaces; unknown extra fields are ignored | Not a number (`nan`, `inf`) is rejected |
+| Against the stored copy (downloads only) | Not dated earlier; not more than 20% fewer entries | The same |
 
 Stored files are checked again every time they are loaded, so a file changed on disk cannot slip through.
 
