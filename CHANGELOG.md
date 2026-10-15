@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A file that is not a UTF-8 CSV is refused with a sentence.** Opening a PDF, a spreadsheet or another binary file with **Open CSV…** used to show a codec message ("'utf-8' codec can't decode byte..."); it now says the file is not a UTF-8 text file and to save a spreadsheet as "CSV UTF-8". A cell too large for the CSV reader is also reported as "not a valid CSV file".
+
 - **Claroty xDome import (CP26).** `ot_triage_import.py` and Batch's **Import scan…** now read the Claroty xDome *device-vulnerability pairs* report, saved as CSV UTF-8 (open an `.xlsx` in Excel and use Save As). It was written from one Claroty report layout, so each run says that another layout may not be recognised. One finding per device and CVE, with the row's CVSS number (a row that names several CVEs gives each the row's score); rows with a resolution or patch-install date are skipped; rows Claroty marks *Potentially Relevant* are kept and marked ` [potentially relevant]` in the finding's name, and `--only-confirmed` leaves them out; the device's addresses go into the inventory's `name` column to help write an aliases file. Claroty's own risk scores, its *Actively Exploited* flag and its EPSS column are not used: the threat level still comes from KEV and EPSS data. A fictional sample (`samples/scanners/claroty/device_vulns.csv`, `sample_scan_claroty.csv` in the bundle) and its expected findings are included. See docs/IMPORT.md.
 
 ## 0.9.1 (2026-10-15)

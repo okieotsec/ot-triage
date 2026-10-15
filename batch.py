@@ -1,4 +1,5 @@
 """Batch scoring of vulnerabilities from a CSV file (no GUI dependencies)."""
+import contextlib
 import csv
 from dataclasses import dataclass, field
 
@@ -108,9 +109,21 @@ def _norm_header(name):
     return _HEADER_ALIASES.get(key, key)
 
 
+@contextlib.contextmanager
+def _readable_text():
+    """Turn what a file that is not a UTF-8 CSV does to the reader into a message a person can act on."""
+    try:
+        yield
+    except UnicodeDecodeError:
+        raise ValueError("The file is not a UTF-8 text file (a PDF, a spreadsheet or another binary file cannot be "
+                         "read; save a spreadsheet as 'CSV UTF-8')") from None
+    except csv.Error as error:  # for example a single cell larger than the CSV reader's field limit
+        raise ValueError(f"The file is not a valid CSV file ({str(error)[:100]})") from None
+
+
 def read_rows(path):
     """Return [(line_number, {normalized_header: stripped_value})], skipping fully blank rows."""
-    with safefile.open_regular(path, False, MAX_FILE_BYTES, ValueError,
+    with _readable_text(), safefile.open_regular(path, False, MAX_FILE_BYTES, ValueError,
                                f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB",
                                newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
@@ -149,7 +162,7 @@ def read_rows(path):
 
 def has_cve_column(path):
     """Return True if the CSV file has a cve column."""
-    with safefile.open_regular(path, False, newline="", encoding="utf-8-sig") as fh:
+    with _readable_text(), safefile.open_regular(path, False, newline="", encoding="utf-8-sig") as fh:
         header = next(csv.reader(fh), [])
     return "cve" in [_norm_header(h) for h in header]
 

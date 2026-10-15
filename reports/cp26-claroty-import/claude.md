@@ -53,3 +53,5 @@ Release gate for this change
 
 Verification
 - Full suite on a private virtual display: 1,164 tests; the first run had one failure, in the bundle test that runs the importer on the bundled samples (it used an option that adds a column the test's header check did not expect); the test was corrected and the bundle tests rerun and pass, and every other test passed in the full run. Runner: ruff, bandit, semgrep and gitleaks 0 findings; 49 suppressions, all in the baseline (none added). The raw tool output is not archived, as in CP23.
+
+Addendum (2026-10-15, found while preparing the owner's test sheet): opening a binary file (a PDF) with Open CSV showed the raw codec message instead of a sentence, because only the inventory and previous-export loaders translated that error. The findings loader now does too (a binary file, or a cell larger than the CSV reader's limit, gives a sentence), with tests for read_rows, has_cve_column and process_file.
