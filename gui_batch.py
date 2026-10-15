@@ -918,7 +918,7 @@ class BatchView:
             if self.state.inventory is not None:
                 possible = rollup.possible_advisories(summaries, self.state.inventory,
                                                       self.ctx.get_threat_data().ics)
-            rollup.write_rollup(out, summaries, possible)
+            scanimport.write_atomically(out, lambda path: rollup.write_rollup(path, summaries, possible))
         except OSError as error:
             self.ctx.error("Export failed", str(error))
             return
@@ -935,7 +935,8 @@ class BatchView:
         if not out:
             return
         try:
-            batch.write_results(out, state.items, state.data, state.comparison)
+            scanimport.write_atomically(out, lambda path: batch.write_results(path, state.items, state.data,
+                                                                              state.comparison))
         except OSError as error:
             self.ctx.error("Export failed", str(error))
             return

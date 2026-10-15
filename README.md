@@ -64,7 +64,7 @@ property-based tests.
 
 ## Download and run
 
-Each [release](https://github.com/okieotsec/ot-triage/releases) has a portable bundle, `ot-triage-<version>.zip`, with a `.sha256` file next to it. Unzip it anywhere and, on Windows, double-click **OT Triage.pyw**; everywhere else run `python3 ot_triage_gui.py`. You need Python 3.12 or newer with Tkinter (the installer from python.org includes it). There is nothing to install: no third-party packages, no executable that could be mistaken for malware, and the bundle is reproducible, so anyone can rebuild it from the tag with `python3 tools/make_bundle.py` and compare the checksum. See [docs/RELEASING.md](docs/RELEASING.md).
+Each [release](https://github.com/okieotsec/ot-triage/releases) has a portable bundle, `ot-triage-<version>.zip`, with a `.sha256` file next to it. Unzip it anywhere and, on Windows, double-click **OT Triage.pyw**; everywhere else run `python3 ot_triage_gui.py`. You need Python 3.12 or newer with Tkinter (the installer from python.org includes it). There is nothing to install: no third-party packages, no executable that could be mistaken for malware, and the bundle can be rebuilt from the tag with `python3 tools/make_bundle.py` to compare the checksum (it matched between GitHub's runner and a developer machine for 0.9.0; zip compression can differ in a very different environment). See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Using the GUI
 
@@ -149,7 +149,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 - **[SECURITY.md](SECURITY.md)** explains how to report a vulnerability, which three public files the app can download (and that it works fully offline otherwise), and what it reads and writes.
 - **[SECURITY_TEST_PLAN.md](SECURITY_TEST_PLAN.md)** is the test plan. Each checkpoint's evidence is archived in `reports/`.
 - **[docs/SECURITY_FRAMEWORKS.md](docs/SECURITY_FRAMEWORKS.md)** maps the practice to the NIST Secure Software Development Framework and MITRE's Security Automation Framework, with the evidence for each practice and what is still open. It is a self-assessment, not an audit.
-- **Software bill of materials:** [sbom/sbom.cdx.json](sbom/sbom.cdx.json) (CycloneDX). The application uses only the Python standard library, so the SBOM lists the application itself and no third-party components. It is generated from a brand-new empty environment by `tools/make_sbom.py`, and a test fails if it goes out of date.
+- **Software bill of materials:** [sbom/sbom.cdx.json](sbom/sbom.cdx.json) (CycloneDX). The application imports only the Python standard library, and the SBOM lists the application itself and no third-party package. It is generated from a brand-new empty environment by `tools/make_sbom.py` (so it shows that nothing is installed beside the application, not what the application needs), and it does not list the Python runtime and Tcl/Tk that the application runs on. A test fails if it goes out of date.
 - **Third-party material:** the CVSS 4.0 scoring tables come from FIRST's calculator (BSD-2-Clause); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### What was tested
@@ -179,8 +179,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP20 | Scanner import: Nozomi and Dragos exports | [reports/cp20-nozomi-dragos](reports/cp20-nozomi-dragos/claude.md) |
 | CP21 | Security process: NIST SSDF and MITRE SAF alignment, suppression gate, CI hardening, release provenance | [reports/cp21-security-framework](reports/cp21-security-framework/claude.md) |
 | CP22 | Scanner import: the Import scan button in Batch | [reports/cp22-import-gui](reports/cp22-import-gui/claude.md) |
+| CP23 | Independent AI review of 0.9.0 (OpenAI Codex): triage and fixes | [reports/cp23-independent-review-fixes](reports/cp23-independent-review-fixes/claude.md), [the review itself](reports/independent-review-codex/codex-report.md) |
 
-Across the checkpoints 46 findings were recorded (3 Medium, 15 Low, 28 Info) and all but two were fixed or consciously accepted with a reason; the two that remain are a hands-on check that needs a person (see the CP4 report) and the absence of an independent security review (see the CP21 report).
+Across the checkpoints 53 findings were recorded (1 High, 5 Medium, 18 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 
 Techniques used:
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Fixes from an independent AI review of 0.9.0** (OpenAI Codex; the report is archived unchanged in `reports/independent-review-codex/`, the triage is in CP23): a formula in the header of an existing inventory is now defused when the importer writes the extended copy; a scanner cell holding thousands of distinct CVE ids is read in time proportional to its size (it was quadratic); the Batch exports (ranked CSV and asset roll-up) are written atomically, so a failure keeps the previous file; scanner inputs are opened once and checked as regular files within the size limit (a named pipe or device is refused, a file that grows is still held to the limit); the release workflow refuses a tag that does not match `version.py`. Wording corrected where a claim was too strong (the SBOM, reproducible builds, and how downloaded data is validated). Four items wait for the owner's decision, listed in CP23.
+
 ## 0.9.0 (2026-10-14)
 
 - **Security process (no change to the application):** the test plan now follows the NIST SSDF and MITRE SAF, with a practice-by-practice self-assessment in docs/SECURITY_FRAMEWORKS.md. `tools/security_checks.py` runs the scanners in one command, lists every suppression comment against a reviewed baseline, and (optionally) converts the results with MITRE's SAF CLI. CI gains semgrep, a weekly schedule, zizmor, CodeQL, dependency review and OpenSSF Scorecard; Dependabot now also watches the pip files with a seven-day cooldown. A release workflow builds the bundle from a tag and records a signed build-provenance attestation that `gh attestation verify` can check. SECURITY.md states response targets and how to verify a download, and its supported version was corrected to 0.8.x. Security checkpoint CP21 in `reports/cp21-security-framework/`.

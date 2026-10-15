@@ -1,7 +1,7 @@
 # Security Test Plan: OT Triage
 
 **Owner:** okieotsec (project lead, final approver)
-**Reviewers:** Claude Code (developer and reviewer), OpenAI Codex (independent reviewer), Google Gemini (independent reviewer). As of CP21 no report from an independent reviewer is archived; the planned independent review is still open.
+**Reviewers:** Claude Code (developer and reviewer), OpenAI Codex (independent reviewer), Google Gemini (independent reviewer). One independent review has been run and archived unchanged: OpenAI Codex, 2026-10-14, against release 0.9.0 (reports/independent-review-codex/, triaged in CP23). It is an AI review, not a human security audit, and Google Gemini has not yet been asked.
 **Applies to:** every release checkpoint below
 **Frameworks:** the plan follows the NIST Secure Software Development Framework (SSDF, SP 800-218 version 1.1) and organises its automation along MITRE's Security Automation Framework (SAF). [docs/SECURITY_FRAMEWORKS.md](docs/SECURITY_FRAMEWORKS.md) maps each practice to its evidence and lists what is still open.
 
@@ -89,7 +89,7 @@ Run at every checkpoint. Attach full output. `python tools/security_checks.py re
 - `osv-scanner --lockfile=requirements.txt --format json > reports/osv.json`
 - For each third-party package, record: name, pinned version, license, maintainer activity (last release date), and why it's needed. Flag any package with no release in two years, a recent ownership change, or a name close to a popular package.
 - Prefer the standard library where practical (e.g. `urllib` over adding a new HTTP library). Every new dependency needs a one-line justification in the review.
-- Confirm dependencies are pinned with hashes (`pip-compile --generate-hashes` or equivalent) and install with `pip install --require-hashes`.
+- Confirm runtime dependencies are pinned with hashes (`pip-compile --generate-hashes` or equivalent) and install with `pip install --require-hashes`. There are none today. The development tools in CI (ruff, bandit, semgrep, zizmor, hypothesis) are pinned by exact version but **not by hash**: that is an open item (docs/SECURITY_FRAMEWORKS.md).
 
 **SBOM**
 - Generate a CycloneDX SBOM from the locked environment: `cyclonedx-py environment -o sbom/sbom.cdx.json` (in a clean virtual environment containing only the app's dependencies).
@@ -122,7 +122,9 @@ For each item, mark Pass, Fail (with a finding), or N/A.
 - [ ] No paths are built from untrusted input.
 
 **Output and integrity**
-- [ ] CSV export neutralizes formula-leading characters in every text cell.
+- [ ] CSV export neutralizes formula-leading characters in every text cell, **including header cells copied from an input file** (CP23-01).
+- [ ] Every file the tool writes over an existing one is written to a temporary file and moved into place, so a failure keeps the old file (CP23-04).
+- [ ] Every file read is opened once, checked as a regular file and held to its size limit on that open file (CP23-05).
 - [ ] Exports and copied summaries include inputs, settings profile, and KEV/EPSS versions.
 - [ ] Custom settings are always visibly indicated.
 

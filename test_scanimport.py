@@ -1,7 +1,9 @@
 import csv
 import hashlib
 import io
+import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -998,6 +1000,119 @@ class ScannerHintTests(Case):
         plain = self.write("plain.csv", "id,name\n1,a\n")
         with self.assertRaisesRegex(ValueError, "Missing required column"):
             batch.process_file(plain)
+
+
+class ReviewFixTests(Case):
+    """Findings of the independent review of 0.9.0 (reports/independent-review-codex), each with its input."""
+
+    def inventory_with_header(self, header):
+        return self.write("inv.csv", f"asset_id,asset,{header}\nPLC-1,critical,x\n")
+
+    def written_header(self, header):
+        result = si.ImportResult(assets={"plc-1": si.Asset("PLC-1", "", "Siemens", "S7-1500", "V2.9.2")})
+        out = self.dir / "out.csv"
+        si.write_inventory(out, result, self.inventory_with_header(header))
+        with open(out, newline="", encoding="utf-8") as fh:
+            return next(csv.reader(fh))
+
+    def test_a_formula_in_the_header_of_the_existing_inventory_is_defused(self):
+        for lead in ("=", "+", "-", "@", "\t", "\r"):
+            with self.subTest(lead=repr(lead)):
+                cell = lead + 'HYPERLINK("https://attacker.example/collect","Inventory")'
+                header = self.written_header('"' + cell.replace('"', '""') + '"')
+                self.assertNotEqual(header[2][:1], lead, header)
+                self.assertTrue(header[2].startswith("'"), header)
+                self.assertEqual(header[:2], ["asset_id", "asset"])
+
+    def test_a_plain_header_is_left_as_it_was_and_the_result_still_loads_as_an_inventory(self):
+        import inventory
+
+        self.assertEqual(self.written_header("notes")[:3], ["asset_id", "asset", "notes"])
+        out = self.dir / "out.csv"
+        si.write_inventory(out, si.ImportResult(assets={"plc-1": si.Asset("PLC-1")}), self.inventory_with_header("=x"))
+        self.assertEqual(len(inventory.load(out)), 1)
+
+    def test_a_cell_with_thousands_of_distinct_cves_is_read_in_time_proportional_to_its_size(self):
+        import time
+
+        cell = " ".join(f"CVE-2024-{10000 + n}" for n in range(40_000))
+        started = time.monotonic()
+        found = si._cves(cell)
+        self.assertEqual(len(found), 40_000)
+        self.assertLess(time.monotonic() - started, 3.0)    # about 11 s when every id was compared with all before it
+        messy = "cve-2024-0001 CVE-2024-0001 CVE-2024-0001, cve-2024-0002"
+        self.assertEqual(si._cves(messy), ["CVE-2024-0001", "CVE-2024-0002"])
+
+    def test_a_pipe_or_a_device_is_refused_instead_of_blocking_for_ever(self):
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("no named pipes on this system")
+        pipe = self.dir / "scan.csv"
+        os.mkfifo(pipe)
+        outcome = []
+        worker = threading.Thread(target=lambda: outcome.append(self.refusal(pipe)), daemon=True)
+        worker.start()
+        worker.join(5)
+        self.assertFalse(worker.is_alive(), "reading a named pipe blocked")
+        self.assertIn("not a regular file", outcome[0])
+        if os.path.exists("/dev/zero"):
+            self.assertIn("not a regular file", self.refusal("/dev/zero"))
+
+    def refusal(self, path):
+        with self.assertRaises(si.ScanImportError) as caught:
+            si.read_export(path)
+        return str(caught.exception)
+
+    def test_a_folder_is_refused(self):
+        self.assertTrue(self.refusal(self.dir))
+
+    def test_a_file_that_grows_after_it_was_opened_is_still_held_to_the_limit(self):
+        import json
+
+        path = self.write("grow.json", json.dumps({"result": [NOZOMI_RECORD] * 5}))
+        real = si._open_input
+
+        def opened_when_small(target, binary, limit=None, advice="", **options):
+            return real(target, binary, None, advice, **options)    # the size check passes, as if the file were small
+
+        small = mock.patch.object(si, "_open_input", opened_when_small)
+        refused = self.assertRaisesRegex(si.ScanImportError, "larger than")
+        with mock.patch.object(si, "MAX_JSON_BYTES", 100), small, refused:
+            self.read(path)
+        xml = self.write("grow.nessus", xml_file(xml_host("h1", [xml_item(plugin=str(n)) for n in range(50)])))
+        refused = self.assertRaisesRegex(si.ScanImportError, "larger than")
+        with mock.patch.object(si, "MAX_FILE_BYTES", 500), small, refused:
+            self.read(xml)
+
+    def test_the_size_limit_is_decided_on_the_open_file(self):
+        path = self.write("big.csv", NESSUS_HEAD + "\n" + "x" * 5000)
+        with mock.patch.object(si, "MAX_FILE_BYTES", 1000), self.assertRaisesRegex(si.ScanImportError, "larger than"):
+            self.read(path)
+        good = self.nessus("1,CVE-2020-0001,5,5,High,h,tcp,1,N,,,,,")
+        with mock.patch("os.path.getsize", side_effect=AssertionError("the name must not be measured")), mock.patch(
+            "os.stat", side_effect=AssertionError("the name must not be measured")
+        ):
+            self.read(good)
+
+    def test_a_json_file_is_read_with_a_cap_never_whole(self):
+        import json
+
+        reads = []
+
+        class Spy(io.BytesIO):
+            def read(self, size=-1):
+                reads.append(size)
+                return super().read(size)
+
+        raw = json.dumps({"result": [NOZOMI_RECORD]}).encode()
+        with mock.patch.object(si, "_open_input", lambda *a, **k: Spy(raw)):
+            self.read(self.dir / "spy.json")
+        self.assertEqual(reads[-1], si.MAX_JSON_BYTES + 1)          # after the two short looks at the start of the file
+        self.assertNotIn(-1, reads)
+
+    def test_a_refused_file_is_closed_again(self):
+        with mock.patch("os.close", wraps=os.close) as closer:
+            self.refusal(self.dir)
+        self.assertTrue(closer.called)
 
 
 class AliasFileTests(Case):

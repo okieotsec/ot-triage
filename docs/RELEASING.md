@@ -19,7 +19,7 @@ Only what is needed to run the application: the Python modules the two entry poi
 sha256sum -c ot-triage-<version>.zip.sha256          # on Windows: certutil -hashfile ot-triage-<version>.zip SHA256
 ```
 
-To confirm the bundle is what the tag says, check out the tag and run `python3 tools/make_bundle.py`: the same files always produce the same bytes (fixed dates, fixed order, fixed permissions), so the checksum matches the one published. Build on Linux or macOS to compare with a published bundle; Windows does not record the executable permission, so its zip differs in that one detail.
+To confirm the bundle is what the tag says, check out the tag and run `python3 tools/make_bundle.py`: the build fixes the dates, the order and the permissions, so the checksum matches the one published (for 0.9.0 it matched between GitHub's runner and a developer's Linux machine; zip compression can differ between Python versions, so a very different environment may give different bytes). Build on Linux or macOS to compare with a published bundle; Windows does not record the executable permission, so its zip differs in that one detail.
 
 ## Build provenance
 

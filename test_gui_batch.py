@@ -1420,6 +1420,51 @@ NESSUS_SCAN = str(Path(__file__).parent / "sample_scan_nessus.csv")
 NOZOMI_SCAN = str(Path(__file__).parent / "sample_scan_nozomi.json")
 
 
+class BatchExportSafetyTests(BatchViewTestCase):
+    """An export that fails half-way must never destroy the file it was meant to replace (review finding 4)."""
+
+    def failing(self, original):
+        def write(path, *args, **kwargs):
+            Path(path).write_text("rank,partial", encoding="utf-8")
+            raise OSError(28, "No space left on device")
+
+        return write
+
+    def test_a_failed_ranked_export_leaves_the_existing_file_untouched(self):
+        view = self.load()
+        target = self.work / "ranked.csv"
+        target.write_text("the previous export", encoding="utf-8")
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        with mock.patch("batch.write_results", side_effect=self.failing(target)):
+            view.export()
+        self.assertEqual(target.read_text(encoding="utf-8"), "the previous export")
+        self.assertEqual(list(self.work.glob(".ot-triage-*")), [])
+        self.assertIn("No space left", self.ctx.error.call_args[0][1])
+        self.assertFalse(self.ctx.info.called)
+
+    def test_a_failed_roll_up_export_leaves_the_existing_file_untouched(self):
+        found = self.write_csv("f.csv", "id,asset_id,asset,exposure,cvss,threat\nA,PLC-1,standard,low,5.0,none\n")
+        view = self.load(found)
+        view.set_mode("assets")
+        target = self.work / "assets.csv"
+        target.write_text("the previous roll-up", encoding="utf-8")
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        with mock.patch("rollup.write_rollup", side_effect=self.failing(target)):
+            view.export_assets()
+        self.assertEqual(target.read_text(encoding="utf-8"), "the previous roll-up")
+        self.assertEqual(list(self.work.glob(".ot-triage-*")), [])
+        self.assertIn("No space left", self.ctx.error.call_args[0][1])
+
+    def test_a_successful_export_replaces_the_file_and_leaves_no_temporary_file(self):
+        view = self.load()
+        target = self.work / "ranked.csv"
+        target.write_text("old", encoding="utf-8")
+        self.ctx.save_file = mock.Mock(return_value=str(target))
+        view.export()
+        self.assertTrue(target.read_text(encoding="utf-8-sig").startswith("rank,"))
+        self.assertEqual(list(self.work.glob(".ot-triage-*")), [])
+
+
 class BatchImportTests(BatchViewTestCase):
     """The Import scan button: read an export, preview it, save the findings and inventory, open them."""
 
