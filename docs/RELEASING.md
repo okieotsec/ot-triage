@@ -25,7 +25,7 @@ To confirm the bundle is what the tag says, check out the tag and run `python3 t
 
 The attestation is a signed statement, recorded by GitHub, that names the zip's SHA-256, the repository, the tag's commit and the workflow that built it. It is made with short-lived keys from GitHub's workflow identity, so there is no signing key to keep or lose. It proves where the file came from, not that the code is free of defects. GitHub documents this kind of attestation as SLSA build provenance at Build Level 2. Releases made before the workflow existed have no attestation.
 
-The workflow's first run on a real tag has not happened yet. After the first release made this way, record in the checkpoint report that `gh attestation verify` succeeded.
+The first release made this way was 0.9.0, and `gh attestation verify` succeeded on its bundle. After each release, record in the checkpoint report that it succeeded again.
 
 ## Why there is no .exe
 
