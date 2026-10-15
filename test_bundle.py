@@ -48,7 +48,7 @@ class ContentTests(BundleCase):
             self.assertFalse(name.startswith("/") or ".." in Path(name).parts or "\\" in name, name)
 
     def test_it_has_what_a_person_needs(self):
-        for needed in ("ot_triage_gui.py", "ot_triage_cli.py", "ot_triage_import.py", "scanimport.py",
+        for needed in ("ot_triage_gui.py", "ot_triage_cli.py", "ot_triage_import.py", "scanimport.py", "safefile.py",
                        "OT Triage.pyw", "README.md", "LICENSE", "CHANGELOG.md",
                        "SECURITY.md", "THIRD_PARTY_NOTICES.md", "START-HERE.txt", "sbom/sbom.cdx.json",
                        "docs/CLI.md", "docs/POLICY.md", "sample_inventory.csv", "sample_scan_nessus.csv",

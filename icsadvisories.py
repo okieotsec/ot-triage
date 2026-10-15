@@ -723,27 +723,30 @@ def _meta(data_dir):
     return {k: threatdata._label(meta.get(k, "")) for k in ("source", "retrieved_at", "sha256", "count")}
 
 
-def _install(raw, source, data_dir, now):
+def _install(raw, source, data_dir, now, strict=False):
+    """Validate the archive and replace the stored index; see threatdata._install for what strict does."""
     data = parse_archive(raw)
     index = to_index(data)
     parse_index(index)  # what is stored must read back exactly as it will be used
     data_dir = Path(data_dir)
+    problems = threatdata.rollback_problems(status(data_dir), data.feed_date, len(data.advisories))
+    note = threatdata._refuse_or_note(problems, strict)
     threatdata._write_atomic(data_dir / ICS_FILE, index)
     meta = {"source": threatdata._label(source), "retrieved_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "sha256": hashlib.sha256(index).hexdigest(), "count": str(len(data.advisories))}
     threatdata._write_atomic(data_dir / ICS_META_FILE, json.dumps({"version": 1, **meta}, indent=2).encode("utf-8"))
-    return len(data.advisories), len(data.by_cve)
+    return len(data.advisories), len(data.by_cve), note
 
 
-def _run(produce, source, data_dir, now):
+def _run(produce, source, data_dir, now, strict=False):
     try:
-        advisories, cves = _install(produce(), source, data_dir, now)
+        advisories, cves, note = _install(produce(), source, data_dir, now, strict)
     except ThreatDataError as error:
         return SourceResult("ics", False, f"ICS advisories not updated: {error}. The previous copy was kept.")
     except OSError as error:
         return SourceResult("ics", False, f"ICS advisories not updated: file error ({error.strerror or error}). "
                                           "The previous copy was kept.")
-    return SourceResult("ics", True, f"ICS advisories updated: {advisories:,} advisories naming {cves:,} CVEs.")
+    return SourceResult("ics", True, f"ICS advisories updated: {advisories:,} advisories naming {cves:,} CVEs.{note}")
 
 
 def update_from_network(data_dir=None, fetcher=None, now=None, cancel=None, progress=None):
@@ -763,7 +766,7 @@ def update_from_network(data_dir=None, fetcher=None, now=None, cancel=None, prog
         raw = fetcher(ICS_URL, ICS_MAX_COMPRESSED, ICS_HOSTS, **kwargs)
     except FetchError as error:
         return SourceResult("ics", False, f"ICS advisories not updated: {error}. The previous copy was kept.")
-    return _run(lambda: raw, ICS_URL, data_dir, now)
+    return _run(lambda: raw, ICS_URL, data_dir, now, strict=True)
 
 
 def import_from_file(path, data_dir=None, now=None):

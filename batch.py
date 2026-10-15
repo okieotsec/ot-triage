@@ -1,10 +1,10 @@
 """Batch scoring of vulnerabilities from a CSV file (no GUI dependencies)."""
 import csv
-import os
 from dataclasses import dataclass, field
 
 import cvss
 import explain
+import safefile
 from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Result, Threat, parse_cvss, prioritize
 from references import clean, describe
 from settings import DEFAULT_SETTINGS
@@ -110,9 +110,9 @@ def _norm_header(name):
 
 def read_rows(path):
     """Return [(line_number, {normalized_header: stripped_value})], skipping fully blank rows."""
-    if os.path.getsize(path) > MAX_FILE_BYTES:
-        raise ValueError(f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
-    with open(path, newline="", encoding="utf-8-sig") as fh:
+    with safefile.open_regular(path, False, MAX_FILE_BYTES, ValueError,
+                               f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB",
+                               newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
         try:
             header = next(reader)
@@ -149,7 +149,7 @@ def read_rows(path):
 
 def has_cve_column(path):
     """Return True if the CSV file has a cve column."""
-    with open(path, newline="", encoding="utf-8-sig") as fh:
+    with safefile.open_regular(path, False, newline="", encoding="utf-8-sig") as fh:
         header = next(csv.reader(fh), [])
     return "cve" in [_norm_header(h) for h in header]
 

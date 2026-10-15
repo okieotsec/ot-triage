@@ -118,13 +118,14 @@ For each item, mark Pass, Fail (with a finding), or N/A.
 **Files and storage**
 - [ ] Temp files are created securely (`tempfile`), and the stored copy is replaced atomically only after validation passes.
 - [ ] A failed update leaves the previous data in place.
+- [ ] A network update refuses a download dated earlier than the stored copy or with more than 20% fewer entries, keeps the stored copy and says why; a file import is allowed with a note (CP25-01).
 - [ ] Data and settings files are written with user-only permissions where the OS supports it.
 - [ ] No paths are built from untrusted input.
 
 **Output and integrity**
 - [ ] CSV export neutralizes formula-leading characters in every text cell, **including header cells copied from an input file** (CP23-01).
 - [ ] Every file the tool writes over an existing one is written to a temporary file and moved into place, so a failure keeps the old file (CP23-04).
-- [ ] Every file read is opened once, checked as a regular file and held to its size limit on that open file (CP23-05).
+- [ ] Every file read, in every loader (findings, inventory, previous export, settings, threat data), is opened once, checked as a regular file and held to its size limit on that open file through `safefile.py` (CP23-05, CP25-02).
 - [ ] Exports and copied summaries include inputs, settings profile, and KEV/EPSS versions.
 - [ ] Custom settings are always visibly indicated.
 

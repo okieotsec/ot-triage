@@ -5,10 +5,10 @@ is size-limited, bad rows are skipped and counted, and a finding that cannot be 
 as ambiguous instead of being guessed at.
 """
 import csv
-import os
 from dataclasses import dataclass, field
 
 import explain
+import safefile
 from prioritizer import NEVER, NEXT, NOW
 from references import clean
 
@@ -114,9 +114,9 @@ def _score(text):
 def load_previous(path):
     """Read a previous ranked export. Return (rows, skipped); raise CompareError if it cannot be used at all."""
     try:
-        if os.path.getsize(path) > MAX_FILE_BYTES:
-            raise CompareError(f"The previous export is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
-        with open(path, newline="", encoding="utf-8-sig") as fh:
+        with safefile.open_regular(path, False, MAX_FILE_BYTES, CompareError,
+                                   f"The previous export is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB",
+                                   newline="", encoding="utf-8-sig") as fh:
             reader = csv.DictReader(fh)
             names = [(n or "").strip().lower() for n in (reader.fieldnames or [])]
             if "priority" not in names or not {"id", "cve", "name"} & set(names):
