@@ -4,13 +4,13 @@ Scope: a new reader for a file the project parses: the Claroty xDome device-vuln
 Tools run (with versions): the project's runner (ruff 0.16.10, bandit 1.9.4, semgrep, gitleaks), the full suite on a private virtual display, mutation checks on the new tests
 Tools not run (and why): atheris (no new binary or archive parser; the CSV reader is the one every importer already uses), osv-scanner and pip-audit (no dependencies)
 
-How it was made. The project lead obtained one demo export of the report as an Excel file and shared its content with the developer for guidance. It was used for the column names, the layout and the kinds of rows, and was then deleted at the lead's request. None of its content (device names, hostnames, addresses, ids) is in the repository: a search of every new and changed file for each device name, host name part and address in it found nothing. The sample is invented in the same plant ("Cedar Creek") and address ranges as the other samples.
+How it was made. The reader was written from the column layout and the kinds of rows of one Claroty report. Only that layout was used. None of the report's content (device names, hostnames, addresses, ids) is in the repository: a search of every new and changed file for each device name, host name part and address in it found nothing. The sample is invented in the same plant ("Cedar Creek") and address ranges as the other samples.
 
 Finding CP26-01
 - Title: Claroty's own scores and exploitation flag must not decide a bucket, and must not be mistaken for the CVSS score
 - Severity: Info (a design risk found before building, not a vulnerability)
 - Location: the Claroty columns "CVSS V3 BASE SCORE" (a severity word), "CVSS V3 BASE SCORE POINTS" (the number), "ADJUSTED VULNERABILITY SCORE", "DEVICE RISK SCORE", "ACTIVELY EXPLOITED", "EPSS SCORE"
-- Description: the export has three scores and a flag that look usable. Reading the severity word as a score gives no score; reading the adjusted or device score would put the vendor's opinion into a bucket; the exploitation flag is set on 39% of the demo rows. The policy (docs/POLICY.md and the earlier importers) is that a scanner's own scores, likelihoods and exploit fields are not used: the threat level comes from CISA KEV and EPSS data.
+- Description: the export has three scores and a flag that look usable. Reading the severity word as a score gives no score; reading the adjusted or device score would put the vendor's opinion into a bucket; the exploitation flag is set on a large share of the rows. The policy (docs/POLICY.md and the earlier importers) is that a scanner's own scores, likelihoods and exploit fields are not used: the threat level comes from CISA KEV and EPSS data.
 - What was done: only the numeric CVSS column is read (the word column is a fallback only if it holds a number); the other columns are never read. A test builds the same row with those columns quiet and loud and requires identical findings with no threat level set.
 - Status: prevented by design and by test. Confidence: Confirmed.
 
@@ -24,7 +24,7 @@ Finding CP26-02
 Finding CP26-03
 - Title: "Potentially Relevant" rows
 - Severity: Info
-- Description: Claroty marks a device-vulnerability pair "Potentially Relevant" when it has not confirmed that the device is affected (252 of 525 rows in the demo). Dropping them would treat "not confirmed" as safe; keeping them silently would mix them in.
+- Description: Claroty marks a device-vulnerability pair "Potentially Relevant" when it has not confirmed that the device is affected (about half of the rows in the layout it was written from). Dropping them would treat "not confirmed" as safe; keeping them silently would mix them in.
 - What was done (owner's decision, 2026-10-15): they are kept, marked ` [potentially relevant]` at the end of the finding's name, counted in the summary note, and `--only-confirmed` leaves them out. The Import scan dialog keeps them (the option is command-line only for now).
 - Status: fixed as decided. Confidence: Confirmed.
 

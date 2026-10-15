@@ -43,7 +43,7 @@ the start of its header in the message, rather than guessed at. The Nozomi and D
 
 ## Claroty: what is used
 
-The Claroty reader was written from one demo export of the *device-vulnerability pairs* report (saved as CSV UTF-8; an `.xlsx` file is not read, so open it in Excel and use **Save As → CSV UTF-8**). It is not experimental in the sense of the Nozomi and Dragos readers, which have never seen an export, but it has seen only one, so each run says so and another report layout may not be recognised.
+The Claroty reader was written from one layout of the *device-vulnerability pairs* report, saved as CSV UTF-8 (an `.xlsx` file is not read, so open it in Excel and use **Save As → CSV UTF-8**). Another layout, or a newer product version, may not be recognised: a file whose header is not known is refused with the start of its header in the message, and each run says that the reader has seen one layout.
 
 * **One finding per device and CVE.** The device name is the asset (`DOMAIN\HOST` as Claroty writes it; use an aliases file to join it to the same device's name in another tool). A row that names several CVEs, as the grouped advisories do, becomes one finding for each, and each gets the **row's score**, which belongs to the whole advisory and may overstate a single CVE. The score is the number in *CVSS V3 Base Score Points*; the column of severity words is never read as a score.
 * **The device's addresses** (up to four, without "Last known IP") go into the inventory's `name` column, to help you write the aliases file.
