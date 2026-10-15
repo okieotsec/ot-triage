@@ -1434,7 +1434,7 @@ class ClarotyTests(Case):
         findings, assets, report = self.read(SAMPLES / "claroty/device_vulns.csv")
         self.assertEqual(report.format, "Claroty xDome device-vulnerability pairs")
         self.assertEqual((report.rows, report.kept), (15, 14))
-        self.assertIn("one demo export only", report.note)
+        self.assertIn("one Claroty report layout", report.note)
         self.assertIn("3 rows are 'potentially relevant'", report.note)
         self.assertEqual(len(findings), 14)
         self.assertEqual(assets["cedarcreek\\cc-eng-02"].name, "192.0.2.22, 192.0.2.122")
