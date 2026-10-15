@@ -270,7 +270,7 @@ class BatchView:
     # ---- importing scanner exports ----
     def import_scanner(self):
         """Ask for scanner export files, read them in the background, then show what would be imported."""
-        paths = self.ctx.open_files("Select scanner exports (Nessus, Tenable, OpenVAS, Nozomi, Dragos)",
+        paths = self.ctx.open_files("Select scanner exports (Nessus, Tenable, OpenVAS, Claroty, Nozomi, Dragos)",
                                     gui_import.EXPORT_TYPES)
         if not paths:
             return
@@ -586,7 +586,7 @@ class BatchView:
         self.detail_title.configure(text="Select a row to see why." if self.state.items else
                                     "Open a CSV file to score it. Required columns: cvss (or cvss_vector), asset, "
                                     "exposure (or asset_id with an inventory), and threat (or cve). A scanner "
-                                    "export (Nessus, Tenable, OpenVAS, Nozomi, Dragos): use Import scan\u2026")
+                                    "export (Nessus, Tenable, OpenVAS, Claroty, Nozomi, Dragos): use Import scan\u2026")
         self.detail_chips.set_items([])
         self.detail_text.configure(text="")
         self._show_references(())

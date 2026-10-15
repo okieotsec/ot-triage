@@ -4,9 +4,10 @@
     python3 ot_triage_import.py nessus.csv openvas.csv -o findings.csv
     python3 ot_triage_import.py scan.csv -o findings.csv -i inventory.csv --inventory-out new.csv --aliases aliases.csv
 
-It reads Nessus CSV, Tenable Vulnerability Management CSV and OpenVAS / Greenbone CSV exports (see docs/IMPORT.md). It
-never uses the network, never changes an input file, and never scores anything: the files it writes are ranked by
-ot_triage_cli.py or the Batch view with the same rules as any other findings file.
+It reads Nessus, Tenable Vulnerability Management, OpenVAS / Greenbone and Claroty CSV exports, Nessus XML, and Nozomi
+and Dragos JSON (see docs/IMPORT.md). It never uses the network, never changes an input file, and never scores
+anything: the files it writes are ranked by ot_triage_cli.py or the Batch view with the same rules as any other
+findings file.
 Exit codes: 0 done, 1 a file could not be used, 2 wrong arguments.
 """
 import argparse
@@ -24,8 +25,8 @@ def build_parser():
     """The command-line arguments."""
     parser = argparse.ArgumentParser(
         prog="ot_triage_import.py", description="Turn scanner exports into findings and inventory files for OT Triage.",
-        epilog="Reads Nessus, Tenable Vulnerability Management and OpenVAS CSV exports. Exit codes: 0 done, "
-               "1 a file could not be used, 2 wrong arguments.")
+        epilog="Reads Nessus, Tenable, OpenVAS and Claroty CSV, Nessus XML, Nozomi and Dragos JSON. Exit codes: "
+               "0 done, 1 a file could not be used, 2 wrong arguments.")
     parser.add_argument("exports", nargs="+", metavar="EXPORT", help="one or more scanner export files (CSV)")
     parser.add_argument("-o", "--output", required=True, metavar="CSV", help="where to save the findings")
     parser.add_argument("-i", "--inventory", metavar="CSV", help="your existing asset inventory (never changed)")
@@ -36,6 +37,9 @@ def build_parser():
     parser.add_argument("--min-qod", type=int, default=scanimport.DEFAULT_MIN_QOD, metavar="N",
                         help=f"OpenVAS: skip detections with a Quality of Detection below N (default "
                              f"{scanimport.DEFAULT_MIN_QOD})")
+    parser.add_argument("--only-confirmed", action="store_true",
+                        help="Claroty: leave out rows Claroty marks 'potentially relevant' (otherwise they are kept "
+                             "and marked in the finding name)")
     parser.add_argument("--default-threat", choices=scanimport.THREAT_LEVELS,
                         help="give findings with no CVE this threat level (otherwise they need one added by hand)")
     parser.add_argument("--force", action="store_true", help="replace output files that already exist")
@@ -54,7 +58,8 @@ def run(args, out):
     if not 0 <= args.min_qod <= 100:
         raise CliError("--min-qod must be between 0 and 100")
     aliases = scanimport.load_aliases(args.aliases) if args.aliases else None
-    result = scanimport.import_exports(args.exports, aliases, args.min_qod, args.default_threat or "")
+    result = scanimport.import_exports(args.exports, aliases, args.min_qod, args.default_threat or "",
+                                       args.only_confirmed)
     if not result.findings:
         raise scanimport.ScanImportError("nothing to import: every row was skipped (see --help for what is skipped)")
     _write_atomically(args.output, lambda p: scanimport.write_findings(p, result))
