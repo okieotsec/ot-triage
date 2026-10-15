@@ -114,11 +114,15 @@ For the reasoning behind each rule, see [docs/POLICY.md](docs/POLICY.md).
 3. **Patch available**: strong controls lower the bucket one level, but never below NEXT for actively exploited items.
 4. **No patch (pending or end of life)**: with CVSS of 4.0 or more, the bucket is raised one level unless strong controls are in place. Strong controls withhold the raise but earn no additional downgrade. End-of-life items with CVSS of 7.0 or more are floored at NEXT, since they need a replacement plan.
 5. **Exposed crown jewel floor**: a crown jewel with high exposure and CVSS of 4.0 or more is never below NEXT.
-6. **Controls and ranking**: partial controls never change the bucket and lower the ordering score by 0.5; strong controls lower it by 1.0 (and can also lower the bucket, see rule 3).
+6. **High-CVSS crown jewel floor**: a crown jewel with CVSS of 7.0 or more is never below NEXT, at any exposure and with any controls.
+7. **Controls and ranking**: partial controls never change the bucket and lower the ordering score by 0.5; strong controls lower it by 1.0 (and can also lower the bucket, see rule 3).
+8. **The action follows the bucket**: a NEVER result says there is no scheduled fix and what to do at a routine opportunity, instead of "Apply the patch".
+
+When the CVSS vector says the flaw can be attacked over a network and exposure is Low, Assess and Batch add an **exposure check** note asking you to confirm Low by testing. The note never changes the bucket or the ordering score.
 
 The **ordering score** (0 to 10) only ranks items within a bucket; it never decides the bucket.
 
-Two CVSS lines in these rules (7.0 and 9.0) can be adjusted within limits; see [docs/SETTINGS.md](docs/SETTINGS.md). Values shown above are the defaults.
+Two CVSS lines in these rules (7.0 and 9.0, and 7.0 is also the line in rule 6) can be adjusted within limits; see [docs/SETTINGS.md](docs/SETTINGS.md). Values shown above are the defaults.
 
 **Low exposure** means no routable path from IT or the internet, verified by testing, not assumed from a firewall's existence.
 
@@ -180,8 +184,9 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP21 | Security process: NIST SSDF and MITRE SAF alignment, suppression gate, CI hardening, release provenance | [reports/cp21-security-framework](reports/cp21-security-framework/claude.md) |
 | CP22 | Scanner import: the Import scan button in Batch | [reports/cp22-import-gui](reports/cp22-import-gui/claude.md) |
 | CP23 | Independent AI review of 0.9.0 (OpenAI Codex): triage and fixes | [reports/cp23-independent-review-fixes](reports/cp23-independent-review-fixes/claude.md), [the review itself](reports/independent-review-codex/codex-report.md) |
+| CP24 | Crown jewel floor for high CVSS, the NEVER action text and the exposure check note | [reports/cp24-crown-jewel-floor](reports/cp24-crown-jewel-floor/claude.md) |
 
-Across the checkpoints 53 findings were recorded (1 High, 5 Medium, 18 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
+Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 
 Techniques used:
 

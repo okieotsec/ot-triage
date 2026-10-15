@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass, field
 
 import cvss
+import explain
 from prioritizer import NEVER, NEXT, NOW, Asset, Controls, Exposure, Patch, Result, Threat, parse_cvss, prioritize
 from references import clean, describe
 from settings import DEFAULT_SETTINGS
@@ -82,6 +83,7 @@ class BatchItem:
     cvss_vector: str = ""
     cvss_version: str = ""
     cvss_environmental: float = None   # shown for comparison only; the priority always uses the base score
+    network_attackable: bool = False   # the vector says Network; only used for the exposure check note
     requirements_from_inventory: bool = False
     threat_sources: str = ""
     references: tuple = ()
@@ -171,6 +173,7 @@ def _read_cvss(item, vector_text, errors, requirements=None):
         errors.append(f"cvss_vector: {e}")
         return
     item.cvss_vector, item.cvss_version, score = parsed.normalized, parsed.version, parsed.score
+    item.network_attackable = parsed.network_attackable
     effective = cvss.with_requirements(parsed, requirements or {})
     item.cvss_environmental = effective.environmental_score
     item.requirements_from_inventory = effective is not parsed
@@ -308,8 +311,13 @@ OUTPUT_COLUMNS = ["rank", "id", "cve", "name", "priority", "ordering_score", "cv
                   "exposure", "patch", "controls", "action", "rationale", "threat_source", "threat_data",
                   "scoring_settings", "error", "source_line", "references", "forensic_triage", "asset_id",
                   "from_inventory", "cvss_environmental", "ics_advisories", "ics_remediation",
-                  "ics_remediation_steps", "change", "previous_priority"]
+                  "ics_remediation_steps", "exposure_check", "change", "previous_priority"]
 MAX_STEPS_CELL = 1500
+
+
+def exposure_check(item):
+    """The note asking for Low exposure to be verified when the vector says Network (empty otherwise)."""
+    return explain.exposure_hint(item.network_attackable, item.inputs.get("exposure"))
 
 
 def _change_cells(comparison, item):
@@ -365,7 +373,7 @@ def write_results(path, items, threatdata=None, comparison=None):
                     rank=rank, ordering_score=f"{item.result.score:.2f}", cvss=f"{item.cvss:.1f}",
                     action=_safe(item.result.action), rationale=_safe(" | ".join(item.result.reasons)),
                     threat_source=_safe(item.threat_sources), threat_data=_safe(data_versions),
-                    scoring_settings=item.result.profile,
+                    scoring_settings=item.result.profile, exposure_check=exposure_check(item),
                     **{k: item.inputs[k].value for k in FIELD_ENUMS},
                 )
             else:

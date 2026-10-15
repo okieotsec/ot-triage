@@ -210,6 +210,8 @@ class AssessView:
         Segmented(env, s, _options(Asset), state.asset).pack(fill=tk.X)
         field_label(env, s, "Network exposure", EXPOSURE_HELP)
         Segmented(env, s, _options(Exposure), state.exposure).pack(fill=tk.X)
+        self.exposure_hint = MessageLabel(env, s, fg=t.warn)
+        self.exposure_hint.pack(fill=tk.X)
         self._build_requirements(env)
 
         rem = card(parent, s, "Remediation & mitigation")
@@ -413,6 +415,7 @@ class AssessView:
         t, state = self.style.theme, self.state
         self._update_threat_controls()
         self._set_advisories()
+        self.exposure_hint.configure(text=self._exposure_hint())
         raw = state.cvss.get().strip()
         self._update_cvss_band(raw)
         self._refresh_environmental()
@@ -475,6 +478,11 @@ class AssessView:
             self.advisories_card.pack(fill=tk.X, pady=(0, 16), before=self.what_card)
         else:
             self.advisories_card.pack_forget()
+
+    def _exposure_hint(self):
+        """A note under Network exposure when the vector says Network but Low is chosen. It sets nothing."""
+        info = self.state.vector_info
+        return explain.exposure_hint(info is not None and info.network_attackable, Exposure[self.state.exposure.get()])
 
     def _patch_hint(self):
         """A note under Patch status saying what the newest CISA advisory says about a fix. It sets nothing."""
@@ -677,6 +685,9 @@ class AssessView:
         if effective.environmental_score is not None:
             lines.append(f"CVSS environmental score: {effective.environmental_score:.1f} (shown for comparison; the "
                          "priority uses the base score)")
+        hint = self._exposure_hint()
+        if hint:
+            lines.append(f"Exposure check: {hint}")
         return lines
 
     def _vector_too_long(self):

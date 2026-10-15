@@ -611,6 +611,8 @@ class BatchView:
                 if item.cvss_environmental is not None:
                     lines.append(f"Environmental score: {item.cvss_environmental:.1f}, shown for comparison; the "
                                  "priority uses the base score.")
+                if batch.exposure_check(item):
+                    lines.append(f"Exposure check: {batch.exposure_check(item)}")
             change = self.state.comparison.changes.get(id(item)) if self.state.comparison else None
             if change is not None and change.text:
                 was = change.previous

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Policy changes found by the owner while testing (CP24):** (1) a crown jewel with CVSS of 7.0 or more is never NEVER, at any exposure and with any controls; before, a 9.8 on a crown jewel with Low exposure and strong controls was NEVER. (2) A NEVER result says "No scheduled fix" and what to do at a routine opportunity instead of "Apply the patch". (3) When the CVSS vector says Network and exposure is Low, Assess and Batch show an exposure check note asking you to confirm Low by testing; Batch exports gain an `exposure_check` column. The note never changes a bucket or an ordering score. See docs/POLICY.md decisions 5 to 7. **This changes some results:** crown jewels with CVSS 7.0 or more that were NEVER are now NEXT.
+
 - **Fixes from an independent AI review of 0.9.0** (OpenAI Codex; the report is archived unchanged in `reports/independent-review-codex/`, the triage is in CP23): a formula in the header of an existing inventory is now defused when the importer writes the extended copy; a scanner cell holding thousands of distinct CVE ids is read in time proportional to its size (it was quadratic); the Batch exports (ranked CSV and asset roll-up) are written atomically, so a failure keeps the previous file; scanner inputs are opened once and checked as regular files within the size limit (a named pipe or device is refused, a file that grows is still held to the limit); the release workflow refuses a tag that does not match `version.py`. Wording corrected where a claim was too strong (the SBOM, reproducible builds, and how downloaded data is validated). Four items wait for the owner's decision, listed in CP23.
 
 ## 0.9.0 (2026-10-14)

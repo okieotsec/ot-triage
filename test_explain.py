@@ -217,3 +217,18 @@ class FactorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExposureHintTests(unittest.TestCase):
+    def test_only_a_network_flaw_with_low_exposure_gets_the_note(self):
+        self.assertIn("Confirm Low by testing", explain.exposure_hint(True, Exposure.LOW))
+        self.assertEqual(explain.exposure_hint(True, Exposure.MEDIUM), "")
+        self.assertEqual(explain.exposure_hint(True, Exposure.HIGH), "")
+        self.assertEqual(explain.exposure_hint(False, Exposure.LOW), "")
+        self.assertEqual(explain.exposure_hint(False, None), "")
+
+    def test_the_note_never_changes_the_result(self):
+        before = prioritize(9.8, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG, Patch.AVAILABLE)
+        explain.exposure_hint(True, Exposure.LOW)
+        self.assertEqual(before, prioritize(9.8, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG,
+                                            Patch.AVAILABLE))

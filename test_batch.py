@@ -445,9 +445,10 @@ class KevReferenceTests(unittest.TestCase):
             with open(path, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh)
                 rows = list(reader)
-        self.assertEqual(reader.fieldnames[-10:], ["references", "forensic_triage", "asset_id", "from_inventory",
+        self.assertEqual(reader.fieldnames[-11:], ["references", "forensic_triage", "asset_id", "from_inventory",
                                                    "cvss_environmental", "ics_advisories", "ics_remediation",
-                                                   "ics_remediation_steps", "change", "previous_priority"])
+                                                   "ics_remediation_steps", "exposure_check", "change",
+                                                   "previous_priority"])
         by_cve = {r["cve"]: r for r in rows}
         kev_row = by_cve["CVE-2024-0001"]
         self.assertEqual(kev_row["forensic_triage"], "Yes")
@@ -615,3 +616,30 @@ class IcsAdvisoryBatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExposureCheckTests(unittest.TestCase):
+    ROW = {"threat": "none", "asset": "crown", "exposure": "low", "controls": "strong"}
+    NETWORK = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+
+    def export(self, rows):
+        items = [batch.score_row(n + 2, row) for n, row in enumerate(rows)]
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "out.csv")
+            batch.write_results(path, batch.sort_items(items), None)
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                return list(csv.DictReader(fh))
+
+    def test_a_network_vector_on_a_low_exposure_row_gets_the_note_without_changing_the_result(self):
+        plain, networked = self.export([{**self.ROW, "cvss": "9.8"}, {**self.ROW, "cvss_vector": self.NETWORK}])
+        by_vector = {r["cvss_vector"]: r for r in (plain, networked)}
+        with_note, without = by_vector[self.NETWORK], by_vector[""]
+        self.assertIn("Confirm Low by testing", with_note["exposure_check"])
+        self.assertEqual(without["exposure_check"], "")
+        for column in ("priority", "ordering_score", "action", "rationale"):
+            self.assertEqual(with_note[column], without[column], column)
+
+    def test_no_note_for_other_exposure_or_other_attack_vectors(self):
+        rows = self.export([{**self.ROW, "exposure": "medium", "cvss_vector": self.NETWORK},
+                            {**self.ROW, "cvss_vector": self.NETWORK.replace("AV:N", "AV:L")}])
+        self.assertEqual([r["exposure_check"] for r in rows], ["", ""])
