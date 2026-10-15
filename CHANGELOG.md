@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Claroty xDome import (CP26).** `ot_triage_import.py` and Batch's **Import scan…** now read the Claroty xDome *device-vulnerability pairs* report, saved as CSV UTF-8 (open an `.xlsx` in Excel and use Save As). It is the first reader written from a real vendor export, one demo export, so each run says that another Claroty layout may not be recognised. One finding per device and CVE, with the row's CVSS number (a row that names several CVEs gives each the row's score); rows with a resolution or patch-install date are skipped; rows Claroty marks *Potentially Relevant* are kept and marked ` [potentially relevant]` in the finding's name, and `--only-confirmed` leaves them out; the device's addresses go into the inventory's `name` column to help write an aliases file. Claroty's own risk scores, its *Actively Exploited* flag and its EPSS column are not used: the threat level still comes from KEV and EPSS data. A fictional sample (`samples/scanners/claroty/device_vulns.csv`, `sample_scan_claroty.csv` in the bundle) and its expected findings are included. See docs/IMPORT.md.
+
 ## 0.9.1 (2026-10-15)
 
 - **A crown jewel with CVSS of 7.0 or more is never NEVER (CP24).** Before, a 9.8 on a crown jewel with Low exposure and strong controls came out as NEVER, because strong controls lowered it one level and the existing floor needed High exposure. Now a crown jewel at or above the "High" CVSS line (7.0 by default) is at least NEXT, at any exposure and with any controls. Strong controls still rank it lower inside the bucket. Important and standard assets are not affected. **This changes some results.** See docs/POLICY.md, decision 5.

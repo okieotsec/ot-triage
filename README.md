@@ -71,7 +71,7 @@ Each [release](https://github.com/okieotsec/ot-triage/releases) has a portable b
 | View | What it does |
 | --- | --- |
 | **Assess** | Score one vulnerability. Optionally look up a CVE in the local KEV, EPSS and CISA ICS advisory data to fill in the threat level. Shows the bucket, why-chips, the recommended action, the reference links CISA lists for a KEV entry, the ICS advisories that name the CVE with what each vendor says to do about it, and what single change would move the result. |
-| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. **By asset** groups the findings by `asset_id`: the worst bucket on each asset, how many NOW, NEXT and NEVER findings it has, and what could be handled on one outage window. **Compare with previous…** reads an earlier ranked export and shows what is new, what moved up or down and what was resolved since. **Import scan…** turns a Nessus, Tenable, OpenVAS, Nozomi or Dragos export into findings and an inventory, with a preview of what is imported and skipped. |
+| **Batch** | Score a CSV file. Click a bucket counter to filter, search, sort by any column, and export the ranked results. **By asset** groups the findings by `asset_id`: the worst bucket on each asset, how many NOW, NEXT and NEVER findings it has, and what could be handled on one outage window. **Compare with previous…** reads an earlier ranked export and shows what is new, what moved up or down and what was resolved since. **Import scan…** turns a Nessus, Tenable, OpenVAS, Claroty, Nozomi or Dragos export into findings and an inventory, with a preview of what is imported and skipped. |
 | **Threat data** | See how fresh the KEV, EPSS and ICS advisory data is. Update it (after a confirmation) or import files for offline use. |
 | **Settings** | Change the four scoring settings with live validation, and choose the theme and text size. |
 | **About** | Version, the exposure definition, where the categories come from, and the documentation. |
@@ -142,7 +142,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 - [docs/CVSS.md](docs/CVSS.md): pasting CVSS vectors, supported versions and how the scores were verified
 - [docs/THREAT_DATA.md](docs/THREAT_DATA.md): KEV, EPSS and ICS advisory data, offline updates and safety checks
 - [docs/CLI.md](docs/CLI.md): the command line, for scripts and scheduled jobs
-- [docs/IMPORT.md](docs/IMPORT.md): importing Nessus, Tenable and OpenVAS exports into findings and an inventory
+- [docs/IMPORT.md](docs/IMPORT.md): importing Nessus, Tenable, OpenVAS, Claroty, Nozomi and Dragos exports into findings and an inventory
 - [docs/INVENTORY.md](docs/INVENTORY.md): the asset inventory, which fills in asset criticality, exposure and controls, the per-asset view and comparing with a previous export
 - [docs/SETTINGS.md](docs/SETTINGS.md): adjustable settings, defaults, limits and file handling
 - [docs/GUI_PROPOSAL.md](docs/GUI_PROPOSAL.md): proposed GUI refresh (open [docs/gui-mockup.html](docs/gui-mockup.html) in a browser)
@@ -186,6 +186,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP23 | Independent AI review of 0.9.0 (OpenAI Codex): triage and fixes | [reports/cp23-independent-review-fixes](reports/cp23-independent-review-fixes/claude.md), [the review itself](reports/independent-review-codex/codex-report.md) |
 | CP24 | Crown jewel floor for high CVSS, the NEVER action text and the exposure check note | [reports/cp24-crown-jewel-floor](reports/cp24-crown-jewel-floor/claude.md) |
 | CP25 | Threat data downloads never go back in time; every file read is checked as a regular file | [reports/cp25-feed-rollback-and-file-checks](reports/cp25-feed-rollback-and-file-checks/claude.md) |
+| CP26 | Scanner import: Claroty xDome device-vulnerability pairs | [reports/cp26-claroty-import](reports/cp26-claroty-import/claude.md) |
 
 Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 

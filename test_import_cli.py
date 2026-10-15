@@ -15,6 +15,7 @@ from version import __version__
 HERE = Path(__file__).parent
 NESSUS = HERE / "sample_scan_nessus.csv"
 OPENVAS = HERE / "sample_scan_openvas.csv"
+CLAROTY = HERE / "sample_scan_claroty.csv"
 
 
 class ImportCliCase(unittest.TestCase):
@@ -48,6 +49,24 @@ class RunTests(ImportCliCase):
         self.assertIn(f"Wrote {out}", text)
         self.assertIn("assets were seen; add --inventory-out", text)
         self.assertEqual(len(self.rows(out)), 10)
+
+    def test_claroty_rows_that_are_potentially_relevant_are_kept_unless_asked_to_leave_them_out(self):
+        code, text, _err = self.run_cli(str(CLAROTY), "-o", str(self.dir / "all.csv"), "--default-threat", "none")
+        self.assertEqual(code, 0)
+        self.assertIn("sample_scan_claroty.csv: Claroty xDome device-vulnerability pairs, 15 rows, 14 findings kept",
+                      text)
+        self.assertIn("  skipped 1: patch already installed", text)
+        self.assertIn("3 rows are 'potentially relevant'", text)
+        every = self.rows(self.dir / "all.csv")
+        self.assertEqual(len(every), 14)
+        self.assertEqual(sum("[potentially relevant]" in r["name"] for r in every), 3)
+        code, text, _err = self.run_cli(str(CLAROTY), "-o", str(self.dir / "only.csv"), "--only-confirmed",
+                                        "--default-threat", "none")
+        self.assertEqual(code, 0)
+        self.assertIn("  skipped 3: not confirmed (potentially relevant)", text)
+        confirmed = self.rows(self.dir / "only.csv")
+        self.assertEqual(len(confirmed), 11)
+        self.assertFalse(any("[potentially relevant]" in r["name"] for r in confirmed))
 
     def test_it_writes_an_inventory_for_the_new_assets(self):
         code, text, _err = self.run_cli(
