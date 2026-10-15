@@ -29,6 +29,8 @@ A metric left as `X` (not defined) keeps its base value, and the 4.0 defaults (`
 
 **Why the priority does not use it.** The priority already has its own inputs for the same context: how critical the asset is, how exposed it is, and what controls protect it. Feeding an environmental score into the bucket as well would count the same facts twice, and it would be a policy change. So the environmental score is shown for comparison and nothing more. That decision can be revisited (see [POLICY.md](POLICY.md)).
 
+**The attack vector adds a note, not a rule.** If the vector's attack vector (or its modified attack vector) is Network and Network exposure is Low, Assess shows an "exposure check" note under the exposure control and in the reasoning and summaries, and Batch adds it to the row's details and to an `exposure_check` export column. It asks you to confirm Low by testing. It never changes the bucket or the ordering score (see [POLICY.md](POLICY.md), decision 7).
+
 You can write the environmental metrics into the vector yourself (for example with FIRST's calculators at first.org), or let the tool apply the three most useful ones for you:
 
 ### Security requirements without building a vector

@@ -6,7 +6,7 @@ Only four values can be changed. Everything else (the rule structure, the 4.0 lo
 
 | Setting | Default | Allowed range | What it does |
 | --- | --- | --- | --- |
-| `cvss_high` | 7.0 | 5.0 to 8.0 | CVSS score where a vulnerability counts as "High". Used by the public-exploit rule, the no-exploit rule and the end-of-life floor. |
+| `cvss_high` | 7.0 | 5.0 to 8.0 | CVSS score where a vulnerability counts as "High". Used by the public-exploit rule, the no-exploit rule, the end-of-life floor and the crown jewel floor. |
 | `cvss_critical` | 9.0 | 8.0 to 10.0 | CVSS score where a vulnerability counts as "Critical". Used by the exposed crown jewel rule for items with no known exploitation. |
 | `epss_percentile_cutoff` | 0.95 | 0.5 to 0.999 | EPSS percentile above which exploitation is treated as likely. Used once threat data is added. |
 | `stale_days` | 7 | 1 to 90 (whole days) | Days before downloaded threat data is flagged as stale. Used once threat data is added. |

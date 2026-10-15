@@ -47,6 +47,12 @@ STRONG_SCORE_CREDIT = 1.0
 
 NOW, NEXT, NEVER = "NOW", "NEXT", "NEVER"
 _ORDER = [NOW, NEXT, NEVER]
+# What to say when the result is NEVER: no scheduled fix, but never "apply it now" next to "no scheduled remediation"
+NEVER_ACTIONS = {
+    Patch.AVAILABLE: "No scheduled fix; apply the patch with routine maintenance if convenient",
+    Patch.PENDING: "No scheduled fix; apply the vendor's patch with routine maintenance once it ships",
+    Patch.EOL: "No scheduled fix; keep the device isolated and include it in replacement planning",
+}
 
 # Points used to order items within a bucket
 _THREAT_PTS = {Threat.ACTIVE: 10, Threat.PUBLIC: 7, Threat.NONE: 3}
@@ -208,6 +214,16 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         priority = NEXT
         reasons.append("Floored at NEXT: internet-exposed crown jewel with CVSS >= 4.0")
         notes.append(Factor("Floored at NEXT: exposed crown jewel", "raise"))
+
+    # A crown jewel with a high CVSS score is never left at NEVER, at any exposure or with any controls
+    if asset is Asset.CROWN and cvss >= high and priority == NEVER:
+        priority = NEXT
+        reasons.append(f"Floored at NEXT: crown jewel with CVSS >= {_fmt(high)}, whatever the exposure or controls")
+        notes.append(Factor("Floored at NEXT: high-CVSS crown jewel", "raise"))
+
+    # The action must agree with the bucket: NEVER means no scheduled fix
+    if priority == NEVER:
+        action = NEVER_ACTIONS[patch]
 
     score = cvss * 0.3 + _THREAT_PTS[threat] * 0.25 + _ASSET_PTS[asset] * 0.25 + _EXPOSURE_PTS[exposure] * 0.2
     if controls is Controls.PARTIAL:

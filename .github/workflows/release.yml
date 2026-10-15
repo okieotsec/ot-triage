@@ -29,6 +29,15 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.14"
+      - name: Check that the tag names the version in version.py
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python -c "import version; print(version.__version__)")
+          if [ "$TAG" != "v$version" ]; then
+            echo "The tag $TAG does not match version.py ($version): nothing was built." >&2
+            exit 1
+          fi
       - name: Build the bundle (the same command as docs/RELEASING.md)
         run: python tools/make_bundle.py dist
       - name: Attest the build provenance of the bundle

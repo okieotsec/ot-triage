@@ -65,8 +65,31 @@ NEVER does not mean "safe". It means "not worth a scheduled fix under today's co
 
 **Trade-off.** Teams with solid partial controls will see more items in NOW than before. That is the cautious direction, and moving to strong controls (or patching) is how to reduce them.
 
+### 5. A crown jewel with a high CVSS score is never NEVER (approved 2026-10-14)
+
+**Rule.** A crown jewel asset with CVSS of 7.0 or more (the "High" line in the settings) is at least NEXT, at any exposure and with any compensating controls.
+
+**Why.** Decision 3 only covered *exposed* crown jewels. A 9.8 on a crown jewel with Low exposure and strong controls was NEVER, because strong controls lowered NEXT by one level. That depends on two claims that nobody checks: that exposure really is Low, and that the controls really are strong. If either is wrong, "never fix" is the wrong answer on the most important asset. NEXT puts the item on a schedule so a person has to make a conscious decision, which is the same reason as decision 3.
+
+**What stays the same.** Strong controls still lower the ordering score by 1.0, so the item ranks below the same item with no controls. Important and standard assets are not affected, and a crown jewel under 7.0 can still be NEVER.
+
+**What it replaced.** Before, CVSS 9.8 / no known exploitation / crown jewel / low exposure / strong controls was NEVER.
+
+### 6. The recommended action agrees with the bucket (approved 2026-10-14)
+
+**Rule.** A NEVER result no longer says "Apply the patch". It says "No scheduled fix" and what to do at a routine opportunity: apply the patch with routine maintenance if convenient (patch available), apply the vendor's patch once it ships (pending), or keep the device isolated and include it in replacement planning (end of life). The wording only changes the text; the bucket and the ordering score are unchanged.
+
+**Why.** The screen said "No scheduled remediation" and "Apply the patch" at the same time.
+
+### 7. The CVSS vector reminds you to verify Low exposure; it does not decide the bucket (approved 2026-10-14)
+
+**Rule.** When the vector's attack vector is Network (or the vector's modified attack vector says Network) and Network exposure is Low, Assess shows a note under the exposure control and adds an "Exposure check" line to the reasoning and the summaries, and Batch adds the line to the row's details and an `exposure_check` export column. The note says that Low must be verified by testing, and that any device that can reach the asset on the network could attack it.
+
+**Why.** The attack vector says how the flaw is reached. A flaw that is attackable over a network is a reason to doubt a Low exposure that was assumed rather than tested (decision 2). A rule that moved the bucket from the vector would count the exposure input twice, so it is a note only. It can be made a rule later, with its own tests, once real exports show how often it matters.
+
 ## Things that deliberately do not decide a bucket
 
+- **The CVSS attack vector** (decision 7). It adds a note when exposure is Low, nothing more.
 - **The CVSS environmental score** (see [CVSS.md](CVSS.md)). It is shown next to the base score, but the bucket uses the base score only. The asset criticality, exposure and controls inputs already say the same things about your environment, and counting them twice would change the rules (approved 2026-10-11: show alongside, do not change the bucket). To make it drive the bucket, that has to be a deliberate policy change with its own rule and tests.
 - **CISA ICS advisories** (see [THREAT_DATA.md](THREAT_DATA.md)). A CVE that a published CISA advisory names gets a neutral chip, a line in the reasoning and the advisory's link, but the bucket and the ordering score are unchanged. An advisory says a vendor and product are affected and what to do; it does not say the flaw is being exploited, so it adds context rather than urgency. KEV and EPSS already carry the exploitation signal. This was stated to the project owner before the feature was built; making advisories drive the bucket would be a deliberate policy change with its own rule and tests.
 
@@ -88,6 +111,8 @@ Generated from the current rules.
 | High CVSS, no exploit, standard, low exposure | 8.0 | None | Standard | Low | None | Available | **NEVER** |
 | Same, end-of-life device with strong controls | 8.0 | None | Standard | Low | Strong | End of life | **NEXT** |
 | Active, reachable, strong controls | 9.0 | Active | Standard | High | Strong | Available | **NEXT** |
+| High CVSS crown jewel, low exposure, strong controls | 9.8 | None | Crown | Low | Strong | Available | **NEXT** |
+| Same, but an important asset | 9.8 | None | Important | Low | Strong | Available | **NEVER** |
 
 ## Properties the tests enforce
 
@@ -97,6 +122,8 @@ Generated from the current rules.
 - **The CVSS environmental score never changes a priority or an ordering score**: vectors with and without environmental metrics give identical results.
 - **CISA ICS advisories never change a priority or an ordering score**: the same item with and without the advisories loaded gives identical results.
 - **Boundaries** sit exactly where documented: 4.0, 7.0 and 9.0 use "greater than or equal to".
+- **The action agrees with the bucket:** for every combination of inputs, the action starts with "No scheduled fix" if and only if the result is NEVER.
+- **A crown jewel with CVSS of 7.0 or more is never NEVER**, whatever the exposure, controls or patch status.
 
 ## When to revisit
 

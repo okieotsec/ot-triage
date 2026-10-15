@@ -16,6 +16,7 @@ import csv
 import json
 import os
 import re
+import stat
 import tempfile
 from dataclasses import dataclass, field
 from typing import ClassVar
@@ -136,27 +137,47 @@ def _score(text):
 
 def _cves(text):
     """The distinct CVE ids named in a cell (any separator), upper case, in order."""
-    found = []
+    found, seen = [], set()           # a set keeps a hostile cell with thousands of ids linear in its size
     for match in CVE_RE.findall(str(text or "")):
         cve = match.upper()
-        if cve not in found:
+        if cve not in seen:
+            seen.add(cve)
             found.append(cve)
     return found
 
 
 # ---- reading -------------------------------------------------------------------
 
+def _open_input(path, binary, limit=None, advice="", **options):
+    """Open a file to read, after checking the opened file itself (not the name it was reached by).
+
+    It must be a regular file, so a folder, a named pipe (which would block for ever) or a device is refused, and it
+    must not be over the limit, judged on the same open file so it cannot be swapped between the check and the read.
+    Raises ScanImportError; the caller closes the file.
+    """
+    name = os.path.basename(path)
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+    except OSError as error:
+        raise ScanImportError(f"{name} could not be read ({error.strerror or error})") from None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise ScanImportError(f"{name} is not a regular file (a folder, a pipe or a device cannot be imported)")
+        if limit is not None and info.st_size > limit:
+            raise ScanImportError(f"{name} is larger than {limit // (1024 * 1024)} MB{advice}")
+        return os.fdopen(fd, "rb" if binary else "r", **options)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 class _Table:
     """A CSV export read row by row, with its columns found by name (never by position)."""
 
     def __init__(self, path):
         self.path = path
-        try:
-            if os.path.getsize(path) > MAX_FILE_BYTES:
-                raise ScanImportError(f"{os.path.basename(path)} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
-            self._fh = open(path, newline="", encoding="utf-8-sig")  # noqa: SIM115 - closed in close()
-        except OSError as error:
-            raise ScanImportError(f"{os.path.basename(path)} could not be read ({error.strerror or error})") from None
+        self._fh = _open_input(path, False, MAX_FILE_BYTES, newline="", encoding="utf-8-sig")
         self._saved_limit = csv.field_size_limit(MAX_FIELD_BYTES)
         self._reader = csv.reader(self._fh)
         try:
@@ -452,11 +473,11 @@ def _load_json(path):
     """Read a JSON file (size-limited; duplicate keys and NaN are refused); return the record list inside it."""
     name = os.path.basename(path)
     try:
-        if os.path.getsize(path) > MAX_JSON_BYTES:
-            raise ScanImportError(f"{name} is larger than {MAX_JSON_BYTES // (1024 * 1024)} MB (a JSON export is read "
-                                  "whole: export it in smaller pieces)")
-        with open(path, "rb") as fh:
-            raw = fh.read()
+        advice = " (a JSON export is read whole: export it in smaller pieces)"
+        with _open_input(path, True, MAX_JSON_BYTES, advice) as fh:
+            raw = fh.read(MAX_JSON_BYTES + 1)          # a file that grows after the check is still held to the limit
+        if len(raw) > MAX_JSON_BYTES:
+            raise ScanImportError(f"{name} is larger than {MAX_JSON_BYTES // (1024 * 1024)} MB{advice}")
         doc = json.loads(raw.decode("utf-8-sig"), parse_constant=threatdata._reject_constant,
                          object_pairs_hook=threatdata._reject_duplicates)
     except ScanImportError:
@@ -588,21 +609,18 @@ def _read_nozomi_csv(table, report):
     return findings, assets
 
 
+def _first_bytes(path):
+    with _open_input(path, True) as fh:
+        return fh.read(1024)
+
+
 def _looks_like_json(path):
-    try:
-        with open(path, "rb") as fh:
-            start = fh.read(1024)
-    except OSError as error:
-        raise ScanImportError(f"{os.path.basename(path)} could not be read ({error.strerror or error})") from None
+    start = _first_bytes(path)
     return start.lstrip(b"\xef\xbb\xbf \t\r\n")[:1] in (b"{", b"[")
 
 
 def _looks_like_xml(path):
-    try:
-        with open(path, "rb") as fh:
-            start = fh.read(1024)
-    except OSError as error:
-        raise ScanImportError(f"{os.path.basename(path)} could not be read ({error.strerror or error})") from None
+    start = _first_bytes(path)
     if start[:2] in (b"\xff\xfe", b"\xfe\xff"):                      # UTF-16 with a byte order mark
         return start.decode("utf-16", errors="ignore").lstrip("\ufeff \t\r\n").startswith("<")
     return start.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<")
@@ -612,8 +630,6 @@ def _read_nessus_xml(path):
     """Read a Nessus v2 (.nessus) file; return (findings, assets, FileReport)."""
     name = os.path.basename(path)
     try:
-        if os.path.getsize(path) > MAX_FILE_BYTES:
-            raise ScanImportError(f"{name} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
         report = FileReport(name, FORMAT_NAMES[NESSUS_XML])
         reader = _NessusXml(report)
         parser = expat.ParserCreate()
@@ -622,9 +638,13 @@ def _read_nessus_xml(path):
         parser.CharacterDataHandler = reader.data
         parser.StartDoctypeDeclHandler = parser.EntityDeclHandler = reader.forbidden
         parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
-        with open(path, "rb") as fh:
+        with _open_input(path, True, MAX_FILE_BYTES) as fh:
+            total = 0
             while True:
                 chunk = fh.read(XML_CHUNK_BYTES)
+                total += len(chunk)
+                if total > MAX_FILE_BYTES:      # a file that grows while it is read is still held to the limit
+                    raise ScanImportError(f"{name} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
                 parser.Parse(chunk, not chunk)
                 if not chunk:
                     break
@@ -842,7 +862,7 @@ def write_inventory(path, result, existing=None):
         updated += touched
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh, lineterminator="\n")
-        writer.writerow(header)
+        writer.writerow([_safe(c) for c in header])         # the header is the person's own text, so it is defused too
         for row in rows:
             writer.writerow([_safe(c) for c in row])
     return new, updated
@@ -863,7 +883,7 @@ def _original_header(path):
     """The header cells exactly as written (the table keeps only normalised names)."""
     saved = csv.field_size_limit(MAX_FIELD_BYTES)
     try:
-        with open(path, newline="", encoding="utf-8-sig") as fh:
+        with _open_input(path, False, None, newline="", encoding="utf-8-sig") as fh:
             return next(csv.reader(fh))
     finally:
         csv.field_size_limit(saved)

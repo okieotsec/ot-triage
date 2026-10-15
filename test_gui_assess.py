@@ -340,6 +340,40 @@ class AssessVectorTests(AssessTestCase):
         self.assertEqual(str(self.view.vector_message.cget("fg")), self.style.theme.ok)
         self.assertEqual(self.view.cvss_band.cget("text"), "CRITICAL  \u00b7  CVSS 3.1")
 
+    def hint(self):
+        return self.view.exposure_hint.cget("text")
+
+    def test_a_network_vector_with_low_exposure_gets_a_note_that_changes_nothing(self):
+        self.build()
+        self.fill("", Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
+        self.assertEqual(self.hint(), "")
+        self.paste(V31)
+        self.assertIn("Confirm Low by testing", self.hint())
+        self.assertEqual(self.view.badge.cget("text"), "NEXT")      # crown jewel, 9.8: the floor, not the note
+        self.assertIn("Exposure check: ", self.view.reasoning_text.cget("text"))
+        self.view.copy_summary()
+        self.assertIn("Exposure check: ", self.ctx.copy.call_args[0][0])
+
+    def test_the_note_goes_away_when_exposure_is_checked_or_the_vector_is_not_network(self):
+        self.build()
+        self.fill("", Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
+        self.paste(V31)
+        self.fill("9.8", Threat.NONE, Asset.CROWN, Exposure.MEDIUM, Controls.STRONG)
+        self.assertEqual(self.hint(), "")
+        self.assertNotIn("Exposure check", self.view.reasoning_text.cget("text"))
+        self.fill("9.8", Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
+        self.assertIn("Confirm Low", self.hint())
+        self.paste(V31.replace("AV:N", "AV:L"))
+        self.assertEqual(self.hint(), "")
+
+    def test_the_note_is_in_the_copied_summary_and_does_not_move_the_bucket(self):
+        self.build()
+        self.fill("9.8", Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
+        without_note = (self.view.badge.cget("text"), self.view.action_label.cget("text"))
+        self.paste(V31)
+        self.assertEqual((self.view.badge.cget("text"), self.view.action_label.cget("text")), without_note)
+        self.assertTrue(any(line.startswith("Exposure check: ") for line in self.view.vector_lines()))
+
     def test_a_v40_vector_is_scored_with_the_v40_algorithm(self):
         self.setup_inputs()
         self.paste(V40_87)

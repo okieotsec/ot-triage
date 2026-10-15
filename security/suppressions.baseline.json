@@ -5,7 +5,6 @@
   "cvss.py|noqa|E731": 1,
   "explain.py|noqa|E731": 1,
   "gui_batch.py|noqa|E731": 1,
-  "scanimport.py|noqa|SIM115": 1,
   "scanimport.py|nosemgrep|DTDs,are,python.lang.security.use-defused-xml.use-defused-xml,refused": 1,
   "test_bundle.py|noqa|S603": 1,
   "test_bundle.py|nosec|B404": 1,

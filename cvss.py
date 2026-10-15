@@ -61,6 +61,12 @@ class CvssVector:
         return base_score(self)
 
     @property
+    def network_attackable(self):
+        """True when the flaw can be attacked over a network: attack vector Network (or the modified one, if set)."""
+        modified = self.metrics.get("MAV", "X")
+        return (self.metrics.get("AV") if modified == "X" else modified) == "N"
+
+    @property
     def has_environmental(self):
         """True when the vector sets an environmental metric (a modified base metric or a security requirement)."""
         names = V4_ENVIRONMENTAL if self.version == "4.0" else V3_ENVIRONMENTAL

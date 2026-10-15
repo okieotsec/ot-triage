@@ -39,6 +39,57 @@ class PrioritizeTests(unittest.TestCase):
         self.assertEqual(p(8.0, Threat.NONE, Asset.CROWN, Exposure.HIGH, True), NEXT)
         self.assertEqual(p(5.0, Threat.NONE, Asset.CROWN, Exposure.HIGH, True), NEXT)
 
+    def test_high_cvss_crown_jewel_is_never_never_at_any_exposure_or_controls(self):
+        for exposure, controls, patch in itertools.product(Exposure, Controls, Patch):
+            for score in (7.0, 8.0, 9.8, 10.0):
+                self.assertNotEqual(p(score, Threat.NONE, Asset.CROWN, exposure, controls, patch), NEVER,
+                                    (score, exposure, controls, patch))
+
+    def test_the_crown_jewel_floor_leaves_other_assets_and_lower_scores_alone(self):
+        self.assertEqual(p(6.9, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEVER)
+        self.assertEqual(p(6.9, Threat.NONE, Asset.CROWN, Exposure.MEDIUM, True), NEVER)
+        self.assertEqual(p(9.8, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEVER)
+        self.assertEqual(p(9.8, Threat.NONE, Asset.STANDARD, Exposure.LOW, True), NEVER)
+
+    def test_the_crown_jewel_floor_follows_the_high_cvss_setting(self):
+        settings = Settings(cvss_high=8.0, cvss_critical=9.0)
+        self.assertEqual(prioritize(7.9, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG,
+                                    Patch.AVAILABLE, settings).priority, NEVER)
+        self.assertEqual(prioritize(8.0, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG,
+                                    Patch.AVAILABLE, settings).priority, NEXT)
+
+    def test_the_crown_jewel_floor_is_explained(self):
+        result = prioritize(9.8, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
+        self.assertEqual(result.priority, NEXT)
+        self.assertTrue(any("Floored at NEXT: crown jewel with CVSS >= 7.0" in r for r in result.reasons))
+        self.assertIn("Floored at NEXT: high-CVSS crown jewel", [f.label for f in result.factors])
+
+    def test_strong_controls_still_rank_a_floored_crown_jewel_lower(self):
+        strong = prioritize(9.8, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
+        none = prioritize(9.8, Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.NONE)
+        self.assertEqual((strong.priority, none.priority), (NEXT, NEXT))
+        self.assertLess(strong.score, none.score)
+
+    def test_the_action_agrees_with_the_bucket(self):
+        for args in itertools.product((0.0, 3.0, 5.0, 8.0, 9.8), Threat, Asset, Exposure, Controls, Patch):
+            result = prioritize(*args)
+            says_never = result.action.startswith("No scheduled fix")
+            self.assertEqual(says_never, result.priority == NEVER, (args, result.priority, result.action))
+
+    def test_a_never_result_names_what_to_do_for_each_patch_status(self):
+        for patch, fragment in ((Patch.AVAILABLE, "routine maintenance if convenient"),
+                                (Patch.PENDING, "once it ships"), (Patch.EOL, "replacement planning")):
+            result = prioritize(3.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, Controls.STRONG, patch)
+            self.assertEqual(result.priority, NEVER)
+            self.assertIn(fragment, result.action)
+
+    def test_other_results_keep_their_actions(self):
+        self.assertEqual(prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH).action, "Apply the patch")
+        self.assertTrue(prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH, Controls.NONE,
+                                   Patch.PENDING).action.startswith("Mitigate now"))
+        self.assertTrue(prioritize(8.0, Threat.NONE, Asset.STANDARD, Exposure.HIGH, Controls.NONE,
+                                   Patch.EOL).action.startswith("Isolate/segment"))
+
     def test_low_cvss_caps_at_next(self):
         self.assertEqual(p(2.0, Threat.ACTIVE, Asset.STANDARD, Exposure.HIGH), NEXT)
         self.assertEqual(p(2.0, Threat.ACTIVE, Asset.CROWN, Exposure.MEDIUM), NEXT)
@@ -53,7 +104,9 @@ class PrioritizeTests(unittest.TestCase):
     def test_controls_downgrade_but_not_below_next_when_exploited(self):
         self.assertEqual(p(9.0, Threat.ACTIVE, Asset.STANDARD, Exposure.HIGH, True), NEXT)
         self.assertEqual(p(9.0, Threat.ACTIVE, Asset.STANDARD, Exposure.LOW, True), NEXT)
-        self.assertEqual(p(8.0, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEVER)
+        # Strong controls still lower an important asset to NEVER; a crown jewel stops at NEXT (see below)
+        self.assertEqual(p(8.0, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEVER)
+        self.assertEqual(p(8.0, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEXT)
 
     def test_no_patch_raises_priority_without_controls(self):
         for patch in (Patch.PENDING, Patch.EOL):
@@ -193,6 +246,10 @@ class BoundaryTests(unittest.TestCase):
     def test_end_of_life_floor_at_7(self):
         self.assertEqual(p(7.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEXT)
         self.assertEqual(p(6.9, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEVER)
+
+    def test_crown_jewel_floor_at_7(self):
+        self.assertEqual(p(7.0, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEXT)
+        self.assertEqual(p(6.9, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEVER)
 
     def test_exposed_crown_jewel_floor_at_4(self):
         self.assertEqual(p(4.0, Threat.NONE, Asset.CROWN, Exposure.HIGH), NEXT)

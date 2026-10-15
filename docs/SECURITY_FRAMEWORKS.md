@@ -25,7 +25,7 @@ Last reviewed: 2026-10-14, checkpoint [CP21](../reports/cp21-security-framework/
 | Practice | Status | Evidence | Open item |
 | --- | --- | --- | --- |
 | PO.1 Define security requirements | Met | [Test plan](../SECURITY_TEST_PLAN.md) sections 2 and 3 (scope and threat model); [SECURITY.md](../SECURITY.md) (what the app connects to, reads, writes, and does not cover) | Threat model is a table, not a data-flow diagram. |
-| PO.2 Roles and responsibilities | Partly | Test plan header names the owner and the reviewers | One-person project. The plan names OpenAI Codex and Google Gemini as independent reviewers, but **no report from either is archived**; every report in `reports/` is by Claude Code. |
+| PO.2 Roles and responsibilities | Partly | Test plan header names the owner and the reviewers | One-person project. One independent AI review (OpenAI Codex, 2026-10-14) is archived unchanged in `reports/independent-review-codex/` and was triaged in CP23; Google Gemini has not been asked; **no human security audit has been done**. |
 | PO.3 Supporting toolchains | Met | [ruff.toml](../ruff.toml), [CI](../.github/workflows/ci.yml), [security runner](../tools/security_checks.py), pinned tool versions in [requirements-dev.txt](../requirements-dev.txt) | CP21 added semgrep to CI (it was only run by hand), a weekly schedule and Dependabot for pip. |
 | PO.4 Criteria for security checks | Met | Test plan sections 7 and 9 (severity rubric, exit criteria); each report ends with a release gate | None. |
 | PO.5 Secure development environments | Partly | CI jobs have read-only tokens, do not persist credentials and pin every action to a commit; GUI tests run on a private virtual display; only synthetic data is used (plan rule 6) | Developer-machine and GitHub account settings cannot be seen from the repository: see the owner checklist below. |
@@ -35,7 +35,7 @@ Last reviewed: 2026-10-14, checkpoint [CP21](../reports/cp21-security-framework/
 | Practice | Status | Evidence | Open item |
 | --- | --- | --- | --- |
 | PS.1 Protect all forms of code | Partly | Changes go through pull requests; gitleaks scans the full history in CI; a source-hygiene test rejects hidden and look-alike characters | Branch protection and two-factor sign-in are GitHub settings: owner checklist. |
-| PS.2 Verify release integrity | Not yet | Reproducible bundle with a published SHA-256 ([RELEASING.md](RELEASING.md)); CP21 added a [release workflow](../.github/workflows/release.yml) that records a signed build-provenance attestation | The attestation is untested on a real tag; the first attested release should be verified with `gh attestation verify` (see RELEASING.md). Releases before that have a checksum only. |
+| PS.2 Verify release integrity | Met (0.9.0 on) | A published SHA-256 for every release; since 0.9.0 a [release workflow](../.github/workflows/release.yml) builds the bundle from the tag (and refuses a tag that does not match `version.py`) and records a signed build-provenance attestation; the 0.9.0 attestation was verified with `gh attestation verify` on 2026-10-14 and its checksum matched the independently built bundle | Releases before 0.9.0 have a checksum only. The workflow does not run the tests itself; branch protection and CI cover the commit. |
 | PS.3 Archive and protect each release | Partly | Tags, the SBOM attached to each release ([sbom/sbom.cdx.json](../sbom/sbom.cdx.json)), every checkpoint report kept in [reports/](../reports/) | Provenance exists only from the first attested release on. |
 
 ### PW: Produce well-secured software
@@ -43,7 +43,7 @@ Last reviewed: 2026-10-14, checkpoint [CP21](../reports/cp21-security-framework/
 | Practice | Status | Evidence | Open item |
 | --- | --- | --- | --- |
 | PW.1 Design to meet security requirements | Met | Threat model in the test plan; design notes in [docs/](.) such as THREAT_DATA.md, IMPORT.md and SCANNER_IMPORT.md | None. |
-| PW.2 Review the design | Partly | Each checkpoint report reviews the design of what changed | No independent design review is archived (see PO.2). |
+| PW.2 Review the design | Partly | Each checkpoint report reviews the design of what changed | An independent AI review of the code exists (see PO.2); no human design review. |
 | PW.4 Reuse well-secured software | Met | Python standard library only; the SBOM lists no third-party component | CVSS 4.0 tables from FIRST are credited in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). |
 | PW.5 Follow secure coding practices | Met | ruff's `S` and `B` rules, bandit and semgrep clean; strict parsing helpers (`jsonfile.py`); manual checklist in test plan section 6.1 | None. |
 | PW.6 Configure build and interpreter settings | Partly | Tests run with `python -X dev -W error::ResourceWarning`; the bundle is plain source built reproducibly | There is no compile step; interpreter hardening flags are not otherwise used. |
@@ -117,8 +117,8 @@ These are GitHub settings. Tick them on the repository's Settings pages and upda
 
 ## Open items, in order
 
-1. Make a release and verify its attestation (PS.2).
-2. Obtain an independent review and archive it (PO.2, PW.2, PW.7).
+1. ~~Make a release and verify its attestation (PS.2).~~ Done: 0.9.0, verified on 2026-10-14.
+2. Obtain a human independent review (PO.2, PW.2, PW.7); an AI review (Codex) is done and archived.
 3. Run Atheris on the parsers for a release candidate (PW.8).
 4. Tick the owner checklist.
 5. Re-map to SSDF 1.2 when NIST finalises it.

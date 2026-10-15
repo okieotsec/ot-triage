@@ -419,3 +419,16 @@ class TableTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NetworkAttackTests(unittest.TestCase):
+    def test_the_attack_vector_decides(self):
+        for text, expected in ((V31, True), (V31.replace("AV:N", "AV:A"), False), (V31.replace("AV:N", "AV:L"), False),
+                               (V31.replace("AV:N", "AV:P"), False), (V40, True), (V40.replace("AV:N", "AV:L"), False)):
+            self.assertEqual(cvss.parse_vector(text).network_attackable, expected, text)
+
+    def test_a_modified_attack_vector_overrides_it(self):
+        self.assertFalse(cvss.parse_vector(V31 + "/MAV:L").network_attackable)
+        self.assertTrue(cvss.parse_vector(V31.replace("AV:N", "AV:L") + "/MAV:N").network_attackable)
+        self.assertTrue(cvss.parse_vector(V31 + "/MAV:X").network_attackable)
+        self.assertFalse(cvss.parse_vector(V40 + "/MAV:A").network_attackable)

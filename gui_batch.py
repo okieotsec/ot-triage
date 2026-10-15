@@ -611,6 +611,8 @@ class BatchView:
                 if item.cvss_environmental is not None:
                     lines.append(f"Environmental score: {item.cvss_environmental:.1f}, shown for comparison; the "
                                  "priority uses the base score.")
+                if batch.exposure_check(item):
+                    lines.append(f"Exposure check: {batch.exposure_check(item)}")
             change = self.state.comparison.changes.get(id(item)) if self.state.comparison else None
             if change is not None and change.text:
                 was = change.previous
@@ -918,7 +920,7 @@ class BatchView:
             if self.state.inventory is not None:
                 possible = rollup.possible_advisories(summaries, self.state.inventory,
                                                       self.ctx.get_threat_data().ics)
-            rollup.write_rollup(out, summaries, possible)
+            scanimport.write_atomically(out, lambda path: rollup.write_rollup(path, summaries, possible))
         except OSError as error:
             self.ctx.error("Export failed", str(error))
             return
@@ -935,7 +937,8 @@ class BatchView:
         if not out:
             return
         try:
-            batch.write_results(out, state.items, state.data, state.comparison)
+            scanimport.write_atomically(out, lambda path: batch.write_results(path, state.items, state.data,
+                                                                              state.comparison))
         except OSError as error:
             self.ctx.error("Export failed", str(error))
             return
