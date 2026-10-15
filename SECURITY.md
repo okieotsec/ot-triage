@@ -47,7 +47,7 @@ The application works **fully offline**. It connects to the internet only when y
 
 ## What the application reads and writes
 
-- **Scanner exports:** `ot_triage_import.py` reads the Nessus, Tenable and OpenVAS exports you give it. They are untrusted: size, row and cell limits, a header that must be recognised by column name, cleaned and cut text, formula-safe output, and no overwriting of any input. It never uses the network and never scores (see [docs/IMPORT.md](docs/IMPORT.md)).
+- **Scanner exports:** `ot_triage_import.py` reads the Nessus, Tenable, OpenVAS, Claroty, Nozomi and Dragos exports you give it. They are untrusted: size, row and cell limits, a header that must be recognised by column name, cleaned and cut text, formula-safe output, and no overwriting of any input. It never uses the network and never scores (see [docs/IMPORT.md](docs/IMPORT.md)).
 - **Files you choose:** the CSV you open, an optional asset inventory CSV, and the export you save. The inventory is size-limited and validated like the findings file, and its path is not remembered. Cells that could run as spreadsheet formulas are neutralised on export.
 - **Settings:** `settings.json` and `ui.json` in your user configuration folder; threat data and its metadata in your user data folder (see [docs/THREAT_DATA.md](docs/THREAT_DATA.md) and [docs/SETTINGS.md](docs/SETTINGS.md) for the locations). They are written atomically with user-only permissions, size-limited, and ignored (with a warning) if invalid. Every file the application reads is opened once and checked on the open file: it must be a regular file (a folder, a named pipe or a device is refused) within its size limit.
 - **Clipboard:** only when you press a copy button.

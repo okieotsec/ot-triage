@@ -22,8 +22,8 @@ The import never overwrites a file it reads from (an export, the aliases file, y
 
 Opening a scanner export with **Open CSV…** or **Load inventory…** does not work (those read OT Triage's own files) and says so, with the import command, in the message.
 
-Try it on the five files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv
-sample_scan.nessus sample_scan_nozomi.json sample_scan_dragos.json -o findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
+Try it on the six files in the bundle: `python3 ot_triage_import.py sample_scan_nessus.csv sample_scan_openvas.csv
+sample_scan.nessus sample_scan_nozomi.json sample_scan_dragos.json sample_scan_claroty.csv -o findings.csv --inventory-out inventory.csv`. They are fictional (every host, address and id is invented).
 
 ## What it reads
 
@@ -32,6 +32,7 @@ sample_scan.nessus sample_scan_nozomi.json sample_scan_dragos.json -o findings.c
 | **Nessus CSV** | Plugin ID, CVE, CVSS (v2 and/or v3), Risk, Host, Name ... |
 | **Tenable Vulnerability Management CSV** | Asset Name, IPv4 Address, CVE, CVSSv3 Base Score, Severity, Plugin ID, Plugin Name, State ... |
 | **OpenVAS / Greenbone CSV** | IP, Hostname, CVSS, Severity, QoD, NVT Name, CVEs, Result ID ... |
+| **Claroty xDome device-vulnerability pairs CSV** | Device Name, Device IP, Vulnerability Name, CVEs, CVSS V3 Base Score Points, Manuf. Remediation Info, Vulnerability Relevance ... |
 | **Nessus `.nessus` (v2 XML)** | an XML file whose root is `NessusClientData_v2`, with `ReportHost` and `ReportItem` elements |
 | **Nozomi `node_cves`** *(experimental)* | JSON (`{"result": [...]}`) or a CSV exported from a `node_cves` query; fields `cve`, `cve_score`, `node_label`, `node_vendor`, `node_product_name`, `node_firmware_version`, `resolved` ... |
 | **Dragos detections** *(experimental)* | JSON (`{"content": [...]}`), each record with a `host` and a `vulnerability` |
@@ -40,13 +41,24 @@ The format is found from the header, by column **name** and never by position, s
 (`CVSS v3.0 Base Score`, `cvss_v3.0_base_score`) do not matter. A file whose header is not one of these is refused, with
 the start of its header in the message, rather than guessed at. The Nozomi and Dragos readers are **experimental**: they follow Nozomi's published `node_cves` data model and third-party descriptions of the Dragos API, and have not been checked against a real export, so the summary says so each time. A file that does not look like them is refused, never guessed at. See [SCANNER_IMPORT.md](SCANNER_IMPORT.md).
 
+## Claroty: what is used
+
+The Claroty reader was written from one layout of the *device-vulnerability pairs* report, saved as CSV UTF-8 (an `.xlsx` file is not read, so open it in Excel and use **Save As → CSV UTF-8**). Another layout, or a newer product version, may not be recognised: a file whose header is not known is refused with the start of its header in the message, and each run says that the reader has seen one layout.
+
+* **One finding per device and CVE.** The device name is the asset (`DOMAIN\HOST` as Claroty writes it; use an aliases file to join it to the same device's name in another tool). A row that names several CVEs, as the grouped advisories do, becomes one finding for each, and each gets the **row's score**, which belongs to the whole advisory and may overstate a single CVE. The score is the number in *CVSS V3 Base Score Points*; the column of severity words is never read as a score.
+* **The device's addresses** (up to four, without "Last known IP") go into the inventory's `name` column, to help you write the aliases file.
+* **Skipped:** rows with a resolution date or a patch-install date. A row with no CVE is kept, and needs a threat level like any other finding with no CVE.
+* **"Potentially Relevant" rows** (Claroty has not confirmed that the device is affected) are **kept and marked** with ` [potentially relevant]` at the end of the finding's name, and the summary counts them. Leaving them out would treat "not confirmed" as safe. `--only-confirmed` leaves them out (the Import scan dialog keeps them).
+* **`patch` is `available`** when *Manuf. Remediation Info* says *Patch Available* or *Version Upgrade Available* and does not say *Manufacturer Not Patching Model*. Mitigation-only rows and *Contact Manufacturer* rows are left empty.
+* **Not used, on purpose:** Claroty's device risk score, its adjusted vulnerability score, its **Actively Exploited** flag and its EPSS column. As for every scanner, the threat level comes from CISA KEV and EPSS data (and your own analyst flags), never from a scanner's own opinion; the same rule keeps Dragos's and Nozomi's exploit fields out. The export has no criticality, exposure, vendor, product or version, so the inventory it writes still needs the first three from you, and the version check has nothing to compare.
+
 ## What it writes
 
 * **The findings CSV** has `id`, `asset_id`, `name`, `cve`, `cvss`, `patch` and `source_tool` (which OT Triage ignores).
   There is one row per CVE, so a plugin that names three CVEs becomes three findings, each of which can be looked up
   in KEV and EPSS. The score is the CVSS v3 score if the export has one, otherwise v2; a missing or invalid score is left
   empty, and OT Triage then shows the finding as **not scored**, with the reason. `patch` is `available` only where the
-  export clearly says a vendor fix exists (OpenVAS Solution Type *VendorFix*); it is never guessed.
+  export clearly says a vendor fix exists (OpenVAS Solution Type *VendorFix*, Claroty *Patch Available* or *Version Upgrade Available*); it is never guessed.
 * **The inventory** (`--inventory-out`) lists the assets the scan saw. With `--inventory` (your existing one) the result
   is that file **plus** a row for each new asset: your rows, columns and values are kept as they are, and a blank name,
   vendor, product or version is filled in from the scan but a value you wrote is never replaced. New assets have empty
@@ -67,6 +79,7 @@ Every skipped row is counted and named in the summary, never dropped silently:
   *Resolved*.
 * OpenVAS: *Log* entries, results with no score, and results whose **Quality of Detection** is below `--min-qod`
   (default 70, Greenbone's own default for hiding low-confidence detections; `--min-qod 0` keeps everything).
+* Claroty: rows with a resolution date or a patch-install date (and, with `--only-confirmed`, rows marked *Potentially Relevant*).
 * Rows with no host or asset name.
 * `.nessus` files: items with severity 0 (informational), and **compliance checks** (items of the *Policy Compliance* family or with `cm:` elements), which are configuration audits, not vulnerabilities.
 

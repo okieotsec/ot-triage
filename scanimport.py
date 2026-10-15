@@ -49,16 +49,18 @@ XML_CHUNK_BYTES = 1024 * 1024
 MAX_JSON_BYTES = 100 * 1024 * 1024    # a JSON file is read whole, so it is held to a smaller limit than a streamed one
 
 NESSUS, TENABLE_VM, OPENVAS, NESSUS_XML = "nessus", "tenable-vm", "openvas", "nessus-xml"
-NOZOMI, DRAGOS = "nozomi", "dragos"
+NOZOMI, DRAGOS, CLAROTY = "nozomi", "dragos", "claroty"
 EXPERIMENTAL = frozenset({NOZOMI, DRAGOS})
 EXPERIMENTAL_NOTE = "read from a public description of this format and not yet checked against a real export"
+CLAROTY_NOTE = "written from one Claroty report layout, so another layout may not be recognised"
 JSON_LISTS = ("result", "results", "content", "detections", "data", "items")
 _TRUE = frozenset({"true", "1", "yes", "y"})
 _CLOSED = frozenset({"resolved", "closed", "fixed", "remediated"})
 ID_PREFIX = {NESSUS: "nessus", TENABLE_VM: "tenable"}      # finding ids start with the tool, then plugin, asset, CVE
 FORMAT_NAMES = {NESSUS: "Nessus CSV", TENABLE_VM: "Tenable Vulnerability Management CSV",
                 OPENVAS: "OpenVAS / Greenbone CSV", NESSUS_XML: "Nessus .nessus (v2 XML)",
-                NOZOMI: "Nozomi node_cves (experimental)", DRAGOS: "Dragos detections (experimental)"}
+                NOZOMI: "Nozomi node_cves (experimental)", DRAGOS: "Dragos detections (experimental)",
+                CLAROTY: "Claroty xDome device-vulnerability pairs"}
 
 
 class ScanImportError(ValueError):
@@ -222,6 +224,8 @@ def detect_format(header):
         return TENABLE_VM
     if "plugin id" in names and "host" in names:
         return NESSUS
+    if {"device name", "vulnerability name", "cves"} <= names:
+        return CLAROTY
     labels = {"node label", "assets name", "asset id", "node id"}
     if "cve" in names and ("cve score" in names or "score" in names) and names & labels:
         return NOZOMI
@@ -313,6 +317,68 @@ def _read_openvas(table, report, min_qod):
         host = _cell(table.get(cells, "hostname"), MAX_NAME_CHARS)
         known = assets.setdefault(asset.lower(), Asset(asset))
         known.name = known.name or host
+    return findings, assets
+
+
+_CLAROTY_NONE = frozenset({"", "n/a", "na", "none", "-"})
+_POTENTIAL_TAG = " [potentially relevant]"
+
+
+def _claroty_ips(text):
+    """The addresses in a Claroty "device ip" cell, without the "(Last known IP)" remarks, at most four."""
+    found = []
+    for part in str(text or "").split(","):
+        address = _cell(part.split("(")[0], 60)
+        if address and address not in found:
+            found.append(address)
+    return ", ".join(found[:4])
+
+
+def _read_claroty(table, report, only_confirmed):
+    """Claroty xDome "device-vulnerability pairs" CSV: one row per device and vulnerability (or advisory).
+
+    A row can name several CVEs, so it becomes one finding per CVE with the row's score. Claroty's own risk scores,
+    its "actively exploited" flag and its EPSS column are not used (the threat level comes from KEV and EPSS data).
+    Rows with a resolution or patch-install date are skipped. A "potentially relevant" row is kept and marked in its
+    name, unless only_confirmed is set.
+    """
+    findings, assets = [], {}
+    potential = 0
+    for cells in table.rows():
+        report.rows += 1
+        if _norm(table.get(cells, "device-vuln. resolution date")) not in _CLAROTY_NONE:
+            report.skip("already resolved")
+            continue
+        if _norm(table.get(cells, "patch install date")) not in _CLAROTY_NONE:
+            report.skip("patch already installed")
+            continue
+        is_potential = _norm(table.get(cells, "vulnerability relevance")).startswith("potentially")
+        if is_potential and only_confirmed:
+            report.skip("not confirmed (potentially relevant)")
+            continue
+        asset = _cell(table.get(cells, "device name"), MAX_ASSET_CHARS)
+        if not asset:
+            report.skip("no device name")
+            continue
+        potential += is_potential
+        title = _cell(table.get(cells, "vulnerability name"), MAX_NAME_CHARS) or "Claroty vulnerability"
+        if is_potential:
+            title = title[:MAX_NAME_CHARS - len(_POTENTIAL_TAG)].rstrip() + _POTENTIAL_TAG
+        score = _score(table.get(cells, "cvss v3 base score points")) or _score(table.get(cells, "cvss v3 base score"))
+        remedy = _norm(table.get(cells, "manuf. remediation info"))
+        fixed = ("patch available" in remedy or "version upgrade available" in remedy) and "not patching" not in remedy
+        token = _cell(title.split(" ")[0], 60)
+        for cve in _cves(table.get(cells, "cves")) or [""]:
+            ident = f"claroty:{token}:{asset}:{cve or 'nocve'}"[:MAX_ID_CHARS]
+            findings.append(Finding(ident, asset, title, cve, score, "available" if fixed else "", CLAROTY))
+            _check_size(findings)
+        known = assets.setdefault(asset.lower(), Asset(asset))
+        known.name = known.name or _claroty_ips(table.get(cells, "device ip"))
+    note = CLAROTY_NOTE
+    if potential:
+        note += (f"; {potential:,} rows are 'potentially relevant' (not confirmed by Claroty): they are marked in the "
+                 "finding name, and --only-confirmed leaves them out")
+    report.note = note
     return findings, assets
 
 
@@ -648,7 +714,7 @@ def _read_nessus_xml(path):
     return reader.findings, reader.assets, report
 
 
-def read_export(path, min_qod=DEFAULT_MIN_QOD):
+def read_export(path, min_qod=DEFAULT_MIN_QOD, only_confirmed=False):
     """Read one export file; return (findings, assets, FileReport). Raises ScanImportError if it cannot be used."""
     if _looks_like_xml(path):
         return _read_nessus_xml(path)
@@ -667,6 +733,8 @@ def read_export(path, min_qod=DEFAULT_MIN_QOD):
         elif source == NOZOMI:
             report.note = EXPERIMENTAL_NOTE
             findings, assets = _read_nozomi_csv(table, report)
+        elif source == CLAROTY:
+            findings, assets = _read_claroty(table, report, only_confirmed)
         else:
             findings, assets = _read_tenable_family(table, report, source)
     finally:
@@ -755,11 +823,11 @@ def merge(result, aliases=None, default_threat=""):
     return result
 
 
-def read_exports(paths, min_qod=DEFAULT_MIN_QOD):
+def read_exports(paths, min_qod=DEFAULT_MIN_QOD, only_confirmed=False):
     """Read several exports into one ImportResult that is not merged yet (see merge). Raises ScanImportError."""
     result = ImportResult()
     for path in paths:
-        findings, assets, report = read_export(path, min_qod)
+        findings, assets, report = read_export(path, min_qod, only_confirmed)
         result.findings += findings
         _check_size(result.findings)
         result.reports.append(report)
@@ -769,9 +837,9 @@ def read_exports(paths, min_qod=DEFAULT_MIN_QOD):
     return result
 
 
-def import_exports(paths, aliases=None, min_qod=DEFAULT_MIN_QOD, default_threat=""):
+def import_exports(paths, aliases=None, min_qod=DEFAULT_MIN_QOD, default_threat="", only_confirmed=False):
     """Read and merge several exports. Raises ScanImportError for a file that cannot be used."""
-    return merge(read_exports(paths, min_qod), aliases, default_threat)
+    return merge(read_exports(paths, min_qod, only_confirmed), aliases, default_threat)
 
 
 # ---- writing ---------------------------------------------------------------------

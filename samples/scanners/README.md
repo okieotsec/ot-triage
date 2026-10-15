@@ -1,14 +1,14 @@
 # Fictional scanner exports
 
-Made-up exports in the shape of six scanner formats, for designing and testing a future import feature (see
-[docs/SCANNER_IMPORT.md](../../docs/SCANNER_IMPORT.md)). The importer (`ot_triage_import.py`, see [docs/IMPORT.md](../../docs/IMPORT.md)) reads all six of them, and copies of the small ones ship in the portable bundle as `sample_scan_*`.
+Made-up exports in the shape of seven scanner formats, for designing and testing a future import feature (see
+[docs/SCANNER_IMPORT.md](../../docs/SCANNER_IMPORT.md)). The importer (`ot_triage_import.py`, see [docs/IMPORT.md](../../docs/IMPORT.md)) reads all seven of them, and copies of the small ones ship in the portable bundle as `sample_scan_*`.
 
 **Everything is invented**: the plant ("Cedar Creek"), the hosts, the addresses (only the ranges reserved for
 documentation: 192.0.2.0/24, 198.51.100.0/24, `example.com`), the plugin and result ids, the dates and the summaries.
 Vendor and product names, CVE ids and CVSS scores are real public facts used for illustration; the pairing of a CVE with
 a device is for the demonstration and says nothing about any real system. None of the files are copied from another
 project: they were written for this repository, from the field names the tools' public documentation and
-integrations describe.
+integrations describe, except the Claroty file, whose column names and layout follow one layout of that report (nothing else of it is used: the plant, devices and addresses are the invented ones above).
 
 | Folder | Format | Shape followed |
 | --- | --- | --- |
@@ -17,6 +17,7 @@ integrations describe.
 | `tenable/vm_export.csv` | Tenable Vulnerability Management findings CSV | the display names of Tenable's documented export fields (Asset Name, IPv4 Address, CVE, CVSSv3 Base Score, VPR, State ...) |
 | `openvas/report.csv` | OpenVAS / Greenbone results CSV | the layout with the Quality of Detection column |
 | `nozomi/node_cves.json` | Nozomi `node_cves` query response | `{"result": [...]}`, each record carrying its own asset context |
+| `claroty/device_vulns.csv` | Claroty xDome device-vulnerability pairs | the 23 columns of the report (Device Name, Device IP, Vulnerability Name, CVEs, CVSS V3 Base Score and its Points, Actively Exploited, Manuf. Remediation Info, Vulnerability Relevance ...) as a CSV; with invented content |
 | `dragos/detections.json` | Dragos vulnerability detections | `{"content": [...]}`, each detection carrying its host and its vulnerability |
 
 The headers of real exports vary with the product version, so treat these as representative, not authoritative. Real

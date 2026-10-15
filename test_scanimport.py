@@ -64,6 +64,7 @@ class SampleFileTests(Case):
         ("nessus/classic.csv", "nessus_csv"),
         ("tenable/vm_export.csv", "tenable_vm"),
         ("openvas/report.csv", "openvas"),
+        ("claroty/device_vulns.csv", "claroty"),
     )
 
     def test_each_sample_gives_the_expected_findings(self):
@@ -93,6 +94,8 @@ class SampleFileTests(Case):
         )
         self.assertEqual(reports["openvas/report.csv"].skipped, {"log entry or no score": 1})
         self.assertEqual(reports["openvas/report.csv"].format, "OpenVAS / Greenbone CSV")
+        self.assertEqual(reports["claroty/device_vulns.csv"].skipped,
+                         {"already resolved": 1, "patch already installed": 1})
 
 
 class DetectionTests(Case):
@@ -1371,7 +1374,7 @@ if given is not None:
         @hyp_settings(max_examples=150, deadline=None)
         @given(st.text(max_size=2000))
         def test_any_text_under_a_known_header_imports_or_is_refused_cleanly(self, body):
-            for head in (NESSUS_HEAD, TENABLE_HEAD, OPENVAS_HEAD):
+            for head in (NESSUS_HEAD, TENABLE_HEAD, OPENVAS_HEAD, ",".join(CLAROTY_HEAD)):
                 path = self.dir / "fuzz.csv"
                 path.write_text(head + "\n" + body, encoding="utf-8", errors="replace")
                 try:
@@ -1386,6 +1389,173 @@ if given is not None:
                 si.write_findings(out, result)
                 si.write_inventory(self.dir / "fuzz_inv.csv", result)
                 io.StringIO("\n".join(si.summary_lines(result)))
+
+
+CLAROTY_HEAD = [
+    "DEVICE NAME", "DEVICE IP", "VULNERABILITY NAME", "DEVICE RISK SCORE", "DEVICE RISK SCORE POINTS", "CVEs",
+    "CVSS V3 BASE SCORE", "CVSS V3 BASE SCORE POINTS", "ADJUSTED VULNERABILITY SCORE",
+    "ADJUSTED VULNERABILITY SCORE POINTS", "ACTIVELY EXPLOITED", "EPSS SCORE", "DEVICE-VULN. DETECTION DATE",
+    "LAST UPDATED", "DEVICE-VULN. RESOLUTION DATE", "PATCH INSTALL DATE", "Device-Vuln. Relevance Reasons",
+    "DEVICE-VULN. NOTES", "MANUF. REMEDIATION INFO", "MANUF. REMEDIATION SOURCE LINKS",
+    "MANUF. REMEDIATION SOURCE COMMENTS", "REQUIRED ACTIONS", "VULNERABILITY RELEVANCE",
+]
+
+
+def claroty_row(**changes):
+    """One Claroty row (a list in the header's order) with the given columns changed; keys use _ for spaces."""
+    row = dict.fromkeys(CLAROTY_HEAD, "N/A")
+    row.update({"DEVICE NAME": "PLANT\\HOST-1", "DEVICE IP": "192.0.2.10", "VULNERABILITY NAME": "CVE-2024-0001",
+                "CVEs": "CVE-2024-0001", "CVSS V3 BASE SCORE": "High", "CVSS V3 BASE SCORE POINTS": "7.5",
+                "MANUF. REMEDIATION INFO": "Patch Available", "VULNERABILITY RELEVANCE": "Confirmed"})
+    for key, value in changes.items():
+        row[key.replace("_", " ")] = value
+    return [row[name] for name in CLAROTY_HEAD]
+
+
+class ClarotyTests(Case):
+    def file(self, *rows, name="c.csv"):
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(CLAROTY_HEAD)
+        writer.writerows(rows)
+        return self.write(name, buffer.getvalue())
+
+    def test_the_header_is_recognised_and_a_findings_screen_explains_what_to_do(self):
+        self.assertEqual(si.detect_format(CLAROTY_HEAD), si.CLAROTY)
+        self.assertIn("Claroty xDome", si.scanner_hint(CLAROTY_HEAD))
+        for other in (NESSUS_HEAD, TENABLE_HEAD, OPENVAS_HEAD):
+            self.assertNotEqual(si.detect_format(other.split(",")), si.CLAROTY)
+        for partial in (["Device Name", "CVEs"], ["Device Name", "Vulnerability Name"], ["Vulnerability Name", "CVEs"]):
+            self.assertIsNone(si.detect_format(partial), partial)       # all three columns are needed
+        with self.assertRaisesRegex(ValueError, "Claroty xDome"):
+            batch.read_rows(self.file(claroty_row()))
+
+    def test_the_sample_gives_findings_assets_and_a_note(self):
+        findings, assets, report = self.read(SAMPLES / "claroty/device_vulns.csv")
+        self.assertEqual(report.format, "Claroty xDome device-vulnerability pairs")
+        self.assertEqual((report.rows, report.kept), (15, 14))
+        self.assertIn("one Claroty report layout", report.note)
+        self.assertIn("3 rows are 'potentially relevant'", report.note)
+        self.assertEqual(len(findings), 14)
+        self.assertEqual(assets["cedarcreek\\cc-eng-02"].name, "192.0.2.22, 192.0.2.122")
+
+    def test_a_row_with_several_cves_becomes_one_finding_each_with_the_rows_score(self):
+        findings, _a, _r = self.read(self.file(claroty_row(CVEs="CVE-2021-44228, cve-2021-45046, CVE-2021-44228",
+                                                           CVSS_V3_BASE_SCORE_POINTS="10")))
+        self.assertEqual([(f.cve, f.cvss) for f in findings], [("CVE-2021-44228", "10.0"), ("CVE-2021-45046", "10.0")])
+        self.assertEqual(len({f.id for f in findings}), 2)
+
+    def test_the_score_is_the_numeric_column_never_the_severity_word(self):
+        findings, _a, _r = self.read(self.file(
+            claroty_row(CVSS_V3_BASE_SCORE_POINTS="9.8", CVSS_V3_BASE_SCORE="Critical"),
+            claroty_row(CVEs="CVE-2024-0002", CVSS_V3_BASE_SCORE_POINTS="N/A", CVSS_V3_BASE_SCORE="High"),
+            claroty_row(CVEs="CVE-2024-0003", CVSS_V3_BASE_SCORE_POINTS="11"),
+            claroty_row(CVEs="CVE-2024-0004", CVSS_V3_BASE_SCORE_POINTS="", CVSS_V3_BASE_SCORE="6.5")))
+        self.assertEqual([f.cvss for f in findings], ["9.8", "", "", "6.5"])
+
+    def test_a_row_with_no_cve_is_kept_for_a_threat_level_to_be_chosen(self):
+        result = si.import_exports([self.file(claroty_row(CVEs="N/A", VULNERABILITY_NAME="CC-1 (bulletin)"))])
+        self.assertEqual((len(result.findings), result.need_threat), (1, 1))
+        self.assertEqual(si.import_exports([self.file(claroty_row(CVEs="N/A"))], default_threat="none").need_threat, 0)
+
+    def test_resolved_and_patched_rows_are_skipped_and_blank_dates_are_open(self):
+        for column, reason in (("DEVICE-VULN._RESOLUTION_DATE", "already resolved"),
+                               ("PATCH_INSTALL_DATE", "patch already installed")):
+            for value in ("09/20/2026 1:02 AM", "2026-09-20"):
+                with self.subTest(f"{column} {value!r}"):
+                    findings, _a, report = self.read(self.file(claroty_row(**{column: value})))
+                    self.assertEqual((findings, report.skipped), ([], {reason: 1}))
+            for value in ("N/A", "n/a", "", "-", " None "):
+                with self.subTest(f"{column} {value!r}"):
+                    self.assertEqual(len(self.read(self.file(claroty_row(**{column: value})))[0]), 1)
+
+    def test_potentially_relevant_rows_are_marked_and_can_be_left_out(self):
+        path = self.file(claroty_row(), claroty_row(CVEs="CVE-2024-0002", VULNERABILITY_NAME="CVE-2024-0002 (x)",
+                                                    VULNERABILITY_RELEVANCE="Potentially Relevant"))
+        kept = si.import_exports([path])
+        self.assertEqual([f.name for f in kept.findings], ["CVE-2024-0001", "CVE-2024-0002 (x) [potentially relevant]"])
+        only = si.import_exports([path], only_confirmed=True)
+        self.assertEqual([f.cve for f in only.findings], ["CVE-2024-0001"])
+        self.assertEqual(only.reports[0].skipped, {"not confirmed (potentially relevant)": 1})
+        self.assertNotIn("potentially relevant'", only.reports[0].note)
+
+    def test_the_mark_never_pushes_a_long_name_past_the_limit(self):
+        findings, _a, _r = self.read(self.file(claroty_row(VULNERABILITY_NAME="A" * 500,
+                                                           VULNERABILITY_RELEVANCE="Potentially Relevant")))
+        self.assertLessEqual(len(findings[0].name), si.MAX_NAME_CHARS)
+        self.assertTrue(findings[0].name.endswith("[potentially relevant]"))
+
+    def test_a_patch_is_only_called_available_when_the_row_says_a_fix_exists(self):
+        cases = {"Patch Available": "available", "Version Upgrade Available": "available",
+                 "Patch Available, Version Upgrade Available": "available",
+                 "Contact Manufacturer, Patch Available": "available",
+                 "Mitigation: Restrict Traffic": "", "Contact Manufacturer": "", "N/A": "",
+                 "Manufacturer Not Patching Model, Version Upgrade Available": ""}
+        for text, expected in cases.items():
+            with self.subTest(text):
+                findings, _a, _r = self.read(self.file(claroty_row(**{"MANUF._REMEDIATION_INFO": text})))
+                self.assertEqual(findings[0].patch, expected)
+
+    def test_claroty_own_scores_and_flags_are_never_used(self):
+        quiet = self.read(self.file(claroty_row()))[0]
+        loud = self.read(self.file(claroty_row(DEVICE_RISK_SCORE="Critical", DEVICE_RISK_SCORE_POINTS="99",
+                                               ADJUSTED_VULNERABILITY_SCORE="Critical",
+                                               ADJUSTED_VULNERABILITY_SCORE_POINTS="9.9",
+                                               ACTIVELY_EXPLOITED="Actively Exploited", EPSS_SCORE="100")))[0]
+        self.assertEqual(quiet, loud)
+        self.assertEqual(loud[0].threat, "")
+
+    def test_ips_lose_their_remark_and_are_capped_at_four(self):
+        ips = "192.0.2.1 (Last known IP), 192.0.2.1, 192.0.2.2, 192.0.2.3 (Last known IP), 192.0.2.4, 192.0.2.5"
+        _f, assets, _r = self.read(self.file(claroty_row(DEVICE_IP=ips)))
+        self.assertEqual(assets["plant\\host-1"].name, "192.0.2.1, 192.0.2.2, 192.0.2.3, 192.0.2.4")
+
+    def test_an_alias_joins_the_claroty_name_to_another_tools_name(self):
+        path = self.file(claroty_row(), claroty_row(CVEs="CVE-2024-0002"))
+        result = si.import_exports([path], {"plant\\host-1": "HOST-1"})
+        self.assertEqual(({f.asset_id for f in result.findings}, result.renamed), ({"HOST-1"}, 2))
+
+    def test_the_imported_findings_are_ranked_by_the_ordinary_rules(self):
+        import inventory
+
+        result = si.import_exports([SAMPLES / "claroty/device_vulns.csv"])
+        out, inv = self.dir / "f.csv", self.dir / "i.csv"
+        si.write_findings(out, result)
+        si.write_inventory(inv, result)
+        with open(inv, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            rows, columns = list(reader), reader.fieldnames
+        for row in rows:
+            row["criticality"], row["exposure"], row["controls"] = "crown jewel", "low", "strong"
+        with open(inv, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, columns, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+        with open(out, newline="", encoding="utf-8") as fh:
+            found = list(csv.DictReader(fh))
+        with open(out, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, [*found[0], "threat"], lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(dict(row, threat="none") for row in found)
+        items = batch.process_file(out, inventory=inventory.load(inv))
+        by = {(i.id.split(":")[-2], i.cve): i for i in items}
+        # a crown jewel with CVSS 7.0 or more is never NEVER, even with Low exposure and strong controls (POLICY.md, 5)
+        scored = [i for i in items if i.cvss is not None and i.cvss >= 7.0]
+        self.assertEqual(len(scored), 12)
+        self.assertEqual({i.priority for i in scored}, {NEXT})
+        self.assertEqual(by[("CEDARCREEK\\CC-ENG-24", "")].priority, NEVER)          # CVSS 5.9, no CVE
+        self.assertEqual(by[("CEDARCREEK\\CC-ENG-24", "CVE-2024-6387")].priority, "ERROR")   # the export has no score
+        self.assertIn("cvss", by[("CEDARCREEK\\CC-ENG-24", "CVE-2024-6387")].error)
+
+    def test_a_formula_in_a_claroty_cell_is_defused_in_the_findings_file(self):
+        result = si.import_exports([self.file(claroty_row(DEVICE_NAME="=HYPERLINK(\"http://x.example\",\"y\")",
+                                                          VULNERABILITY_NAME='@SUM(1)'))])
+        out = self.dir / "f.csv"
+        si.write_findings(out, result)
+        text = out.read_text(encoding="utf-8")
+        self.assertIn("'=HYPERLINK", text)
+        self.assertIn("'@SUM", text)
+        self.assertNotIn(",=HYPERLINK", text)
 
 
 if __name__ == "__main__":

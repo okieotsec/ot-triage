@@ -53,7 +53,7 @@ class ContentTests(BundleCase):
                        "SECURITY.md", "THIRD_PARTY_NOTICES.md", "START-HERE.txt", "sbom/sbom.cdx.json",
                        "docs/CLI.md", "docs/POLICY.md", "sample_inventory.csv", "sample_scan_nessus.csv",
                        "sample_scan.nessus", "sample_scan_nozomi.json", "sample_scan_dragos.json",
-                       "sample_findings_multiple_per_asset.csv", "requirements.txt"):
+                       "sample_scan_claroty.csv", "sample_findings_multiple_per_asset.csv", "requirements.txt"):
             self.assertIn(f"{TOP}/{needed}", self.names, needed)
 
     def test_it_has_no_tests_tools_reports_or_repository_files(self):
@@ -115,13 +115,14 @@ class RunsOnItsOwnTests(BundleCase):
         out = self.root / "imported.csv"
         done = self.run_python("ot_triage_import.py", "sample_scan_nessus.csv", "sample_scan_openvas.csv",
                                "sample_scan.nessus", "sample_scan_nozomi.json", "sample_scan_dragos.json",
-                               "-o", str(out),
+                               "sample_scan_claroty.csv", "-o", str(out),
                                "--inventory-out", str(self.root / "inventory.new.csv"))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("Nessus CSV", done.stdout)
         self.assertIn("Nessus .nessus (v2 XML)", done.stdout)
         self.assertIn("Nozomi node_cves (experimental)", done.stdout)
         self.assertIn("Dragos detections (experimental)", done.stdout)
+        self.assertIn("Claroty xDome device-vulnerability pairs", done.stdout)
         self.assertTrue(out.read_text(encoding="utf-8").startswith("id,asset_id,name,cve,cvss,patch,source_tool"))
 
     def test_every_module_imports_from_the_extracted_bundle_alone(self):
