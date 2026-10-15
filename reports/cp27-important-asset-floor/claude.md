@@ -32,3 +32,6 @@ Release gate for this change
 
 Verification
 - Full suite on a private virtual display: 1,171 tests, all passing. Runner: ruff, bandit, semgrep and gitleaks 0 findings; 49 suppressions, all in the baseline (none added). The raw tool output is not archived, as in CP23.
+
+Verification
+- Full suite on a private virtual display: 1,171 tests, all passing. Runner: ruff, bandit, semgrep and gitleaks 0 findings; 49 suppressions, all in the baseline (none added). The raw tool output is not archived, as in CP23.
