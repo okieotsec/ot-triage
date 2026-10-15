@@ -1110,8 +1110,10 @@ class ReviewFixTests(Case):
         self.assertNotIn(-1, reads)
 
     def test_a_refused_file_is_closed_again(self):
-        with mock.patch("os.close", wraps=os.close) as closer:
-            self.refusal(self.dir)
+        # A regular file that opens and is then refused (a folder cannot even be opened on Windows)
+        path = self.write("big.csv", "plugin id,name\n" + "1,x\n" * 50)
+        with mock.patch.object(si, "MAX_FILE_BYTES", 10), mock.patch("os.close", wraps=os.close) as closer:
+            self.assertIn("larger than", self.refusal(path))
         self.assertTrue(closer.called)
 
 

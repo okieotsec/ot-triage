@@ -97,3 +97,5 @@ Release gate for this change
 | The independent report is archived unchanged | reports/independent-review-codex/ (byte-identical copy) | Yes |
 | Open findings stated, with a recommendation | CP23-02, -05 (older loaders), -06 (rest), -07 | Yes, awaiting the owner |
 | Documentation corrected where a claim was wrong | README, SECURITY.md, plan, RELEASING.md, SECURITY_FRAMEWORKS.md | Yes |
+
+Addendum (CI on Windows, 2026-10-15): one test of this checkpoint, the one proving a refused input file is closed again, failed on Windows with Python 3.12 and 3.14 and passed on Linux. It used a folder as the refused input; Windows cannot open a folder at all, so no file was ever opened and nothing needed closing. The importer was right and the test assumed Linux behaviour. The test now uses a regular file that opens and is refused for its size (the limit lowered for the test), and a mutation check removing the close is caught. No application code changed.
