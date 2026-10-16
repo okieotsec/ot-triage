@@ -110,9 +110,9 @@
     },
     "component": {
       "type": "application",
-      "bom-ref": "pkg:github/okieotsec/ot-triage@0.9.1",
+      "bom-ref": "pkg:github/okieotsec/ot-triage@0.10.0",
       "name": "ot-triage",
-      "version": "0.9.1",
+      "version": "0.10.0",
       "description": "Now / Next / Never triage for OT/ICS vulnerabilities",
       "supplier": {
         "name": "OkieOTSec",
@@ -127,7 +127,7 @@
           }
         }
       ],
-      "purl": "pkg:github/okieotsec/ot-triage@0.9.1",
+      "purl": "pkg:github/okieotsec/ot-triage@0.10.0",
       "externalReferences": [
         {
           "type": "vcs",
@@ -147,7 +147,7 @@
   "components": [],
   "dependencies": [
     {
-      "ref": "pkg:github/okieotsec/ot-triage@0.9.1",
+      "ref": "pkg:github/okieotsec/ot-triage@0.10.0",
       "dependsOn": []
     }
   ]
