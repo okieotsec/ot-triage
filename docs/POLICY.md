@@ -71,7 +71,7 @@ NEVER does not mean "safe". It means "not worth a scheduled fix under today's co
 
 **Why.** Decision 3 only covered *exposed* crown jewels. A 9.8 on a crown jewel with Low exposure and strong controls was NEVER, because strong controls lowered NEXT by one level. That depends on two claims that nobody checks: that exposure really is Low, and that the controls really are strong. If either is wrong, "never fix" is the wrong answer on the most important asset. NEXT puts the item on a schedule so a person has to make a conscious decision, which is the same reason as decision 3.
 
-**What stays the same.** Strong controls still lower the ordering score by 1.0, so the item ranks below the same item with no controls. Important and standard assets are not affected, and a crown jewel under 7.0 can still be NEVER.
+**What stays the same.** Strong controls still lower the ordering score by 1.0, so the item ranks below the same item with no controls. Standard assets are not affected, important assets have their own, higher line (decision 8), and a crown jewel under 7.0 can still be NEVER.
 
 **What it replaced.** Before, CVSS 9.8 / no known exploitation / crown jewel / low exposure / strong controls was NEVER.
 
@@ -86,6 +86,16 @@ NEVER does not mean "safe". It means "not worth a scheduled fix under today's co
 **Rule.** When the vector's attack vector is Network (or the vector's modified attack vector says Network) and Network exposure is Low, Assess shows a note under the exposure control and adds an "Exposure check" line to the reasoning and the summaries, and Batch adds the line to the row's details and an `exposure_check` export column. The note says that Low must be verified by testing, and that any device that can reach the asset on the network could attack it.
 
 **Why.** The attack vector says how the flaw is reached. A flaw that is attackable over a network is a reason to doubt a Low exposure that was assumed rather than tested (decision 2). A rule that moved the bucket from the vector would count the exposure input twice, so it is a note only. It can be made a rule later, with its own tests, once real exports show how often it matters.
+
+### 8. An important asset with a critical CVSS score is never NEVER (approved 2026-10-15)
+
+**Rule.** An important asset with CVSS of 9.0 or more (the "Critical" line in the settings) is at least NEXT, at any exposure and with any compensating controls. A standard asset has no such floor, and an important asset under 9.0 can still be NEVER.
+
+**Why.** After decision 5 an important asset with a 9.8, Low exposure and strong controls was still NEVER, on the strength of one claim ("strong controls") that nothing in the tool checks. The frameworks that OT teams use do not let a controls claim make a flaw disappear: CVSS lets a segmented component's attack vector be scored as Adjacent only when there is high confidence it is unavailable from the internet, and the effect is modest; CISA's SSVC has no "never" outcome (its lowest one, Track, keeps the item under review); and IEC TR 62443-2-3 expects every deferred patch to be documented and justified with its compensating controls. NEXT puts the item on a schedule so a person has to decide, which is what those documents ask for. The bar is higher than for a crown jewel (9.0 instead of 7.0) because the asset matters less.
+
+**What stays the same.** Strong controls still lower the ordering score by 1.0. The change reaches one corner only: important asset, no known exploitation, CVSS 9.0 or more, strong controls (without strong controls such an item is already NEXT).
+
+**What it replaced.** Before, CVSS 9.8 / no known exploitation / important asset / low exposure / strong controls was NEVER.
 
 ## Things that deliberately do not decide a bucket
 
@@ -112,7 +122,8 @@ Generated from the current rules.
 | Same, end-of-life device with strong controls | 8.0 | None | Standard | Low | Strong | End of life | **NEXT** |
 | Active, reachable, strong controls | 9.0 | Active | Standard | High | Strong | Available | **NEXT** |
 | High CVSS crown jewel, low exposure, strong controls | 9.8 | None | Crown | Low | Strong | Available | **NEXT** |
-| Same, but an important asset | 9.8 | None | Important | Low | Strong | Available | **NEVER** |
+| Important asset, same inputs | 9.8 | None | Important | Low | Strong | Available | **NEXT** |
+| Important asset just under the critical line | 8.9 | None | Important | Low | Strong | Available | **NEVER** |
 
 ## Properties the tests enforce
 
@@ -123,7 +134,7 @@ Generated from the current rules.
 - **CISA ICS advisories never change a priority or an ordering score**: the same item with and without the advisories loaded gives identical results.
 - **Boundaries** sit exactly where documented: 4.0, 7.0 and 9.0 use "greater than or equal to".
 - **The action agrees with the bucket:** for every combination of inputs, the action starts with "No scheduled fix" if and only if the result is NEVER.
-- **A crown jewel with CVSS of 7.0 or more is never NEVER**, whatever the exposure, controls or patch status.
+- **A crown jewel with CVSS of 7.0 or more, and an important asset with CVSS of 9.0 or more, is never NEVER**, whatever the exposure, controls or patch status.
 
 ## When to revisit
 

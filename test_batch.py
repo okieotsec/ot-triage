@@ -154,6 +154,39 @@ class FormulaSafetyTests(unittest.TestCase):
                 self.assertFalse(value.startswith(tuple("=+-@\t\r")), value)
 
 
+class NotATextFileTests(unittest.TestCase):
+    """A file that is not a UTF-8 CSV is refused with a sentence, never with a codec message or a traceback."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = tmp.name
+
+    def write(self, name, data):
+        path = os.path.join(self.dir, name)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        return path
+
+    def test_a_binary_file_is_refused_with_a_message_about_utf_8(self):
+        path = self.write("a.csv", b"%PDF-1.7\n\xe2\xe3\xcf\xd3\n1 0 obj\n" + bytes(range(128, 255)) * 5)
+        for read in (batch.read_rows, batch.has_cve_column, batch.process_file):
+            with self.subTest(read.__name__), self.assertRaisesRegex(ValueError, "not a UTF-8 text file") as caught:
+                read(path)
+            self.assertNotIn("codec", str(caught.exception))
+
+    def test_a_cell_too_large_for_the_csv_reader_is_refused_with_a_message(self):
+        path = self.write("b.csv", b"cvss,threat,asset,exposure\n" + b"x" * 300_000 + b",none,standard,low\n")
+        with self.assertRaisesRegex(ValueError, "not a valid CSV file"):
+            batch.read_rows(path)
+
+    def test_a_good_file_and_an_empty_file_behave_as_before(self):
+        good = self.write("c.csv", b"cvss,threat,asset,exposure\n5,none,standard,low\n")
+        self.assertEqual(len(batch.read_rows(good)), 1)
+        with self.assertRaisesRegex(ValueError, "file is empty"):
+            batch.read_rows(self.write("d.csv", b""))
+
+
 class RankingTests(unittest.TestCase):
     @staticmethod
     def item(line, cvss, threat, asset, exposure):
@@ -634,7 +667,7 @@ class ExposureCheckTests(unittest.TestCase):
         plain, networked = self.export([{**self.ROW, "cvss": "9.8"}, {**self.ROW, "cvss_vector": self.NETWORK}])
         by_vector = {r["cvss_vector"]: r for r in (plain, networked)}
         with_note, without = by_vector[self.NETWORK], by_vector[""]
-        self.assertIn("Confirm Low by testing", with_note["exposure_check"])
+        self.assertIn("Confirm the isolation by testing", with_note["exposure_check"])
         self.assertEqual(without["exposure_check"], "")
         for column in ("priority", "ordering_score", "action", "rationale"):
             self.assertEqual(with_note[column], without[column], column)

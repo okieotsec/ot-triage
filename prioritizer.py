@@ -221,6 +221,13 @@ def prioritize(cvss, threat, asset, exposure, controls=Controls.NONE, patch=Patc
         reasons.append(f"Floored at NEXT: crown jewel with CVSS >= {_fmt(high)}, whatever the exposure or controls")
         notes.append(Factor("Floored at NEXT: high-CVSS crown jewel", "raise"))
 
+    # An important asset with a critical CVSS score is never left at NEVER either (controls alone cannot decide that)
+    if asset is Asset.IMPORTANT and cvss >= critical and priority == NEVER:
+        priority = NEXT
+        reasons.append(f"Floored at NEXT: important asset with CVSS >= {_fmt(critical)}, whatever the exposure or "
+                       "controls")
+        notes.append(Factor("Floored at NEXT: critical-CVSS important asset", "raise"))
+
     # The action must agree with the bucket: NEVER means no scheduled fix
     if priority == NEVER:
         action = NEVER_ACTIONS[patch]

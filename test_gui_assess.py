@@ -348,7 +348,7 @@ class AssessVectorTests(AssessTestCase):
         self.fill("", Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
         self.assertEqual(self.hint(), "")
         self.paste(V31)
-        self.assertIn("Confirm Low by testing", self.hint())
+        self.assertIn("Confirm the isolation by testing", self.hint())
         self.assertEqual(self.view.badge.cget("text"), "NEXT")      # crown jewel, 9.8: the floor, not the note
         self.assertIn("Exposure check: ", self.view.reasoning_text.cget("text"))
         self.view.copy_summary()
@@ -362,7 +362,7 @@ class AssessVectorTests(AssessTestCase):
         self.assertEqual(self.hint(), "")
         self.assertNotIn("Exposure check", self.view.reasoning_text.cget("text"))
         self.fill("9.8", Threat.NONE, Asset.CROWN, Exposure.LOW, Controls.STRONG)
-        self.assertIn("Confirm Low", self.hint())
+        self.assertIn("Confirm the isolation", self.hint())
         self.paste(V31.replace("AV:N", "AV:L"))
         self.assertEqual(self.hint(), "")
 

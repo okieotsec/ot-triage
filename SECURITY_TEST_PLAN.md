@@ -89,7 +89,7 @@ Run at every checkpoint. Attach full output. `python tools/security_checks.py re
 - `osv-scanner --lockfile=requirements.txt --format json > reports/osv.json`
 - For each third-party package, record: name, pinned version, license, maintainer activity (last release date), and why it's needed. Flag any package with no release in two years, a recent ownership change, or a name close to a popular package.
 - Prefer the standard library where practical (e.g. `urllib` over adding a new HTTP library). Every new dependency needs a one-line justification in the review.
-- Confirm runtime dependencies are pinned with hashes (`pip-compile --generate-hashes` or equivalent) and install with `pip install --require-hashes`. There are none today. The development tools in CI (ruff, bandit, semgrep, zizmor, hypothesis) are pinned by exact version but **not by hash**: that is an open item (docs/SECURITY_FRAMEWORKS.md).
+- Confirm runtime dependencies are pinned with hashes (`pip-compile --generate-hashes` or equivalent) and install with `pip install --require-hashes`. There are none today. The development tools in CI (ruff, bandit, semgrep, zizmor, hypothesis) are pinned by exact version but **not by hash**: that is a deliberate deferral (CP23-07, decided 2026-10-15; see reports/cp23-independent-review-fixes), to be reconsidered if a CI job gains write access or the list of tools grows.
 
 **SBOM**
 - Generate a CycloneDX SBOM from the locked environment: `cyclonedx-py environment -o sbom/sbom.cdx.json` (in a clean virtual environment containing only the app's dependencies).

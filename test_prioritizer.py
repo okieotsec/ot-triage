@@ -48,8 +48,32 @@ class PrioritizeTests(unittest.TestCase):
     def test_the_crown_jewel_floor_leaves_other_assets_and_lower_scores_alone(self):
         self.assertEqual(p(6.9, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEVER)
         self.assertEqual(p(6.9, Threat.NONE, Asset.CROWN, Exposure.MEDIUM, True), NEVER)
-        self.assertEqual(p(9.8, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEVER)
+        self.assertEqual(p(8.9, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEVER)
         self.assertEqual(p(9.8, Threat.NONE, Asset.STANDARD, Exposure.LOW, True), NEVER)
+        self.assertEqual(p(10.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, True), NEVER)
+
+    def test_critical_cvss_important_asset_is_never_never_at_any_exposure_or_controls(self):
+        for exposure, controls, patch in itertools.product(Exposure, Controls, Patch):
+            for score in (9.0, 9.8, 10.0):
+                self.assertNotEqual(p(score, Threat.NONE, Asset.IMPORTANT, exposure, controls, patch), NEVER,
+                                    (score, exposure, controls, patch))
+
+    def test_the_important_asset_floor_is_at_the_critical_line_and_follows_the_setting(self):
+        self.assertEqual(p(9.0, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEXT)
+        self.assertEqual(p(8.9, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEVER)
+        settings = Settings(cvss_high=7.0, cvss_critical=9.5)
+        for score, expected in ((9.4, NEVER), (9.5, NEXT)):
+            self.assertEqual(prioritize(score, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, Controls.STRONG,
+                                        Patch.AVAILABLE, settings).priority, expected, score)
+
+    def test_the_important_asset_floor_is_explained_and_strong_controls_still_rank_it_lower(self):
+        strong = prioritize(9.8, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, Controls.STRONG)
+        none = prioritize(9.8, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, Controls.NONE)
+        self.assertEqual((strong.priority, none.priority), (NEXT, NEXT))
+        self.assertLess(strong.score, none.score)
+        self.assertTrue(any("Floored at NEXT: important asset with CVSS >= 9.0" in r for r in strong.reasons))
+        self.assertIn("Floored at NEXT: critical-CVSS important asset", [f.label for f in strong.factors])
+        self.assertFalse(any("important asset" in r for r in none.reasons))
 
     def test_the_crown_jewel_floor_follows_the_high_cvss_setting(self):
         settings = Settings(cvss_high=8.0, cvss_critical=9.0)
@@ -246,6 +270,10 @@ class BoundaryTests(unittest.TestCase):
     def test_end_of_life_floor_at_7(self):
         self.assertEqual(p(7.0, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEXT)
         self.assertEqual(p(6.9, Threat.NONE, Asset.STANDARD, Exposure.LOW, True, Patch.EOL), NEVER)
+
+    def test_important_asset_floor_at_9(self):
+        self.assertEqual(p(9.0, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEXT)
+        self.assertEqual(p(8.9, Threat.NONE, Asset.IMPORTANT, Exposure.LOW, True), NEVER)
 
     def test_crown_jewel_floor_at_7(self):
         self.assertEqual(p(7.0, Threat.NONE, Asset.CROWN, Exposure.LOW, True), NEXT)
