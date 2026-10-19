@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>demo ui check</title></head>
+<body>
+<iframe id="page" src="../demo/index.html" width="1000" height="1400"></iframe>
+<pre id="report">RUNNING</pre>
+<script>
+// Drives the real demo page the way a person would and writes PASS or the problems into #report.
+// Run through test_demo.py (headless Chromium with --allow-file-access-from-files); it opens no window.
+(function () {
+  "use strict";
+  var problems = [];
+  function check(ok, message) { if (!ok) { problems.push(message); } }
+  var frame = document.getElementById("page");
+  frame.addEventListener("load", function () {
+    try {
+      var d = frame.contentDocument, w = frame.contentWindow;
+      function $(id) { return d.getElementById(id); }
+      function press(i) { d.querySelectorAll("#presets button")[i].click(); }
+      function type(id, value) { $(id).value = value; $(id).dispatchEvent(new w.Event("input", {bubbles: true})); }
+      function choose(name, value) { d.querySelector('input[name="' + name + '"][value="' + value + '"]').click(); }
+
+      check($("badge").textContent === "NEXT", "the default answer should be NEXT, got " + $("badge").textContent);
+      check($("version").textContent.length > 0, "the version is not shown");
+      check(d.querySelectorAll("#presets button").length === 5, "expected five examples");
+
+      press(1);   // 9.8 on an isolated crown jewel with strong controls, vector Network
+      check($("cvss").value === "9.8" && $("vector").value === "network", "the example did not fill the form");
+      check($("badge").textContent === "NEXT", "example 2 should be NEXT, got " + $("badge").textContent);
+      check(!$("exposure-note").hidden && $("exposure-note").textContent.indexOf("asserts") > -1,
+        "example 2 should show the exposure note");
+      check($("bar-badge").textContent === "NEXT", "the bottom bar should follow the answer");
+
+      press(2);   // 8.9 on an important asset behind strong controls
+      check($("badge").textContent === "NEVER", "example 3 should be NEVER, got " + $("badge").textContent);
+      check($("action").textContent.indexOf("No scheduled fix") === 0, "a NEVER answer must not say to apply the patch now");
+      check($("exposure-note").hidden, "example 3 has no vector, so no note");
+
+      press(0);
+      check($("badge").textContent === "NOW", "example 1 should be NOW, got " + $("badge").textContent);
+      check(d.querySelectorAll("#whatif li").length >= 1, "the what-would-change list is empty");
+
+      ["abc", "", "11", "-1", "NaN", "1e3"].forEach(function (bad) {
+        type("cvss", bad);
+        check(!$("problem").hidden && $("answer").hidden, "'" + bad + "' should be refused");
+      });
+      type("cvss", "8.04");
+      check($("problem").hidden && !$("answer").hidden, "8.04 should be accepted");
+      check(d.querySelector("#chips li").textContent.indexOf("8.0") > -1 || $("chips").textContent.indexOf("CVSS 8.0") > -1,
+        "8.04 should be used as 8.0");
+
+      // a score is used to one decimal place, as the application does: 6.96 is 7.0, which is on the High line
+      choose("threat", "none"); choose("asset", "standard"); choose("exposure", "medium"); choose("controls", "none");
+      choose("patch", "available");
+      type("cvss", "6.96");
+      check($("badge").textContent === "NEXT", "6.96 should be read as 7.0 (NEXT), got " + $("badge").textContent);
+      type("cvss", "6.94");
+      check($("badge").textContent === "NEVER", "6.94 should be read as 6.9 (NEVER), got " + $("badge").textContent);
+
+      type("cvss", "9.8");
+      $("vector").value = "network";
+      choose("asset", "crown"); choose("controls", "strong"); choose("exposure", "low");
+      check(!$("exposure-note").hidden, "Low exposure with a Network vector should show the note");
+      choose("exposure", "medium");
+      check($("exposure-note").hidden, "Medium exposure should hide the note");
+      choose("exposure", "low");
+      $("vector").value = "local";
+      $("vector").dispatchEvent(new w.Event("change", {bubbles: true}));
+      check($("exposure-note").hidden, "a Local vector should hide the note");
+
+      // the page must not have made the answer depend on anything but the form
+      check(!d.querySelector("script:not([src])"), "the page should have no inline script");
+      check(!d.querySelector("[style]"), "the page should have no inline styles");
+    } catch (error) {
+      problems.push("the page threw: " + error);
+    }
+    document.getElementById("report").textContent = problems.length ? "FAIL\n" + problems.join("\n") : "PASS";
+  });
+})();
+</script>
+</body>
+</html>

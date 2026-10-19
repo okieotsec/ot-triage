@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="description" content="Try the OT Triage rules in your browser: NOW, NEXT or NEVER for one vulnerability on one asset, with the reasons.">
+<title>OT Triage: try the rules</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">OT Triage by OkieOTSec</p>
+    <h1>Try the rules</h1>
+    <p class="lead">Answer six questions about one vulnerability on one asset and see whether it is <strong>NOW</strong>,
+    <strong>NEXT</strong> or <strong>NEVER</strong>, and why. This page runs the same rules as the OT Triage
+    application, in your browser.</p>
+    <p class="notice">This is a small demo. Everything stays on this page: nothing you enter is sent, stored or logged,
+    and the page loads nothing from other sites. It uses the default settings and the answers you choose. The
+    application also looks up CISA's KEV catalog and EPSS, reads scanner exports and ranks whole files. Do not make
+    decisions from this page.</p>
+  </header>
+
+  <div class="layout">
+    <form id="inputs" autocomplete="off" novalidate>
+      <section class="card" aria-labelledby="h-vuln">
+        <h2 id="h-vuln">Vulnerability</h2>
+        <div class="field">
+          <label for="cvss">CVSS base score</label>
+          <input id="cvss" name="cvss" type="number" inputmode="decimal" min="0" max="10" step="0.1" value="8.0">
+          <p class="help" id="cvss-help">A number from 0.0 to 10.0, to one decimal place.</p>
+        </div>
+        <div class="field">
+          <label for="vector">Attack vector in the CVSS vector (optional)</label>
+          <select id="vector" name="vector">
+            <option value="">Not given</option>
+            <option value="network">Network (AV:N)</option>
+            <option value="adjacent">Adjacent (AV:A)</option>
+            <option value="local">Local (AV:L)</option>
+            <option value="physical">Physical (AV:P)</option>
+          </select>
+          <p class="help">Only used for a reminder about Low exposure. It never changes the answer.</p>
+        </div>
+        <fieldset class="field" data-name="threat">
+          <legend>Threat</legend>
+          <div class="choices">
+            <label><input type="radio" name="threat" value="none" checked><span>None</span></label>
+            <label><input type="radio" name="threat" value="public"><span>Public exploit</span></label>
+            <label><input type="radio" name="threat" value="active"><span>Active</span></label>
+          </div>
+          <p class="help">None: no known exploitation. Public exploit: a public or likely exploit. Active: attackers are
+          using it now (for example, it is in CISA's KEV catalog). The application fills this in from KEV and EPSS data.</p>
+        </fieldset>
+      </section>
+
+      <section class="card" aria-labelledby="h-asset">
+        <h2 id="h-asset">Asset and environment</h2>
+        <fieldset class="field" data-name="asset">
+          <legend>Asset criticality</legend>
+          <div class="choices">
+            <label><input type="radio" name="asset" value="standard" checked><span>Standard</span></label>
+            <label><input type="radio" name="asset" value="important"><span>Important</span></label>
+            <label><input type="radio" name="asset" value="crown"><span>Crown jewel</span></label>
+          </div>
+          <p class="help">Crown jewel: assets whose compromise would stop operations or endanger safety. Important:
+          significant but not critical. Standard: everything else.</p>
+        </fieldset>
+        <fieldset class="field" data-name="exposure">
+          <legend>Network exposure</legend>
+          <div class="choices">
+            <label><input type="radio" name="exposure" value="low"><span>Low</span></label>
+            <label><input type="radio" name="exposure" value="medium" checked><span>Medium</span></label>
+            <label><input type="radio" name="exposure" value="high"><span>High</span></label>
+          </div>
+          <p class="help">Low means no routable path from IT or the internet, verified by testing, not assumed from a
+          firewall's existence. If you are unsure, choose Medium.</p>
+        </fieldset>
+        <p class="note" id="exposure-note" hidden></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-fix">
+        <h2 id="h-fix">Remediation and mitigation</h2>
+        <fieldset class="field" data-name="patch">
+          <legend>Patch status</legend>
+          <div class="choices">
+            <label><input type="radio" name="patch" value="available" checked><span>Available</span></label>
+            <label><input type="radio" name="patch" value="pending"><span>Pending</span></label>
+            <label><input type="radio" name="patch" value="eol"><span>None (end of life)</span></label>
+          </div>
+          <p class="help">Pending means the vendor supports the product and a fix is on the way. End of life means no fix
+          will ever ship.</p>
+        </fieldset>
+        <fieldset class="field" data-name="controls">
+          <legend>Compensating controls</legend>
+          <div class="choices">
+            <label><input type="radio" name="controls" value="none" checked><span>None</span></label>
+            <label><input type="radio" name="controls" value="partial"><span>Partial</span></label>
+            <label><input type="radio" name="controls" value="strong"><span>Strong</span></label>
+          </div>
+          <p class="help">Strong: segmentation, virtual patching or allow-listing that actually stops the attack. Partial:
+          ACLs or monitoring only. Partial controls rank the item lower inside its bucket but never change the bucket.</p>
+        </fieldset>
+      </section>
+
+      <section class="card" aria-labelledby="h-try">
+        <h2 id="h-try">Or start from an example</h2>
+        <div class="presets" id="presets"></div>
+      </section>
+    </form>
+
+    <div class="results" id="results" aria-live="polite">
+      <section class="card" aria-labelledby="h-priority">
+        <h2 id="h-priority">Priority</h2>
+        <p class="problem" id="problem" hidden></p>
+        <div id="answer">
+          <div class="verdict">
+            <div class="badge" id="badge" data-bucket="">-</div>
+            <div>
+              <p class="headline" id="headline"></p>
+              <p class="sub" id="sub"></p>
+            </div>
+          </div>
+          <div class="score">
+            <label for="score">Ordering score</label>
+            <meter id="score" min="0" max="10" value="0"></meter>
+            <output id="score-text"></output>
+          </div>
+          <p class="help">The ordering score ranks items inside a bucket; it never decides the bucket.</p>
+          <ul class="chips" id="chips"></ul>
+        </div>
+      </section>
+      <section class="card" id="action-card" aria-labelledby="h-action">
+        <h2 id="h-action">Recommended action</h2>
+        <p id="action"></p>
+      </section>
+      <section class="card" id="reasons-card" aria-labelledby="h-reasons">
+        <h2 id="h-reasons">Why</h2>
+        <ul id="reasons"></ul>
+      </section>
+      <section class="card" id="whatif-card" aria-labelledby="h-whatif">
+        <h2 id="h-whatif">What would change this?</h2>
+        <ul id="whatif"></ul>
+      </section>
+    </div>
+  </div>
+
+  <div class="bar" id="bar" aria-hidden="true">
+    <span class="bar-badge" id="bar-badge" data-bucket=""></span>
+    <span id="bar-text"></span>
+  </div>
+
+  <footer>
+    <p>Rules as of OT Triage <span id="version"></span>. A test compares this page with the application's rules for
+    thousands of inputs, so the two give the same answers.
+    <a href="https://github.com/okieotsec/ot-triage/blob/main/docs/POLICY.md">Why the rules work this way</a> ·
+    <a href="https://github.com/okieotsec/ot-triage">Get OT Triage (free, open source)</a></p>
+    <p class="fine">MIT licensed code. The OkieOTSec name and logo are not part of that license.</p>
+  </footer>
+</main>
+<script src="rules.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

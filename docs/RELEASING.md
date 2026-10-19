@@ -4,10 +4,11 @@ How a release of OT Triage is made, so that anyone can check what was published.
 
 ## Steps
 
-1. **Prepare:** a pull request bumps `version.py`, regenerates the SBOM (`python3 tools/make_sbom.py`, which needs `pip install cyclonedx-bom`) and dates the changelog's "Unreleased" section. All CI checks must pass before it is merged.
+1. **Prepare:** a pull request bumps `version.py` **and `VERSION` in `demo/rules.js`, then regenerates `demo/golden.json` (`python3 tools/make_demo_golden.py`)**, regenerates the SBOM (`python3 tools/make_sbom.py`, which needs `pip install cyclonedx-bom`) and dates the changelog's "Unreleased" section. All CI checks must pass before it is merged.
 2. **Tag:** an annotated tag `v<version>` on the merge commit, made under the project's own identity.
 3. **Build the bundle:** pushing the tag starts the *Release bundle* workflow, which builds `dist/ot-triage-<version>.zip` and its `.sha256` file with `python3 tools/make_bundle.py`, records a signed build-provenance attestation for the zip, and keeps the files as a workflow artifact for 30 days. It does not create the release. To build locally instead, run the same command from a clean checkout of the tag.
 4. **Check, then publish:** download the workflow artifact, run `gh attestation verify ot-triage-<version>.zip --repo okieotsec/ot-triage`, and confirm that the checksum matches a local rebuild from the tag. Then make the GitHub release for the tag with the notes from the changelog and three files attached: the bundle, its `.sha256` file, and the SBOM (`ot-triage-<version>.cdx.json`).
+5. **Publish the demo:** copy `demo/index.html`, `style.css`, `rules.js` and `app.js` into the website repository's `ot-triage-demo/` folder and open a pull request there (the page names the version of the rules it shows). See [demo/README.md](../demo/README.md).
 
 ## What the bundle contains
 

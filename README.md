@@ -19,6 +19,8 @@ answers **NOW**, **NEXT** or **NEVER**, shows *why* in plain language, and shows
 answer. It pulls in CISA's Known Exploited Vulnerabilities (KEV) catalog and EPSS scores, including CISA's own
 advisory links, shows which CISA ICS advisories name a CVE, and ranks whole spreadsheets of findings in one go.
 
+**Try the rules in your browser:** [okieotsec.com/ot-triage-demo](https://okieotsec.com/ot-triage-demo/) (a small page, nothing leaves it; the source is in [demo/](demo/README.md)).
+
 ![The Assess view: a crown-jewel asset with an actively exploited CVE is NOW, with the reasons, CISA's required action and its reference links](docs/images/assess-dark.png)
 
 Pure standard library: no third-party dependencies. It works fully offline; the only network access is a
@@ -188,6 +190,7 @@ Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are reje
 | CP25 | Threat data downloads never go back in time; every file read is checked as a regular file | [reports/cp25-feed-rollback-and-file-checks](reports/cp25-feed-rollback-and-file-checks/claude.md) |
 | CP26 | Scanner import: Claroty xDome device-vulnerability pairs | [reports/cp26-claroty-import](reports/cp26-claroty-import/claude.md) |
 | CP27 | An important asset with a critical score is never NEVER; the exposure note's wording | [reports/cp27-important-asset-floor](reports/cp27-important-asset-floor/claude.md) |
+| CP28 | A browser demo of the rules, kept identical to the Python rules by test | [reports/cp28-browser-demo](reports/cp28-browser-demo/claude.md) |
 
 Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 
