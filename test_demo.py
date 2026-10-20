@@ -99,8 +99,8 @@ class StaticSafetyTests(unittest.TestCase):
     def test_there_are_no_inline_scripts_styles_or_event_handlers(self):
         page = text("index.html")
         self.assertEqual(re.findall(r"<script(?![^>]*\bsrc=)[^>]*>", page, flags=re.IGNORECASE), [])
-        self.assertNotRegex(page, r"\sstyle\s*=")
-        self.assertNotRegex(page, r"\son[a-z]+\s*=")
+        self.assertNotRegex(page, r"(?i)\sstyle\s*=")
+        self.assertNotRegex(page, r"(?i)\son[a-z]+\s*=")        # HTML is not case sensitive: ONCLICK= is a handler too
 
     def test_the_code_can_neither_send_nor_keep_nor_run_other_code(self):
         for name in ("rules.js", "app.js"):
