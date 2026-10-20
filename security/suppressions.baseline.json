@@ -11,6 +11,7 @@
   "test_cli.py|noqa|S603": 1,
   "test_cli.py|nosec|B404": 1,
   "test_cli.py|nosec|B603": 1,
+  "test_demo.py|noqa|S603": 2,
   "test_gui_app.py|noqa|SIM118": 1,
   "test_gui_assess.py|noqa|E731": 2,
   "test_gui_batch.py|noqa|E731": 1,

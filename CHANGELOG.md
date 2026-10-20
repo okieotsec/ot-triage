@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **A browser demo of the rules (CP28).** `demo/` is a small page that runs the NOW / NEXT / NEVER rules in the browser: six answers in, the bucket, the reasons, the recommended action and "what would change this?" out, with five examples to start from and the exposure check note. It loads nothing from other sites, sends and stores nothing (a Content Security Policy, no network calls, no storage, text written to the page only as text), and uses the default settings. It is a second copy of the rules in JavaScript, kept identical to the Python rules by a file of the Python answers for 2,916 inputs that the test suite compares it with, so a rule change that is not mirrored fails the build. The page is published on the OkieOTSec website; it is not part of the downloadable application. See demo/README.md.
+
 ## 0.10.0 (2026-10-15)
 
 - **Claroty xDome import (CP26).** `ot_triage_import.py` and Batch's **Import scan…** now read the Claroty xDome *device-vulnerability pairs* report, saved as CSV UTF-8 (open an `.xlsx` in Excel and use Save As). It was written from one Claroty report layout, so each run says that another layout may not be recognised. One finding per device and CVE, with the row's CVSS number (a row that names several CVEs gives each the row's score); rows with a resolution or patch-install date are skipped; rows Claroty marks *Potentially Relevant* are kept and marked ` [potentially relevant]` in the finding's name, and `--only-confirmed` leaves them out; the device's addresses go into the inventory's `name` column to help write an aliases file. Claroty's own risk scores, its *Actively Exploited* flag and its EPSS column are not used: the threat level still comes from KEV and EPSS data. A fictional sample (`samples/scanners/claroty/device_vulns.csv`, `sample_scan_claroty.csv` in the bundle) and its expected findings are included. See docs/IMPORT.md.
