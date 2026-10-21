@@ -138,6 +138,10 @@ Other columns are ignored. Header names accept common aliases, and enum cells ac
 
 Import limits: 25 MB and 50,000 data rows. Files with duplicate columns are rejected. Exported CSVs prefix text cells that start with `=`, `+`, `-`, `@`, tab or carriage return with `'` so spreadsheets do not run them as formulas.
 
+## Feedback and contributing
+
+Questions, bug reports and ideas are welcome as [issues](https://github.com/okieotsec/ot-triage/issues/new/choose); please use synthetic data only. Vulnerabilities go to the private **Report a vulnerability** button on the Security tab ([SECURITY.md](SECURITY.md)). To send a change, see [CONTRIBUTING.md](CONTRIBUTING.md): tests with every change, no new runtime dependencies, and rule changes are recorded in [docs/POLICY.md](docs/POLICY.md).
+
 ## Documentation
 
 - [docs/POLICY.md](docs/POLICY.md): the prioritization decisions and why
