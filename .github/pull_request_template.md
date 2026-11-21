@@ -1,3 +1,5 @@
+<!-- Code contributions from outside are not being accepted at this time; see CONTRIBUTING.md. This template is the maintainer's own checklist. -->
+
 ## What this changes and why
 
 ## Checklist

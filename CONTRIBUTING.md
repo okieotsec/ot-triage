@@ -1,7 +1,10 @@
 # Contributing to OT Triage
 
 Thank you for looking. OT Triage is a small, free, open-source project run by one maintainer on a best-effort basis, so
-please be patient: issues and pull requests are usually answered within a week or two.
+please be patient: issues are usually answered within a week or two.
+
+**Code contributions (pull requests) are not being accepted at this time.** Bug reports, questions, ideas and review findings
+are welcome as issues; see below.
 
 ## Reporting a bug
 
@@ -23,14 +26,20 @@ rule), say so: the rules are the product, and a rule change is decided by the ma
 [docs/POLICY.md](docs/POLICY.md) with its reason, and covered by tests before it is merged. A change to the ranking that is
 not in the policy will not be accepted, however small.
 
-## Sending a pull request
+## Code contributions
 
-1. Fork the repository and make a branch from `main`.
-2. Make the change, with the tests and documents below.
-3. Open a pull request against `main` and fill in the checklist. A pull request is merged only after the checks have passed and
-   the maintainer has reviewed it; changes are squash-merged.
+Pull requests from outside contributors are not being accepted for now. This is a small project whose one maintainer reads and
+decides every change, and the terms for accepting outside code have not been settled. A pull request may be closed without
+review; that is not a judgement of the change. If you have a fix in mind, describe it in an issue: the problem, where the code
+goes wrong and what you would change. This page will say so before any outside code is accepted.
 
-### What a pull request needs
+If you read the code and find a problem, an issue is welcome. A security problem goes through the private
+**Report a vulnerability** button instead (see [SECURITY.md](SECURITY.md)).
+
+## How changes are made in this project
+
+These are the standards every change meets, whether the maintainer or an AI assistant working to the maintainer's direction
+wrote it. The maintainer reviews each one before it is accepted.
 
 - **Tests.** Every new feature and every bug fix comes with a test that fails without the change. This is the project's test
   policy, and the reports in `reports/` show it being followed. The tests use the standard library's `unittest`: run
@@ -47,7 +56,7 @@ not in the policy will not be accepted, however small.
   [demo/README.md](demo/README.md)).
 - **No personal or real data.** No real host names, addresses, people, scanner output or credentials in code, samples, tests,
   reports or commit messages.
-- **Small and focused.** One change per pull request is much easier to review.
+- **Small and focused.** One change at a time is much easier to review.
 
 ## Security checks
 
@@ -58,5 +67,6 @@ application reads files or the network should say in the pull request how they w
 
 ## Licence
 
-By contributing you agree that your contribution is released under the project's [MIT licence](LICENSE). The OkieOTSec name
-and logo are not part of that licence.
+OT Triage is licensed under the GNU Affero General Public License v3.0 only (see [LICENSE](LICENSE) and
+[COPYRIGHT](COPYRIGHT)). The OkieOTSec name and logo are not part of that licence. Because code contributions are not being
+accepted, no contributor licence terms apply for now.
