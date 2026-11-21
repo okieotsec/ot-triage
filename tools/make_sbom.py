@@ -44,7 +44,7 @@ def application_component():
         "version": __version__,
         "description": "Now / Next / Never triage for OT/ICS vulnerabilities",
         "supplier": {"name": "OkieOTSec", "url": ["https://okieotsec.com"]},
-        "licenses": [{"license": {"id": "MIT"}}],
+        "licenses": [{"license": {"id": "AGPL-3.0-only"}}],
         "purl": BOM_REF,
         "externalReferences": [{"type": "vcs", "url": REPO},
                                {"type": "website", "url": "https://okieotsec.com/projects/"}],
