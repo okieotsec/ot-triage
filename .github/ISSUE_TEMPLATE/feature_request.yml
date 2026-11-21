@@ -1,0 +1,21 @@
+name: Feature request
+description: An idea for something OT Triage could do, or do better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If your idea changes how an item is prioritized (a bucket, a score or a rule), say so: rule changes are decided by the maintainer and recorded in docs/POLICY.md with the reason.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation first, then the change you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+    validations:
+      required: false
