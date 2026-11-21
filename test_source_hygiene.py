@@ -35,9 +35,12 @@ class SourceHygieneTests(unittest.TestCase):
             self.assertFalse(path.read_bytes().startswith(b"\xef\xbb\xbf"), path.name)
 
     def test_no_personal_name_or_home_folder_path_is_in_any_file_of_the_repository(self):
-        # Built from pieces so this test does not contain what it forbids. The project is published under a handle.
-        forbidden = ("ja" + "red", "frit" + "ts", "/ho" + "me/")
-        suffixes = {".py", ".md", ".json", ".html", ".yml", ".yaml", ".toml", ".txt", ".js", ".csv"}
+        # Built from pieces so this test does not contain what it forbids. The project is published under a handle; the owner is named
+        # as the copyright holder in COPYRIGHT and in no other file. A home folder path is forbidden everywhere. Files with no suffix
+        # (LICENSE, COPYRIGHT) are checked too.
+        names = ("ja" + "red", "frit" + "ts")
+        forbidden = names + ("/ho" + "me/",)
+        suffixes = {"", ".py", ".md", ".json", ".html", ".yml", ".yaml", ".toml", ".txt", ".js", ".csv"}
         checked = 0
         for path in sorted(ROOT.rglob("*")):
             if (not path.is_file() or path.suffix not in suffixes
@@ -46,8 +49,14 @@ class SourceHygieneTests(unittest.TestCase):
             checked += 1
             text = path.read_text(encoding="utf-8", errors="replace").lower()
             for word in forbidden:
+                if word in names and path == ROOT / "COPYRIGHT":
+                    continue
                 self.assertNotIn(word, text, f"{path.relative_to(ROOT)} contains {word!r}")
         self.assertGreater(checked, 50)
+
+    def test_the_copyright_file_names_the_owner_as_the_holder(self):
+        text = (ROOT / "COPYRIGHT").read_text(encoding="utf-8").lower()
+        self.assertIn("copyright (c) 2026 " + "ja" + "red " + "frit" + "ts", text)
 
     def test_the_checks_themselves_catch_the_hostile_characters(self):
         for codepoint in (0x202E, 0x200B, 0xFEFF, 0x2066, 0x0410, 0xFF0F, 0x0663):

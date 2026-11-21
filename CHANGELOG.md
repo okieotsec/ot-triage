@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New versions are licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only); see `LICENSE` and `COPYRIGHT`. Everything committed before the change was released under the MIT License and remains available under those terms. Code contributions are not being accepted for now; issues are welcome.
+- Rewrote the statements about who makes OT Triage and what has been reviewed (README, `SECURITY.md`, the test plan and the framework assessment). They now describe the maintainer's own review and hands-on testing, which were done from the first release, and say that no independent third-party audit has been done. Added `REVIEW.md`, the review log, and a note in the README that OT Triage supports prioritization decisions and does not make them. No change to the program.
 - **A browser demo of the rules (CP28).** `demo/` is a small page that runs the NOW / NEXT / NEVER rules in the browser: six answers in, the bucket, the reasons, the recommended action and "what would change this?" out, with five examples to start from and the exposure check note. It loads nothing from other sites, sends and stores nothing (a Content Security Policy, no network calls, no storage, text written to the page only as text), and uses the default settings. It is a second copy of the rules in JavaScript, kept identical to the Python rules by a file of the Python answers for 2,916 inputs that the test suite compares it with, so a rule change that is not mirrored fails the build. The page is published on the OkieOTSec website; it is not part of the downloadable application. See demo/README.md.
 
 ## 0.10.0 (2026-10-15)
