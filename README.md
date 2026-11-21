@@ -10,7 +10,7 @@
 *OT Triage, an [OkieOTSec](https://okieotsec.com) project.*
 
 [![CI](https://github.com/okieotsec/ot-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/okieotsec/ot-triage/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 **Now / Next / Never triage for OT/ICS vulnerabilities**, by [OkieOTSec](https://okieotsec.com).
 
@@ -50,6 +50,20 @@ threat-data update that you start yourself.
     <td colspan="2" align="center"><em>CISA's ICS advisory for the CVE, with what the vendor says to do about it (here: CVE-2024-3400, from the advisory for a Siemens RUGGEDCOM device)</em></td>
   </tr>
 </table>
+
+## How this project is made
+
+OT Triage is designed and directed by me, an OT security practitioner (OkieOTSec). The ideas, designs and features are mine. I decide what it must do and make its prioritization decisions: the NOW / NEXT / NEVER rules, the floors that keep crown-jewel and important assets from being under-prioritized, and the requirement that "low exposure" means verified by testing, not assumed from a firewall. They are written down in [docs/POLICY.md](docs/POLICY.md). I supply the OT security knowledge behind them.
+
+I am not a professional developer. I write a small amount of the code myself, and I make suggestions and changes during testing and prototyping, but most of the code is written by an AI coding assistant (Anthropic's Claude, through Claude Code), working to my direction.
+
+**What I do to check it:**
+
+- I review the changes, using Claude Code to explain them until I understand what they do, and I confirm they behave as I intended. I read some of the code myself; I do not claim to read all of it.
+- I do hands-on security and interface testing, for example testing the limits of protections such as the file-size caps, and checking in the interface that the calculation rules give the intended results. I test manually before each release. I make the final decision on every security finding, which I track in DefectDojo, and I plan the work in a local Vikunja project board and mark it complete myself.
+- I have done this since the first release. A structured, recorded review process began in October 2026; see [REVIEW.md](REVIEW.md) for what is recorded and for what was written down later from memory.
+
+Automated checks, the tests and one independent review by another AI model supplement this (see [Security](#security) below). **No independent third-party security audit has been done.** My review and testing are real, but I am also the maintainer, so they are not independent.
 
 ## Run
 
@@ -128,6 +142,8 @@ Two CVSS lines in these rules (7.0 and 9.0, and both are also lines in rule 6) c
 
 **Low exposure** means no routable path from IT or the internet, verified by testing, not assumed from a firewall's existence.
 
+> **OT Triage supports prioritization decisions; it does not make them.** Its buckets come from the rules above and the information you give it. The asset owner remains responsible for each decision, for checking that its inputs are true, and for accepting any remaining risk.
+
 ## Batch CSV
 
 Required columns: `cvss` (or `cvss_vector`), `asset`, `exposure`, and `threat` (or `cve`). A `cvss_vector` column (CVSS 3.0, 3.1 or 4.0) supplies the score, and if it sets environmental metrics the environmental score is shown next to it for comparison (the priority uses the base score); see [docs/CVSS.md](docs/CVSS.md).
@@ -196,7 +212,7 @@ Questions, bug reports, ideas and review findings are welcome as [issues](https:
 | CP27 | An important asset with a critical score is never NEVER; the exposure note's wording | [reports/cp27-important-asset-floor](reports/cp27-important-asset-floor/claude.md) |
 | CP28 | A browser demo of the rules, kept identical to the Python rules by test | [reports/cp28-browser-demo](reports/cp28-browser-demo/claude.md) |
 
-Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: a hands-on check that needs a person (CP4), the absence of a human security audit (CP21; one independent AI review has been done and archived, CP23), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
+Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: the absence of an independent third-party security audit (CP21; one independent AI review has been done and archived, CP23; the manual interface checklist left open in CP4 has since been done by the maintainer), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 
 Techniques used:
 
@@ -215,4 +231,8 @@ Run `python3 -m unittest` for the test suite (see [docs/GUI_TESTING.md](docs/GUI
 
 ## License
 
-The code is released under the [MIT License](LICENSE). The OkieOTSec name and logo are not part of that licence: forks must not use them (see [assets/brand/README.md](assets/brand/README.md)). The CVSS v4.0 scoring tables come from FIRST under their own license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+OT Triage is licensed under the **GNU Affero General Public License v3.0 only** (AGPL-3.0-only); see [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT). If you distribute it, or let others use a modified version over a network, you must make your source available under the same licence. Everything committed before the licence change was released under the MIT License and remains available under those terms; see [COPYRIGHT](COPYRIGHT).
+
+Bug reports, questions and review findings are welcome as issues. Code contributions are not being accepted at this time.
+
+The OkieOTSec name and logo are not part of that licence: forks must not use them (see [assets/brand/README.md](assets/brand/README.md)). The CVSS v4.0 scoring tables come from FIRST under their own license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
