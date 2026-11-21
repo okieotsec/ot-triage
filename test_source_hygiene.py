@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+SKIPPED_FOLDERS = (".git", "__pycache__", ".ruff_cache", ".venv", ".mypy_cache", ".pytest_cache", ".hypothesis")
 # The only non-ASCII characters source code may contain: visible interface symbols.
 ALLOWED = {0x00B7, 0x2022, 0x2026, 0x25AC, 0x25B2, 0x25B8, 0x25BC, 0x25BE, 0x26A0, 0x2713, 0x2716}
 SOURCES = sorted([*ROOT.glob("*.py"), *(ROOT / "tools").glob("*.py"), *(ROOT / "tools").glob("*.js")])
@@ -35,16 +36,16 @@ class SourceHygieneTests(unittest.TestCase):
             self.assertFalse(path.read_bytes().startswith(b"\xef\xbb\xbf"), path.name)
 
     def test_no_personal_name_or_home_folder_path_is_in_any_file_of_the_repository(self):
-        # Built from pieces so this test does not contain what it forbids. The project is published under a handle; the owner is named
-        # as the copyright holder in COPYRIGHT and in no other file. A home folder path is forbidden everywhere. Files with no suffix
-        # (LICENSE, COPYRIGHT) are checked too.
+        # Built from pieces so this test does not contain what it forbids. The project is published under a handle.
+        # The owner is named as the copyright holder in COPYRIGHT and in no other file. A home folder path is
+        # forbidden everywhere. Files with no suffix (LICENSE, COPYRIGHT) are checked too, but tool caches are not.
         names = ("ja" + "red", "frit" + "ts")
         forbidden = names + ("/ho" + "me/",)
         suffixes = {"", ".py", ".md", ".json", ".html", ".yml", ".yaml", ".toml", ".txt", ".js", ".csv"}
         checked = 0
         for path in sorted(ROOT.rglob("*")):
             if (not path.is_file() or path.suffix not in suffixes
-                    or any(part in (".git", "__pycache__") for part in path.relative_to(ROOT).parts)):
+                    or any(part in SKIPPED_FOLDERS for part in path.relative_to(ROOT).parts)):
                 continue
             checked += 1
             text = path.read_text(encoding="utf-8", errors="replace").lower()
