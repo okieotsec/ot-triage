@@ -21,7 +21,7 @@ class SbomTests(unittest.TestCase):
         component = self.bom["metadata"]["component"]
         self.assertEqual((component["name"], component["version"], component["type"]), ("ot-triage", __version__,
                                                                                          "application"))
-        self.assertEqual(component["licenses"], [{"license": {"id": "MIT"}}])
+        self.assertEqual(component["licenses"], [{"license": {"id": "AGPL-3.0-only"}}])
         self.assertTrue(component["purl"].endswith(f"@{__version__}"))
         self.assertIn(__version__, component["bom-ref"], "regenerate it with tools/make_sbom.py after a version change")
 
