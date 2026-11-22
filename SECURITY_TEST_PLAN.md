@@ -1,7 +1,7 @@
 # Security Test Plan: OT Triage
 
 **Owner:** okieotsec (project lead, final approver)
-**Reviewers:** Claude Code (developer and reviewer), OpenAI Codex (independent reviewer), Google Gemini (independent reviewer). One independent review has been run and archived unchanged: OpenAI Codex, 2026-10-14, against release 0.9.0 (reports/independent-review-codex/, triaged in CP23). It is an AI review, not a human security audit, and Google Gemini has not yet been asked.
+**Reviewers:** Claude Code (developer and reviewer) and the owner, who reviews the changes, tests by hand and decides every finding (a structured, recorded process began in October 2026; see [REVIEW.md](REVIEW.md)). One independent AI review has been run and archived unchanged: OpenAI Codex, 2026-10-14, against release 0.9.0 (reports/independent-review-codex/, triaged in CP23). It is an AI review, not an independent human audit, and none has been done; a second AI reviewer (Google Gemini) has not yet been asked.
 **Applies to:** every release checkpoint below
 **Frameworks:** the plan follows the NIST Secure Software Development Framework (SSDF, SP 800-218 version 1.1) and organises its automation along MITRE's Security Automation Framework (SAF). [docs/SECURITY_FRAMEWORKS.md](docs/SECURITY_FRAMEWORKS.md) maps each practice to its evidence and lists what is still open.
 
@@ -229,4 +229,5 @@ AI reviewers can produce plausible but incorrect findings. Nothing is fixed or a
 - Atheris was run on the parsers, or the report records why not.
 - `SECURITY.md` published with: how to report a vulnerability and what response to expect, supported versions, what data the app downloads and from where, how to verify a release, and that it runs fully offline apart from user-started updates.
 - README links to the SBOM and summarizes the security testing performed.
+- The owner's release review is recorded in `REVIEW.md`: what was read, what was tested by hand, the findings decided, and the owner's sign-off. The README and `SECURITY.md` statement about who makes the project and what has been reviewed is present and true.
 - This plan and all checkpoint reports archived in the repository.
