@@ -1,0 +1,42 @@
+name: Bug report
+description: Something does not work, or gives a result you do not expect.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. **Use synthetic data only**: never attach real asset names, addresses, scanner exports or credentials. Vulnerabilities go to the private report button on the Security tab, not here (see SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: OT Triage version
+      description: Shown in the About view, or run `python3 ot_triage_cli.py --version`.
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system and Python version
+      placeholder: "Windows 11, Python 3.12"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A small invented input file, pasted here, helps most.
+    validations:
+      required: false
+  - type: checkboxes
+    id: no-real-data
+    attributes:
+      label: Data
+      options:
+        - label: I have not included real asset names, addresses, scanner output or credentials.
+          required: true
