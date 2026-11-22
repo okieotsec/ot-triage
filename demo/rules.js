@@ -5,7 +5,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "0.10.0";
+  var VERSION = "0.11.0";
   var NOW = "NOW", NEXT = "NEXT", NEVER = "NEVER";
   var ORDER = [NOW, NEXT, NEVER];
   var URGENCY = {NOW: 2, NEXT: 1, NEVER: 0};
