@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-11-21)
 
 - New versions are licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only); see `LICENSE` and `COPYRIGHT`. Everything committed before the change was released under the MIT License and remains available under those terms. Code contributions are not being accepted for now; issues are welcome.
 - Rewrote the statements about who makes OT Triage and what has been reviewed (README, `SECURITY.md`, the test plan and the framework assessment). They now describe the maintainer's own review and hands-on testing, which were done from the first release, and say that no independent third-party audit has been done. Added `REVIEW.md`, the review log, and a note in the README that OT Triage supports prioritization decisions and does not make them. No change to the program.
