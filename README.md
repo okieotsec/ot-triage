@@ -211,6 +211,7 @@ Questions, bug reports, ideas and review findings are welcome as [issues](https:
 | CP26 | Scanner import: Claroty xDome device-vulnerability pairs | [reports/cp26-claroty-import](reports/cp26-claroty-import/claude.md) |
 | CP27 | An important asset with a critical score is never NEVER; the exposure note's wording | [reports/cp27-important-asset-floor](reports/cp27-important-asset-floor/claude.md) |
 | CP28 | A browser demo of the rules, kept identical to the Python rules by test | [reports/cp28-browser-demo](reports/cp28-browser-demo/claude.md) |
+| CP29 | Release 0.11.0: the AGPL licence, the authorship statements and the verified attestation | [reports/cp29-release-0.11.0](reports/cp29-release-0.11.0/claude.md) |
 
 Across the checkpoints 55 findings were recorded (1 High, 5 Medium, 20 Low, 29 Info). Most were fixed or consciously accepted with a reason. Still open: the absence of an independent third-party security audit (CP21; one independent AI review has been done and archived, CP23; the manual interface checklist left open in CP4 has since been done by the maintainer), and four items from that review that wait for the owner's decision (CP23-02, the rest of -05, -06 and -07).
 
